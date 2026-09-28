@@ -1,0 +1,149 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Panel del Docente - EDUSMART{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <div>
+        <h1 style="font-size: 1.8rem; font-weight: 700;">Panel del Docente</h1>
+        <p style="color: var(--text-muted); font-size: 0.95rem;">Prof. {{ user.nombre_completo }} | {{ docente.especialidad }} ({{ docente.departamento }})</p>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <a href="{% url 'crear_tarea' %}" class="btn btn-primary">
+            <i class="fa-solid fa-plus"></i> Crear Nueva Tarea
+        </a>
+        <a href="{% url 'reporte_progreso' %}" class="btn btn-outline">
+            <i class="fa-solid fa-chart-line"></i> Reportes de Progreso
+        </a>
+    </div>
+</div>
+
+<!-- Key Performance Metrics -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.2rem; margin-bottom: 2rem;">
+    <div class="card" style="display: flex; align-items: center; gap: 1rem;">
+        <div style="background: rgba(79, 70, 229, 0.2); color: #818cf8; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+            <i class="fa-solid fa-book"></i>
+        </div>
+        <div>
+            <div style="font-size: 1.6rem; font-weight: 800; font-family: 'Outfit';">{{ total_cursos }}</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">Cursos Asignados</div>
+        </div>
+    </div>
+
+    <div class="card" style="display: flex; align-items: center; gap: 1rem;">
+        <div style="background: rgba(6, 182, 212, 0.2); color: #67e8f9; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+            <i class="fa-solid fa-tasks"></i>
+        </div>
+        <div>
+            <div style="font-size: 1.6rem; font-weight: 800; font-family: 'Outfit';">{{ total_tareas }}</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">Tareas Publicadas</div>
+        </div>
+    </div>
+
+    <div class="card" style="display: flex; align-items: center; gap: 1rem;">
+        <div style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+        <div>
+            <div style="font-size: 1.6rem; font-weight: 800; font-family: 'Outfit';">{{ total_entregas_pendientes }}</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">Entregas por Calificar</div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Grid -->
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+
+    <!-- Left Column: Tasks Management -->
+    <div>
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.8rem;">
+                <h3 style="font-size: 1.2rem; font-weight: 600;"><i class="fa-solid fa-list-check" style="color: var(--primary);"></i> Gestión de Tareas Académicas</h3>
+                <span style="font-size: 0.85rem; color: var(--text-muted);">Casos de Uso: Crear, Editar, Eliminar, Publicar</span>
+            </div>
+
+            {% if tareas %}
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                {% for t in tareas %}
+                <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.2rem; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <span class="status-tag" style="background: rgba(99, 102, 241, 0.2); color: #818cf8; margin-bottom: 4px;">
+                                {{ t.curso.nombre }} ({{ t.materia }})
+                            </span>
+                            <h4 style="font-size: 1.1rem; font-weight: 600; margin-top: 4px;">{{ t.titulo }}</h4>
+                        </div>
+                        <div style="display: flex; gap: 6px;">
+                            <a href="{% url 'ver_entregas' t.id %}" class="btn btn-primary btn-sm" title="Revisar Entregas">
+                                <i class="fa-solid fa-inbox"></i> Ver Entregas ({{ t.entregas.count }})
+                            </a>
+                            <a href="{% url 'editar_tarea' t.id %}" class="btn btn-outline btn-sm" title="Editar Tarea">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
+                            <a href="{% url 'eliminar_tarea' t.id %}" class="btn btn-outline btn-sm" style="color: #f87171;" onclick="return confirm('¿Confirma eliminar esta tarea?')" title="Eliminar Tarea">
+                                <i class="fa-solid fa-trash"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.4;">{{ t.descripcion|truncatewords:20 }}</p>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.05);">
+                        <span><i class="fa-regular fa-calendar-check"></i> Publicado: {{ t.fecha_publicacion|date:"d M Y, H:i" }}</span>
+                        <span><i class="fa-regular fa-clock"></i> Límite: <strong style="color: {% if t.esta_vencida %}#f87171{% else %}#34d399{% endif %};">{{ t.fecha_limite|date:"d M Y, H:i" }}</strong></span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="color: var(--text-muted); text-align: center; padding: 2rem;">No se han publicado tareas aún. Haz clic en "Crear Nueva Tarea" para comenzar.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Right Column: Recent Submissions & Course List -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+
+        <!-- Cursos Asignados -->
+        <div class="card">
+            <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;"><i class="fa-solid fa-graduation-cap" style="color: var(--secondary);"></i> Cursos a Cargo</h3>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                {% for c in cursos %}
+                <div style="padding: 10px; background: rgba(15, 23, 42, 0.4); border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: 600; font-size: 0.9rem;">{{ c.nombre }}</div>
+                        <div style="font-size: 0.78rem; color: var(--text-muted);">{{ c.grado }} '{{ c.paralelo }}' | {{ c.inscripciones.count }} Estudiantes</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Entregas Recientes a Calificar -->
+        <div class="card">
+            <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;"><i class="fa-solid fa-clipboard-check" style="color: var(--accent);"></i> Útimas Entregas</h3>
+            {% if entregas_recientes %}
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                {% for e in entregas_recientes %}
+                <div style="padding: 10px; background: rgba(15, 23, 42, 0.4); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span style="font-weight: 600; font-size: 0.88rem;">{{ e.estudiante.usuario.nombre_completo }}</span>
+                        <span class="status-tag status-{{ e.estado|lower }}">{{ e.get_estado_display }}</span>
+                    </div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); truncate;">{{ e.tarea.titulo }}</div>
+                    <div style="text-align: right; margin-top: 6px;">
+                        <a href="{% url 'ver_entregas' e.tarea.id %}" class="btn btn-outline btn-sm" style="font-size: 0.75rem; padding: 2px 8px;">
+                            Evaluar Tarea <i class="fa-solid fa-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="font-size: 0.85rem; color: var(--text-muted);">No hay entregas recientes pendientes.</p>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+{% endblock %}

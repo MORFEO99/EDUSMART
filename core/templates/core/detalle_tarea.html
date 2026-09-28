@@ -1,0 +1,131 @@
+{% extends 'core/base.html' %}
+
+{% block title %}{{ tarea.titulo }} - EDUSMART{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto;">
+
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
+        <div>
+            <span class="status-tag" style="background: rgba(99, 102, 241, 0.2); color: #818cf8;">
+                {{ tarea.curso.nombre }} | {{ tarea.materia }}
+            </span>
+            <h1 style="font-size: 1.8rem; font-weight: 700; margin-top: 6px;">{{ tarea.titulo }}</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 4px;">
+                <i class="fa-regular fa-user"></i> Docente: Prof. {{ tarea.curso.docente.usuario.nombre_completo }}
+            </p>
+        </div>
+        <a href="{% url 'dashboard' %}" class="btn btn-outline btn-sm">
+            <i class="fa-solid fa-arrow-left"></i> Volver al Panel
+        </a>
+    </div>
+
+    <!-- Main Grid -->
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+
+        <!-- Left Column: Instructions & Files -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <div class="card">
+                <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                    <i class="fa-solid fa-file-lines" style="color: var(--primary);"></i> Instrucciones de la Tarea
+                </h3>
+                <div style="font-size: 0.95rem; line-height: 1.6; color: var(--text-main); white-space: pre-line;">
+                    {{ tarea.descripcion }}
+                </div>
+            </div>
+
+            <!-- Materiales adjuntos -->
+            <div class="card">
+                <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                    <i class="fa-solid fa-paperclip" style="color: var(--secondary);"></i> Materiales y Recursos Adjuntos
+                </h3>
+                {% if materiales %}
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    {% for m in materiales %}
+                    <div style="padding: 10px 14px; background: rgba(15, 23, 42, 0.5); border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fa-solid {% if m.tipo == 'PDF' %}fa-file-pdf{% elif m.tipo == 'ENLACE' %}fa-link{% else %}fa-file-word{% endif %}" style="color: var(--secondary); font-size: 1.2rem;"></i>
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">{{ m.nombre }}</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">{{ m.get_tipo_display }}</div>
+                            </div>
+                        </div>
+                        <a href="{{ m.archivo_url }}" target="_blank" class="btn btn-outline btn-sm">
+                            <i class="fa-solid fa-download"></i> Descargar
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p style="font-size: 0.85rem; color: var(--text-muted);">El docente no ha incluido archivos adjuntos en esta tarea.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right Column: Submission Status & Form -->
+        <div>
+            <div class="card" style="position: sticky; top: 90px;">
+                <h3 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                    <i class="fa-solid fa-upload" style="color: var(--accent);"></i> Estado de tu Entrega
+                </h3>
+
+                <div style="margin-bottom: 1.2rem;">
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">Fecha límite de entrega:</div>
+                    <div style="font-weight: 700; color: {% if tarea.esta_vencida %}#f87171{% else %}#34d399{% endif %}; font-size: 0.95rem;">
+                        <i class="fa-regular fa-clock"></i> {{ tarea.fecha_limite|date:"d M Y, H:i" }}
+                    </div>
+                </div>
+
+                {% if entrega %}
+                <div style="background: rgba(15, 23, 42, 0.6); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 1.2rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.82rem; color: var(--text-muted);">Estado Actual:</span>
+                        <span class="status-tag status-{{ entrega.estado|lower }}">{{ entrega.get_estado_display }}</span>
+                    </div>
+
+                    {% if entrega.calificacion %}
+                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color);">
+                        <div style="font-size: 0.82rem; color: var(--text-muted);">Calificación Obtenida:</div>
+                        <div style="font-size: 1.6rem; font-weight: 800; color: #a5b4fc; font-family: 'Outfit';">
+                            {{ entrega.calificacion.nota }}/100
+                        </div>
+                    </div>
+
+                    {% if entrega.calificacion.retroalimentacion %}
+                    <div style="margin-top: 10px; background: rgba(79, 70, 229, 0.15); border-left: 3px solid #818cf8; padding: 10px; border-radius: 4px; font-size: 0.85rem;">
+                        <strong style="color: #a5b4fc;"><i class="fa-solid fa-comment-dots"></i> Retroalimentación:</strong>
+                        <p style="margin-top: 4px; color: var(--text-main);">"{{ entrega.calificacion.retroalimentacion.comentario }}"</p>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Submission Form -->
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label class="form-label">Enlace o Archivo Adjunto</label>
+                        <input type="text" name="archivo_url" class="form-control" 
+                               value="{{ entrega.archivo_url|default:'' }}" 
+                               placeholder="Ej. https://drive.google.com/mi_tarea.pdf">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Comentarios / Observaciones</label>
+                        <textarea name="observaciones" class="form-control" rows="3" placeholder="Mensaje opcional para el docente...">{{ entrega.observaciones|default:'' }}</textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-success" style="width: 100%;">
+                        <i class="fa-solid fa-paper-plane"></i> 
+                        {% if entrega %}Actualizar Mi Entrega{% else %}Entregar Tarea Ahora{% endif %}
+                    </button>
+                </form>
+
+            </div>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends 'core/base.html' %}
+
+{% block title %}{% if tarea %}Editar Tarea{% else %}Publicar Nueva Tarea{% endif %} - EDUSMART{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h1 style="font-size: 1.6rem; font-weight: 700;">
+            {% if tarea %}<i class="fa-solid fa-pen-to-square"></i> Editar Tarea{% else %}<i class="fa-solid fa-plus-circle"></i> Publicar Nueva Tarea{% endif %}
+        </h1>
+        <a href="{% url 'dashboard' %}" class="btn btn-outline btn-sm">
+            <i class="fa-solid fa-arrow-left"></i> Volver al Panel
+        </a>
+    </div>
+
+    <div class="card" style="padding: 2rem;">
+        <form method="POST">
+            {% csrf_token %}
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Curso Destino</label>
+                    <select name="curso" class="form-control" required>
+                        {% for c in cursos %}
+                        <option value="{{ c.id }}" {% if tarea and tarea.curso.id == c.id %}selected{% endif %}>
+                            {{ c.nombre }} ({{ c.grado }} '{{ c.paralelo }}')
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Materia / Asignatura</label>
+                    <input type="text" name="materia" class="form-control" value="{{ tarea.materia|default:'Matemáticas' }}" required placeholder="Ej. Álgebra, Física, Química">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Título de la Tarea</label>
+                <input type="text" name="titulo" class="form-control" value="{{ tarea.titulo|default:'' }}" required placeholder="Ej. Guía Práctica de Sistemas de Ecuaciones">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Descripción e Instrucciones</label>
+                <textarea name="descripcion" class="form-control" rows="5" required placeholder="Escribe aquí las instrucciones detalladas para los estudiantes...">{{ tarea.descripcion|default:'' }}</textarea>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Fecha y Hora Límite de Entrega</label>
+                    <input type="datetime-local" name="fecha_limite" class="form-control" 
+                           value="{% if tarea %}{{ tarea.fecha_limite|date:'Y-m-d\TH:i' }}{% else %}2026-10-15T23:59{% endif %}" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Estado de Publicación</label>
+                    <select name="estado" class="form-control">
+                        <option value="PUBLICADA" {% if not tarea or tarea.estado == 'PUBLICADA' %}selected{% endif %}>Publicada (Visible inmediatamente)</option>
+                        <option value="BORRADOR" {% if tarea and tarea.estado == 'BORRADOR' %}selected{% endif %}>Borrador (Solo visible para el docente)</option>
+                    </select>
+                </div>
+            </div>
+
+            {% if not tarea %}
+            <!-- Materiales adjuntos opcionales -->
+            <div style="background: rgba(15, 23, 42, 0.6); border: 1px dashed var(--border-color); padding: 1.2rem; border-radius: var(--radius-md); margin-top: 1rem;">
+                <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.8rem; color: var(--secondary);">
+                    <i class="fa-solid fa-paperclip"></i> Adjuntar Material / Guía Didáctica (Opcional)
+                </h4>
+                <div style="display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 10px;">
+                    <input type="text" name="material_nombre" class="form-control" placeholder="Nombre del recurso (Ej. Guía.pdf)">
+                    <select name="material_tipo" class="form-control">
+                        <option value="PDF">PDF</option>
+                        <option value="DOCUMENTO">Documento</option>
+                        <option value="ENLACE">Enlace Web</option>
+                    </select>
+                    <input type="url" name="material_url" class="form-control" placeholder="URL o enlace del archivo">
+                </div>
+            </div>
+            {% endif %}
+
+            <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.8rem;">
+                <a href="{% url 'dashboard' %}" class="btn btn-outline">Cancelar</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-check"></i> {% if tarea %}Guardar Cambios{% else %}Publicar Tarea{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
