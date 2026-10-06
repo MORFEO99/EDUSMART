@@ -5,8 +5,9 @@ import {
 } from 'lucide-react';
 import { dashboardAPI } from '../api';
 import { Loading } from '../components';
+import ChallengeBoard from '../components/ChallengeBoard';
 
-export default function TeacherDashboard({ onNavigate, onOpenCreateTask }) {
+export default function TeacherDashboard({ user, onNavigate, onOpenCreateTask }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -44,6 +45,9 @@ export default function TeacherDashboard({ onNavigate, onOpenCreateTask }) {
           </button>
         </div>
       </div>
+
+      {/* Retos Educativos del Docente */}
+      <ChallengeBoard userRole={user?.rol || 'DOCENTE'} />
 
       {/* KPI Cards matching Section 17: Mis espacios, Tareas creadas, Entregas pendientes, Tareas calificadas */}
       <div className="kpi-grid">

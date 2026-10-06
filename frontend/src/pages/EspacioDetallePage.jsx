@@ -3,12 +3,14 @@ import {
   ArrowLeft, BookOpen, ClipboardList, Users, Award,
   CheckCircle, AlertCircle, ChevronDown, ChevronRight,
   Calendar, FileText, Eye, EyeOff, BarChart2, Plus, X,
-  Upload, Send, Check
+  Upload, Send, Check, Target, Sparkles
 } from 'lucide-react';
 import { Loading, EmptyState, Modal } from '../components';
 import { getNoteColor } from '../utils';
 import { GradeSubmissionModal } from './TeacherViews';
 import { SubmitTaskForm } from './MyTasks';
+import SendReportModal from '../components/SendReportModal';
+import ChallengeBoard from '../components/ChallengeBoard';
 import apiFetch from '../api';
 
 function getBadgeStyle(estado, vencida) {
@@ -122,10 +124,11 @@ function FormCrearTarea({ espacioId, onClose, onSaved }) {
 function ReporteTarea({ tarea }) {
   const [tab, setTab] = useState('presentaron');
 
-  const presentaron = tarea.entregas.filter(e => e.calificacion || (e.archivo_nombre && e.archivo_nombre !== 'Sin archivo'));
-  const noPresentaron = tarea.entregas.filter(e => !presentaron.includes(e));
-  const vieron = tarea.entregas.filter(e => presentaron.includes(e) || (e.estado && e.estado !== 'ASIGNADA'));
-  const noVieron = tarea.entregas.filter(e => !vieron.includes(e));
+  const entregasArr = Array.isArray(tarea.entregas) ? tarea.entregas : [];
+  const presentaron = entregasArr.filter(e => e.calificacion || (e.archivo_nombre && e.archivo_nombre !== 'Sin archivo'));
+  const noPresentaron = entregasArr.filter(e => !presentaron.includes(e));
+  const vieron = entregasArr.filter(e => presentaron.includes(e) || (e.estado && e.estado !== 'ASIGNADA'));
+  const noVieron = entregasArr.filter(e => !vieron.includes(e));
 
   const listToShow = tab === 'presentaron' ? presentaron
     : tab === 'no_presentaron' ? noPresentaron
@@ -203,9 +206,10 @@ function ReporteTarea({ tarea }) {
 // Sub-component: Lista de entregas de una tarea
 // ─────────────────────────────────────────────────────────────
 function EntregasTarea({ tarea, onCalificar }) {
+  const entregasArr = Array.isArray(tarea.entregas) ? tarea.entregas : [];
   return (
     <div style={{ borderTop: '1px solid #F1F5F9', background: '#F8FAFC' }}>
-      {tarea.entregas.length === 0 ? (
+      {entregasArr.length === 0 ? (
         <div style={{ padding: '16px 18px', textAlign: 'center', fontSize: 13, color: '#94A3B8' }}>
           Ningún estudiante ha entregado esta tarea aún.
         </div>
@@ -216,13 +220,13 @@ function EntregasTarea({ tarea, onCalificar }) {
             color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px',
             borderBottom: '1px solid #E2E8F0',
           }}>
-            {tarea.entregas.length} entrega{tarea.entregas.length !== 1 ? 's' : ''} recibida{tarea.entregas.length !== 1 ? 's' : ''}
+            {entregasArr.length} entrega{entregasArr.length !== 1 ? 's' : ''} recibida{entregasArr.length !== 1 ? 's' : ''}
           </div>
 
-          {tarea.entregas.map((ent, idx) => (
+          {entregasArr.map((ent, idx) => (
             <div key={ent.id || idx} style={{
               padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12,
-              borderBottom: idx < tarea.entregas.length - 1 ? '1px solid #F1F5F9' : 'none',
+              borderBottom: idx < entregasArr.length - 1 ? '1px solid #F1F5F9' : 'none',
               background: '#FFFFFF',
             }}>
               <div style={{
@@ -281,7 +285,7 @@ function getEstadoBadge(estado, esta_vencida) {
 // ─────────────────────────────────────────────────────────────
 // Main page
 // ─────────────────────────────────────────────────────────────
-export default function EspacioDetallePage({ espacioId, onBack, user }) {
+export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab }) {
   const isEstudiante = user?.rol === 'ESTUDIANTE';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -290,28 +294,33 @@ export default function EspacioDetallePage({ espacioId, onBack, user }) {
   const [vistaExpandida, setVistaExpandida] = useState({});
   const [gradingEntrega, setGradingEntrega] = useState(null);
   const [showCrearTarea, setShowCrearTarea] = useState(false);
-  const [activeTab, setActiveTab] = useState('tareas');
+  const [activeTab, setActiveTab] = useState(defaultTab || 'tareas');
   const [submitTarea, setSubmitTarea] = useState(null);  // tarea to submit for student
+  const [reportStudent, setReportStudent] = useState(null);
 
-  const loadData = () => {
+  const loadData = async () => {
     setLoading(true);
-    const url = isEstudiante
-      ? `/api/tareas/?espacio_id=${espacioId}&filtro=todas`
-      : `/api/v2/espacios/${espacioId}/tareas/`;
-    apiFetch(url)
-      .then(res => {
-        if (isEstudiante) {
-          // For students, api returns a flat array of tasks
-          // We need espacio info too, fetch from /api/espacios/
-          apiFetch(`/api/espacios/${espacioId}/`)
-            .then(espInfo => setData({ espacio: espInfo, tareas: res, estudiantes: [] }))
-            .catch(() => setData({ espacio: { nombre: 'Espacio' }, tareas: res, estudiantes: [] }));
-        } else {
-          setData(res);
-        }
-      })
-      .catch(err => setError(err.message || 'Error cargando el espacio'))
-      .finally(() => setLoading(false));
+    setError('');
+    try {
+      if (isEstudiante) {
+        const [tareasRes, espInfo] = await Promise.all([
+          apiFetch(`/api/tareas/?espacio_id=${espacioId}&filtro=todas`).catch(() => []),
+          apiFetch(`/api/espacios/${espacioId}/`).catch(() => ({ nombre: 'Materia' }))
+        ]);
+        setData({
+          espacio: espInfo,
+          tareas: Array.isArray(tareasRes) ? tareasRes : [],
+          estudiantes: []
+        });
+      } else {
+        const res = await apiFetch(`/api/v2/espacios/${espacioId}/tareas/`);
+        setData(res);
+      }
+    } catch (err) {
+      setError(err.message || 'Error cargando el espacio');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -341,23 +350,25 @@ export default function EspacioDetallePage({ espacioId, onBack, user }) {
   const espacio = data?.espacio;
   const tareas = data?.tareas || [];
   const estudiantes = data?.estudiantes || [];
-  const totalEntregas = tareas.reduce((acc, t) => acc + t.total_entregas, 0);
-  const pendientesCalificar = tareas.reduce((acc, t) => acc + t.entregas.filter(e => !e.calificacion).length, 0);
+  const totalEntregas = tareas.reduce((acc, t) => acc + (t.total_entregas || (t.mi_entrega ? 1 : 0) || 0), 0);
+  const pendientesCalificar = tareas.reduce((acc, t) => acc + (Array.isArray(t.entregas) ? t.entregas.filter(e => !e?.calificacion).length : 0), 0);
+  const entregadasEstudiante = tareas.filter(t => t.mi_entrega).length;
+  const pendientesEstudiante = tareas.filter(t => !t.mi_entrega && !t.esta_vencida).length;
 
   return (
     <div className="page-container">
       {/* Back + Breadcrumb */}
       <div style={{ marginBottom: 20 }}>
         <button className="btn btn-outline btn-sm" onClick={onBack} style={{ marginBottom: 14 }}>
-          <ArrowLeft size={14} /> Volver a mis colegios
+          <ArrowLeft size={14} /> {isEstudiante ? 'Volver a mis materias' : 'Volver a mis colegios'}
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748B', marginBottom: 10 }}>
-          <span style={{ fontWeight: 600 }}>{espacio?.colegio}</span>
+          <span style={{ fontWeight: 600 }}>{espacio?.colegio || 'Institución'}</span>
           <ChevronRight size={12} />
-          <span style={{ fontWeight: 600 }}>{espacio?.curso}</span>
+          <span style={{ fontWeight: 600 }}>{espacio?.curso || 'Curso'}</span>
           <ChevronRight size={12} />
-          <span style={{ color: '#1E3A8A', fontWeight: 700 }}>{espacio?.materia}</span>
+          <span style={{ color: '#1E3A8A', fontWeight: 700 }}>{espacio?.materia || espacio?.nombre || 'Espacio'}</span>
         </div>
 
         {/* Header card */}
@@ -376,7 +387,7 @@ export default function EspacioDetallePage({ espacioId, onBack, user }) {
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 18, fontWeight: 800 }}>{espacio?.materia || espacio?.nombre}</div>
             <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
-              {espacio?.colegio} · {espacio?.curso}
+              {[espacio?.colegio, espacio?.curso].filter(Boolean).join(' · ')}
             </div>
           </div>
           {/* Stats */}
@@ -385,18 +396,37 @@ export default function EspacioDetallePage({ espacioId, onBack, user }) {
               <div style={{ fontWeight: 800, fontSize: 22 }}>{tareas.length}</div>
               <div style={{ opacity: 0.7 }}>Tareas</div>
             </div>
-            <div style={{ width: 1, background: 'rgba(255,255,255,0.2)' }} />
-            <div>
-              <div style={{ fontWeight: 800, fontSize: 22 }}>{totalEntregas}</div>
-              <div style={{ opacity: 0.7 }}>Entregas</div>
-            </div>
-            <div style={{ width: 1, background: 'rgba(255,255,255,0.2)' }} />
-            <div>
-              <div style={{ fontWeight: 800, fontSize: 22, color: pendientesCalificar > 0 ? '#FCD34D' : '#6EE7B7' }}>
-                {pendientesCalificar}
-              </div>
-              <div style={{ opacity: 0.7 }}>Por calificar</div>
-            </div>
+            {!isEstudiante ? (
+              <>
+                <div style={{ width: 1, background: 'rgba(255,255,255,0.2)' }} />
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 22 }}>{totalEntregas}</div>
+                  <div style={{ opacity: 0.7 }}>Entregas</div>
+                </div>
+                <div style={{ width: 1, background: 'rgba(255,255,255,0.2)' }} />
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 22, color: pendientesCalificar > 0 ? '#FCD34D' : '#6EE7B7' }}>
+                    {pendientesCalificar}
+                  </div>
+                  <div style={{ opacity: 0.7 }}>Por calificar</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ width: 1, background: 'rgba(255,255,255,0.2)' }} />
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 22, color: '#6EE7B7' }}>{entregadasEstudiante}</div>
+                  <div style={{ opacity: 0.7 }}>Entregadas</div>
+                </div>
+                <div style={{ width: 1, background: 'rgba(255,255,255,0.2)' }} />
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 22, color: pendientesEstudiante > 0 ? '#FCD34D' : '#6EE7B7' }}>
+                    {pendientesEstudiante}
+                  </div>
+                  <div style={{ opacity: 0.7 }}>Pendientes</div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -411,6 +441,14 @@ export default function EspacioDetallePage({ espacioId, onBack, user }) {
             <Users size={13} /> Estudiantes ({estudiantes.length})
           </button>
         )}
+        <button
+          className={`teams-tab ${activeTab === 'retos' ? 'active' : ''}`}
+          onClick={() => setActiveTab('retos')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+        >
+          <Target size={13} color={activeTab === 'retos' ? '#4F46E5' : '#64748B'} />
+          <span>Retos con IA</span>
+        </button>
         {!isEstudiante && (
           <button
             className="btn btn-primary btn-sm"
@@ -515,7 +553,7 @@ export default function EspacioDetallePage({ espacioId, onBack, user }) {
                         </div>
                         {cal.retroalimentacion && (
                           <div style={{ borderLeft: '3px solid #1E3A8A', paddingLeft: 10, fontSize: 12, color: '#475569', marginTop: 8 }}>
-                            💬 {cal.retroalimentacion?.comentario || cal.retroalimentacion}
+                            💬 {typeof cal.retroalimentacion === 'string' ? cal.retroalimentacion : (cal.retroalimentacion?.comentario || 'Retroalimentación registrada')}
                           </div>
                         )}
                       </div>
@@ -542,7 +580,7 @@ export default function EspacioDetallePage({ espacioId, onBack, user }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {tareas.map(tarea => {
             const badgeStyle = getBadgeStyle(tarea.estado, tarea.esta_vencida);
-            const pendientes = tarea.entregas.filter(e => !e.calificacion).length;
+            const pendientes = Array.isArray(tarea.entregas) ? tarea.entregas.filter(e => !e?.calificacion).length : 0;
             const vistaActiva = vistaExpandida[tarea.id];
 
             return (
@@ -642,13 +680,14 @@ export default function EspacioDetallePage({ espacioId, onBack, user }) {
           ) : (
             <div style={{ border: '1px solid #E2E8F0', borderRadius: 10, overflow: 'hidden' }}>
               {/* Table header */}
-              <div style={{ background: '#0F1E3D', color: 'white', padding: '10px 18px', display: 'grid', gridTemplateColumns: '2fr ' + tareas.map(() => '1fr').join(' '), gap: 8, fontSize: 11, fontWeight: 700 }}>
+              <div style={{ background: '#0F1E3D', color: 'white', padding: '10px 18px', display: 'grid', gridTemplateColumns: '2fr ' + (tareas.map(() => '1fr').join(' ')) + ' 120px', gap: 8, fontSize: 11, fontWeight: 700, alignItems: 'center' }}>
                 <span>ESTUDIANTE</span>
                 {tareas.map(t => (
                   <span key={t.id} style={{ textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={t.titulo}>
                     {t.titulo.slice(0, 12)}{t.titulo.length > 12 ? '…' : ''}
                   </span>
                 ))}
+                <span style={{ textAlign: 'center' }}>ACCIONES</span>
               </div>
 
               {/* Student rows */}
@@ -656,7 +695,7 @@ export default function EspacioDetallePage({ espacioId, onBack, user }) {
                 <div key={est.id} style={{
                   padding: '12px 18px',
                   display: 'grid',
-                  gridTemplateColumns: '2fr ' + tareas.map(() => '1fr').join(' '),
+                  gridTemplateColumns: '2fr ' + (tareas.map(() => '1fr').join(' ')) + ' 120px',
                   gap: 8,
                   alignItems: 'center',
                   borderBottom: idx < estudiantes.length - 1 ? '1px solid #F1F5F9' : 'none',
@@ -691,11 +730,44 @@ export default function EspacioDetallePage({ espacioId, onBack, user }) {
                       </div>
                     );
                   })}
+
+                  {/* Report action button */}
+                  <div style={{ textAlign: 'center' }}>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      style={{ fontSize: 11, padding: '4px 8px', width: '100%', justifyContent: 'center' }}
+                      onClick={() => setReportStudent({
+                        id: est.id,
+                        nombre_completo: est.nombre,
+                        email: est.email || `${est.nombre.toLowerCase().replace(/\s+/g, '')}@estudiante.com`,
+                        matricula: est.ru || `EST-${est.id}`,
+                        tareas_asignadas: tareas.length,
+                        tareas_entregadas: tareas.filter(t => t.participacion?.some(p => p.estudiante_id === est.id && p.entrego)).length,
+                        tareas_pendientes: tareas.filter(t => !t.participacion?.some(p => p.estudiante_id === est.id && p.entrego)).length,
+                        porcentaje_cumplimiento: Math.round((tareas.filter(t => t.participacion?.some(p => p.estudiante_id === est.id && p.entrego)).length / (tareas.length || 1)) * 100),
+                        promedio: 0,
+                        estado_academico: 'Activo'
+                      })}
+                    >
+                      <Send size={11} /> Reporte
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Retos de Aprendizaje con IA para este Espacio/Materia ── */}
+      {activeTab === 'retos' && (
+        <ChallengeBoard
+          userRole={user?.rol}
+          espacioId={espacioId}
+          espacioNombre={espacio?.materia || espacio?.nombre}
+          cursoNombre={espacio?.curso}
+          tareas={tareas}
+        />
       )}
 
       {/* Grade modal */}
@@ -730,6 +802,16 @@ export default function EspacioDetallePage({ espacioId, onBack, user }) {
             existingEntrega={submitTarea.mi_entrega}
             onSuccess={() => { setSubmitTarea(null); loadData(); }}
             onCancel={() => setSubmitTarea(null)}
+          />
+        </Modal>
+      )}
+
+      {/* Teacher: Send Report Modal */}
+      {reportStudent && (
+        <Modal open={true} onClose={() => setReportStudent(null)} title={`📊 Enviar Reporte Académico — ${reportStudent.nombre_completo}`}>
+          <SendReportModal
+            student={reportStudent}
+            onClose={() => setReportStudent(null)}
           />
         </Modal>
       )}

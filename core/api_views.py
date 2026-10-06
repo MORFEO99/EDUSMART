@@ -10,14 +10,25 @@ from django.shortcuts import get_object_or_404
 
 from .models import (
     Usuario, Docente, Estudiante, Espacio, MiembroEspacio,
-    Tarea, Material, Entrega, Calificacion, Retroalimentacion,
-    ProgresoAcademico, Notificacion
+    Tarea, Material, Entrega, VersionEntrega, Calificacion, Retroalimentacion,
+    ProgresoAcademico, Notificacion, AvisoEspacio, RecursoEspacio,
+    ExtensionFechaTarea, PlantillaTarea
 )
 from .serializers import (
     UsuarioSerializer, DocenteSerializer, EstudianteSerializer,
     EspacioSerializer, TareaSerializer, MaterialSerializer,
-    EntregaSerializer, CalificacionSerializer, RetroalimentacionSerializer,
-    ProgresoAcademicoSerializer, NotificacionSerializer
+    EntregaSerializer, VersionEntregaSerializer, CalificacionSerializer, RetroalimentacionSerializer,
+    ProgresoAcademicoSerializer, NotificacionSerializer,
+    AvisoEspacioSerializer, RecursoEspacioSerializer, PlantillaTareaSerializer
+)
+# MongoDB - Servicios de registro de actividad
+from .mongo_services import (
+    log_actividad,
+    registrar_sesion,
+    cerrar_sesion,
+    guardar_notificacion,
+    log_badge_obtenido,
+    log_coin_transaction,
 )
 
 
@@ -82,6 +93,17 @@ def api_login(request):
             'titulo_academico': doc.titulo_academico,
             'biografia': doc.biografia,
         }
+
+    # MongoDB: registrar sesion e inicio de sesion
+    ip = request.META.get('REMOTE_ADDR')
+    ua = request.META.get('HTTP_USER_AGENT', '')
+    registrar_sesion(usuario_id=user.id, ip=ip, user_agent=ua)
+    log_actividad(
+        usuario_id=user.id,
+        accion='LOGIN',
+        detalle=f'Inicio de sesion: {user.username} [{user.rol}]',
+        extra={'ip': ip, 'demo': bool(demo_role)}
+    )
 
     return Response({
         'user': profile_data,
@@ -168,6 +190,19 @@ def api_register(request):
 
     login(request, user)
 
+    # MongoDB: registrar nuevo usuario y primera sesion
+    log_actividad(
+        usuario_id=user.id,
+        accion='REGISTRO',
+        detalle=f'Nuevo usuario registrado: {user.username} [{rol}]',
+        extra={'nombre': user.nombre_completo, 'rol': rol}
+    )
+    registrar_sesion(
+        usuario_id=user.id,
+        ip=request.META.get('REMOTE_ADDR'),
+        user_agent=request.META.get('HTTP_USER_AGENT', '')
+    )
+
     return Response({
         'user': UsuarioSerializer(user).data,
         'role_info': role_info,
@@ -177,6 +212,14 @@ def api_register(request):
 
 @api_view(['POST'])
 def api_logout(request):
+    if request.user.is_authenticated:
+        # MongoDB: cerrar sesion activa y registrar log
+        cerrar_sesion(usuario_id=request.user.id)
+        log_actividad(
+            usuario_id=request.user.id,
+            accion='LOGOUT',
+            detalle=f'Cierre de sesion: {request.user.username}'
+        )
     logout(request)
     return Response({'message': 'Sesión finalizada correctamente.'})
 
@@ -318,7 +361,12 @@ def api_espacio_detail(request, pk):
         if espacio.docente.usuario != user:
             return Response({'error': 'No tienes permisos para ver este espacio.'}, status=status.HTTP_403_FORBIDDEN)
     else:
-        if not MiembroEspacio.objects.filter(espacio=espacio, estudiante__usuario=user).exists():
+        est = getattr(user, 'perfil_estudiante', None)
+        if not est:
+            return Response({'error': 'Perfil de estudiante no encontrado.'}, status=status.HTTP_403_FORBIDDEN)
+        is_miembro = MiembroEspacio.objects.filter(espacio=espacio, estudiante=est).exists()
+        is_in_curso = bool(espacio.curso and EstudianteCurso.objects.filter(curso=espacio.curso, estudiante=est, estado='ACTIVO').exists())
+        if not (is_miembro or is_in_curso):
             return Response({'error': 'No estás inscrito en este espacio.'}, status=status.HTTP_403_FORBIDDEN)
 
     # Space data
@@ -404,7 +452,7 @@ def api_tareas(request):
 
         if user.rol == 'ESTUDIANTE' and hasattr(user, 'perfil_estudiante'):
             estudiante = user.perfil_estudiante
-            espacios_ids = estudiante.espacios_inscritos.values_list('espacio_id', flat=True)
+            espacios_ids = estudiante.get_espacios_ids()
             tareas = Tarea.objects.filter(espacio_id__in=espacios_ids, estado='PUBLICADA')
 
             if espacio_id:
@@ -582,7 +630,11 @@ def api_presentar_tarea(request, pk):
     observaciones = data.get('observaciones') or ''
 
     now = timezone.now()
-    estado = 'ATRASADO' if now > tarea.fecha_limite else 'ENTREGADO'
+    # Check if student has an individual deadline extension
+    extension = ExtensionFechaTarea.objects.filter(tarea=tarea, estudiante=estudiante).first()
+    fecha_limite_efectiva = extension.nueva_fecha_limite if extension else tarea.fecha_limite
+
+    estado = 'ATRASADO' if now > fecha_limite_efectiva else 'ENTREGADO'
 
     entrega, created = Entrega.objects.get_or_create(
         tarea=tarea,
@@ -593,18 +645,32 @@ def api_presentar_tarea(request, pk):
             'archivo_tamano': archivo_tamano,
             'observaciones': observaciones,
             'fecha_entrega': now,
-            'estado': estado
+            'estado': estado,
+            'version': 1
         }
     )
 
     if not created:
+        entrega.version += 1
         entrega.archivo_url = archivo_url
         entrega.archivo_nombre = archivo_nombre
         entrega.archivo_tamano = archivo_tamano
         entrega.observaciones = observaciones
         entrega.fecha_entrega = now
-        entrega.estado = estado
+        entrega.estado = 'REENTREGADA' if entrega.estado == 'DEVUELTA' else estado
         entrega.save()
+
+    # Create immutable version record
+    VersionEntrega.objects.create(
+        entrega=entrega,
+        numero_version=entrega.version,
+        archivo_url=archivo_url,
+        archivo_nombre=archivo_nombre,
+        archivo_tamano=archivo_tamano,
+        comentario=observaciones,
+        fecha_envio=now,
+        estado=entrega.estado
+    )
 
     estudiante.actualizar_progreso()
 
@@ -612,7 +678,7 @@ def api_presentar_tarea(request, pk):
     Notificacion.objects.create(
         usuario=user,
         tipo='ENTREGA_CONFIRMADA',
-        mensaje=f"Entrega realizada correctamente para '{tarea.titulo}'. Estado: {entrega.get_estado_display()}.",
+        mensaje=f"Entrega v{entrega.version} realizada correctamente para '{tarea.titulo}'. Estado: {entrega.get_estado_display()}.",
         espacio_id=tarea.espacio.id,
         tarea_id=tarea.id
     )
@@ -621,13 +687,36 @@ def api_presentar_tarea(request, pk):
     Notificacion.objects.create(
         usuario=tarea.docente.usuario,
         tipo='ENTREGA_CONFIRMADA',
-        mensaje=f"El estudiante {user.nombre_completo} presentó la tarea '{tarea.titulo}' en '{tarea.espacio.nombre}'.",
+        mensaje=f"El estudiante {user.nombre_completo} entregó la tarea '{tarea.titulo}' (v{entrega.version}) en '{tarea.espacio.nombre}'.",
+        espacio_id=tarea.espacio.id,
+        tarea_id=tarea.id
+    )
+
+    # MongoDB: registrar entrega en log de actividad
+    log_actividad(
+        usuario_id=user.id,
+        accion='ENTREGAR_TAREA',
+        detalle=f"Entrega v{entrega.version} de '{tarea.titulo}'",
+        espacio_id=tarea.espacio.id,
+        tarea_id=tarea.id,
+        extra={
+            'estado': entrega.estado,
+            'version': entrega.version,
+            'archivo': archivo_nombre,
+            'a_tiempo': entrega.estado != 'ATRASADO'
+        }
+    )
+    # MongoDB: duplicar notificacion de confirmacion
+    guardar_notificacion(
+        usuario_id=user.id,
+        tipo='ENTREGA_CONFIRMADA',
+        mensaje=f"Entrega v{entrega.version} de '{tarea.titulo}' registrada.",
         espacio_id=tarea.espacio.id,
         tarea_id=tarea.id
     )
 
     return Response({
-        'message': 'Entrega realizada correctamente.',
+        'message': f'Tarea entregada correctamente (Versión {entrega.version}).',
         'entrega': EntregaSerializer(entrega).data,
         'estado': entrega.estado,
         'fecha': entrega.fecha_entrega.strftime('%d/%m/%Y %H:%M')
@@ -746,11 +835,439 @@ def api_calificar_entrega(request, pk):
             retro.fecha = timezone.now()
             retro.save()
 
+    # Also update latest VersionEntrega
+    latest_v = entrega.versiones.order_by('-numero_version').first()
+    if latest_v:
+        latest_v.nota = nota
+        latest_v.retroalimentacion = retro_comentario
+        latest_v.estado = 'CALIFICADO'
+        latest_v.save()
+
+    # MongoDB: registrar calificacion en log de actividad
+    estudiante_id = entrega.estudiante.usuario.id
+    log_actividad(
+        usuario_id=user.id,
+        accion='CALIFICAR',
+        detalle=f"Calificacion {nota}/100 para '{entrega.tarea.titulo}'",
+        espacio_id=entrega.tarea.espacio.id,
+        tarea_id=entrega.tarea.id,
+        extra={
+            'nota': nota,
+            'estudiante_id': estudiante_id,
+            'con_retroalimentacion': bool(retro_comentario),
+            'nueva': created
+        }
+    )
+    # MongoDB: notificar al estudiante de su calificacion
+    guardar_notificacion(
+        usuario_id=estudiante_id,
+        tipo='CALIFICADA',
+        mensaje=f"Tu tarea '{entrega.tarea.titulo}' fue calificada con {nota}/100.",
+        espacio_id=entrega.tarea.espacio.id,
+        tarea_id=entrega.tarea.id
+    )
+
     return Response({
         'message': f"Evaluación guardada con éxito ({nota}/100).",
         'calificacion': CalificacionSerializer(calificacion).data,
         'estado': entrega.estado
     })
+
+
+@api_view(['POST'])
+def api_devolver_entrega(request, pk):
+    user = request.user
+    if user.rol != 'DOCENTE' or not hasattr(user, 'perfil_docente'):
+        return Response({'error': 'Acceso solo para docentes.'}, status=status.HTTP_403_FORBIDDEN)
+
+    entrega = get_object_or_404(Entrega, id=pk, tarea__docente=user.perfil_docente)
+    motivo = (request.data.get('motivo') or request.data.get('retroalimentacion') or 'Se solicitan correcciones en el trabajo presentado.').strip()
+
+    entrega.estado = 'DEVUELTA'
+    entrega.save()
+
+    latest_v = entrega.versiones.order_by('-numero_version').first()
+    if latest_v:
+        latest_v.estado = 'DEVUELTA'
+        latest_v.retroalimentacion = motivo
+        latest_v.save()
+    else:
+        VersionEntrega.objects.create(
+            entrega=entrega,
+            numero_version=entrega.version,
+            archivo_url=entrega.archivo_url,
+            archivo_nombre=entrega.archivo_nombre,
+            archivo_tamano=entrega.archivo_tamano,
+            comentario=entrega.observaciones,
+            fecha_envio=entrega.fecha_entrega,
+            estado='DEVUELTA',
+            retroalimentacion=motivo
+        )
+
+    Notificacion.objects.create(
+        usuario=entrega.estudiante.usuario,
+        tipo='CORRECCION_SOLICITADA',
+        mensaje=f"Corrección solicitada para '{entrega.tarea.titulo}'. Observación: {motivo}",
+        espacio_id=entrega.tarea.espacio.id,
+        tarea_id=entrega.tarea.id
+    )
+
+    return Response({
+        'message': 'Entrega devuelta para corrección.',
+        'entrega': EntregaSerializer(entrega).data
+    })
+
+
+@api_view(['POST'])
+def api_reentregar_tarea(request, pk):
+    user = request.user
+    if user.rol != 'ESTUDIANTE' or not hasattr(user, 'perfil_estudiante'):
+        return Response({'error': 'Solo los estudiantes pueden reentregar tareas.'}, status=status.HTTP_403_FORBIDDEN)
+
+    tarea = get_object_or_404(Tarea, id=pk)
+    estudiante = user.perfil_estudiante
+
+    entrega = get_object_or_404(Entrega, tarea=tarea, estudiante=estudiante)
+    data = request.data
+    archivo_url = data.get('archivo_url') or entrega.archivo_url
+    archivo_nombre = data.get('archivo_nombre') or 'trabajo_corregido.pdf'
+    archivo_tamano = data.get('archivo_tamano') or '2.4 MB'
+    observaciones = data.get('observaciones') or ''
+
+    now = timezone.now()
+    entrega.version += 1
+    entrega.archivo_url = archivo_url
+    entrega.archivo_nombre = archivo_nombre
+    entrega.archivo_tamano = archivo_tamano
+    entrega.observaciones = observaciones
+    entrega.fecha_entrega = now
+    entrega.estado = 'REENTREGADA'
+    entrega.save()
+
+    VersionEntrega.objects.create(
+        entrega=entrega,
+        numero_version=entrega.version,
+        archivo_url=archivo_url,
+        archivo_nombre=archivo_nombre,
+        archivo_tamano=archivo_tamano,
+        comentario=observaciones,
+        fecha_envio=now,
+        estado='REENTREGADA'
+    )
+
+    estudiante.actualizar_progreso()
+
+    Notificacion.objects.create(
+        usuario=user,
+        tipo='ENTREGA_CONFIRMADA',
+        mensaje=f"Reentrega (v{entrega.version}) enviada con éxito para '{tarea.titulo}'.",
+        espacio_id=tarea.espacio.id,
+        tarea_id=tarea.id
+    )
+
+    Notificacion.objects.create(
+        usuario=tarea.docente.usuario,
+        tipo='REENTREGA',
+        mensaje=f"El estudiante {user.nombre_completo} ha reentregado su tarea '{tarea.titulo}' (Versión {entrega.version}).",
+        espacio_id=tarea.espacio.id,
+        tarea_id=tarea.id
+    )
+
+    return Response({
+        'message': f'Reentrega v{entrega.version} realizada correctamente.',
+        'entrega': EntregaSerializer(entrega).data
+    })
+
+
+@api_view(['GET'])
+def api_entrega_historial(request, pk):
+    user = request.user
+    if not user.is_authenticated:
+        return Response({'error': 'No autenticado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    entrega = get_object_or_404(Entrega, id=pk)
+    if user.rol == 'ESTUDIANTE' and entrega.estudiante.usuario != user:
+        return Response({'error': 'No tienes permiso para ver este historial.'}, status=status.HTTP_403_FORBIDDEN)
+    if user.rol == 'DOCENTE' and entrega.tarea.docente.usuario != user:
+        return Response({'error': 'No tienes permiso para ver este historial.'}, status=status.HTTP_403_FORBIDDEN)
+
+    versiones = entrega.versiones.order_by('-numero_version')
+    return Response(VersionEntregaSerializer(versiones, many=True).data)
+
+
+@api_view(['GET'])
+def api_entregas_pendientes(request):
+    user = request.user
+    if user.rol != 'DOCENTE' or not hasattr(user, 'perfil_docente'):
+        return Response({'error': 'Solo docentes pueden consultar la bandeja de revisión.'}, status=status.HTTP_403_FORBIDDEN)
+
+    docente = user.perfil_docente
+    filtro = request.query_params.get('filtro', 'todos').lower()
+    espacio_id = request.query_params.get('espacio_id')
+    search = request.query_params.get('search', '').strip().lower()
+
+    entregas = Entrega.objects.filter(tarea__docente=docente).select_related(
+        'tarea', 'tarea__espacio', 'estudiante__usuario', 'calificacion'
+    )
+
+    if espacio_id:
+        entregas = entregas.filter(tarea__espacio_id=espacio_id)
+
+    if filtro == 'pendientes':
+        entregas = entregas.filter(calificacion__isnull=True)
+    elif filtro == 'atrasadas':
+        entregas = entregas.filter(estado='ATRASADO')
+    elif filtro == 'reentregadas':
+        entregas = entregas.filter(estado='REENTREGADA')
+    elif filtro == 'calificadas':
+        entregas = entregas.filter(calificacion__isnull=False)
+
+    if search:
+        entregas = entregas.filter(
+            Q(estudiante__usuario__first_name__icontains=search) |
+            Q(estudiante__usuario__last_name__icontains=search) |
+            Q(tarea__titulo__icontains=search)
+        )
+
+    result = []
+    for e in entregas.order_by('-fecha_entrega'):
+        result.append({
+            'id': e.id,
+            'entrega_id': e.id,
+            'tarea_id': e.tarea.id,
+            'tarea_titulo': e.tarea.titulo,
+            'espacio_id': e.tarea.espacio.id,
+            'espacio_nombre': e.tarea.espacio.nombre,
+            'estudiante_id': e.estudiante.id,
+            'estudiante_nombre': e.estudiante.usuario.nombre_completo,
+            'estudiante_matricula': f"EST-{e.estudiante.id:04d}",
+            'archivo_nombre': e.archivo_nombre,
+            'archivo_url': e.archivo_url,
+            'fecha_entrega': e.fecha_entrega.strftime('%d/%m/%Y %H:%M'),
+            'estado': e.estado,
+            'version': e.version,
+            'nota': e.calificacion.nota if hasattr(e, 'calificacion') else None,
+            'retroalimentacion': e.calificacion.retroalimentacion.comentario if hasattr(e, 'calificacion') and hasattr(e.calificacion, 'retroalimentacion') else '',
+            'observaciones': e.observaciones
+        })
+
+    return Response({
+        'total': len(result),
+        'pendientes_count': entregas.filter(calificacion__isnull=True).count(),
+        'entregas': result
+    })
+
+
+@api_view(['GET', 'POST'])
+def api_espacio_avisos(request, espacio_id):
+    user = request.user
+    if not user.is_authenticated:
+        return Response({'error': 'No autenticado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    espacio = get_object_or_404(Espacio, id=espacio_id)
+
+    if request.method == 'GET':
+        avisos = espacio.avisos.all()
+        return Response(AvisoEspacioSerializer(avisos, many=True).data)
+
+    elif request.method == 'POST':
+        if user.rol != 'DOCENTE' or espacio.docente.usuario != user:
+            return Response({'error': 'Solo el docente del espacio puede publicar avisos.'}, status=status.HTTP_403_FORBIDDEN)
+
+        data = request.data
+        titulo = (data.get('titulo') or '').strip()
+        contenido = (data.get('contenido') or '').strip()
+        fijado = bool(data.get('fijado', False))
+        importante = bool(data.get('importante', False))
+        fecha_expiracion = data.get('fecha_expiracion') or None
+
+        if not titulo or not contenido:
+            return Response({'error': 'El título y el contenido del aviso son obligatorios.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        aviso = AvisoEspacio.objects.create(
+            espacio=espacio,
+            docente=user.perfil_docente,
+            titulo=titulo,
+            contenido=contenido,
+            fijado=fijado,
+            importante=importante,
+            fecha_expiracion=fecha_expiracion
+        )
+
+        for m in espacio.miembros.select_related('estudiante__usuario'):
+            Notificacion.objects.create(
+                usuario=m.estudiante.usuario,
+                tipo='AVISO_NUEVO',
+                mensaje=f"📢 Nuevo aviso en '{espacio.nombre}': {titulo}",
+                espacio_id=espacio.id
+            )
+
+        return Response(AvisoEspacioSerializer(aviso).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['DELETE'])
+def api_eliminar_aviso(request, pk):
+    user = request.user
+    aviso = get_object_or_404(AvisoEspacio, id=pk)
+    if user.rol != 'DOCENTE' or aviso.docente.usuario != user:
+        return Response({'error': 'No tienes permiso para eliminar este aviso.'}, status=status.HTTP_403_FORBIDDEN)
+    aviso.delete()
+    return Response({'message': 'Aviso eliminado correctamente.'})
+
+
+@api_view(['GET', 'POST'])
+def api_espacio_recursos(request, espacio_id):
+    user = request.user
+    if not user.is_authenticated:
+        return Response({'error': 'No autenticado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    espacio = get_object_or_404(Espacio, id=espacio_id)
+
+    if request.method == 'GET':
+        recursos = espacio.recursos.all()
+        return Response(RecursoEspacioSerializer(recursos, many=True).data)
+
+    elif request.method == 'POST':
+        if user.rol != 'DOCENTE' or espacio.docente.usuario != user:
+            return Response({'error': 'Solo el docente del espacio puede compartir recursos.'}, status=status.HTTP_403_FORBIDDEN)
+
+        data = request.data
+        titulo = (data.get('titulo') or '').strip()
+        descripcion = (data.get('descripcion') or '').strip()
+        tipo = data.get('tipo') or 'PDF'
+        archivo_url = data.get('archivo_url') or ''
+        enlace_url = data.get('enlace_url') or ''
+        tamano = data.get('tamano') or '1.5 MB'
+
+        if not titulo:
+            return Response({'error': 'El título del recurso es obligatorio.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        recurso = RecursoEspacio.objects.create(
+            espacio=espacio,
+            docente=user.perfil_docente,
+            titulo=titulo,
+            descripcion=descripcion,
+            tipo=tipo,
+            archivo_url=archivo_url,
+            enlace_url=enlace_url,
+            tamano=tamano
+        )
+
+        return Response(RecursoEspacioSerializer(recurso).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['DELETE'])
+def api_eliminar_recurso(request, pk):
+    user = request.user
+    recurso = get_object_or_404(RecursoEspacio, id=pk)
+    if user.rol != 'DOCENTE' or recurso.docente.usuario != user:
+        return Response({'error': 'No tienes permiso para eliminar este recurso.'}, status=status.HTTP_403_FORBIDDEN)
+    recurso.delete()
+    return Response({'message': 'Recurso eliminado correctamente.'})
+
+
+@api_view(['POST'])
+def api_tarea_extension(request, pk):
+    user = request.user
+    if user.rol != 'DOCENTE' or not hasattr(user, 'perfil_docente'):
+        return Response({'error': 'Solo docentes pueden otorgar extensiones de fecha.'}, status=status.HTTP_403_FORBIDDEN)
+
+    tarea = get_object_or_404(Tarea, id=pk, docente=user.perfil_docente)
+    data = request.data
+    estudiante_id = data.get('estudiante_id')
+    nueva_fecha_limite = data.get('nueva_fecha_limite')
+    motivo = data.get('motivo') or 'Prórroga académica individual'
+
+    if not estudiante_id or not nueva_fecha_limite:
+        return Response({'error': 'Debe especificar el estudiante y la nueva fecha límite.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    estudiante = get_object_or_404(Estudiante, id=estudiante_id)
+
+    ext, created = ExtensionFechaTarea.objects.get_or_create(
+        tarea=tarea,
+        estudiante=estudiante,
+        defaults={
+            'docente': user.perfil_docente,
+            'nueva_fecha_limite': nueva_fecha_limite,
+            'motivo': motivo
+        }
+    )
+    if not created:
+        ext.nueva_fecha_limite = nueva_fecha_limite
+        ext.motivo = motivo
+        ext.save()
+
+    Notificacion.objects.create(
+        usuario=estudiante.usuario,
+        tipo='NUEVA_TAREA',
+        mensaje=f"Se te ha concedido una prórroga para la tarea '{tarea.titulo}' hasta el {nueva_fecha_limite}.",
+        espacio_id=tarea.espacio.id,
+        tarea_id=tarea.id
+    )
+
+    return Response({'message': f'Extensión concedida a {estudiante.usuario.nombre_completo}.'})
+
+
+@api_view(['GET', 'POST'])
+def api_plantillas_tarea(request):
+    user = request.user
+    if user.rol != 'DOCENTE' or not hasattr(user, 'perfil_docente'):
+        return Response({'error': 'Solo docentes pueden gestionar plantillas.'}, status=status.HTTP_403_FORBIDDEN)
+
+    docente = user.perfil_docente
+
+    if request.method == 'GET':
+        plantillas = docente.plantillas_tarea.all()
+        return Response(PlantillaTareaSerializer(plantillas, many=True).data)
+
+    elif request.method == 'POST':
+        data = request.data
+        titulo = (data.get('titulo') or '').strip()
+        descripcion = data.get('descripcion') or ''
+        indicaciones = data.get('indicaciones') or ''
+        puntaje_maximo = int(data.get('puntaje_maximo') or 100)
+        criterios_json = data.get('criterios_json') or '[]'
+
+        if not titulo:
+            return Response({'error': 'El título de la plantilla es obligatorio.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        plantilla = PlantillaTarea.objects.create(
+            docente=docente,
+            titulo=titulo,
+            descripcion=descripcion,
+            indicaciones=indicaciones,
+            puntaje_maximo=puntaje_maximo,
+            criterios_json=criterios_json
+        )
+        return Response(PlantillaTareaSerializer(plantilla).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+def api_duplicar_tarea(request, pk):
+    user = request.user
+    if user.rol != 'DOCENTE' or not hasattr(user, 'perfil_docente'):
+        return Response({'error': 'Solo docentes pueden duplicar tareas.'}, status=status.HTTP_403_FORBIDDEN)
+
+    tarea_original = get_object_or_404(Tarea, id=pk, docente=user.perfil_docente)
+    nuevo_espacio_id = request.data.get('nuevo_espacio_id') or tarea_original.espacio_id
+    nuevo_espacio = get_object_or_404(Espacio, id=nuevo_espacio_id, docente=user.perfil_docente)
+
+    nueva_tarea = Tarea.objects.create(
+        espacio=nuevo_espacio,
+        docente=user.perfil_docente,
+        titulo=f"{tarea_original.titulo} (Copia)",
+        descripcion=tarea_original.descripcion,
+        indicaciones=tarea_original.indicaciones,
+        puntaje_maximo=tarea_original.puntaje_maximo,
+        fecha_publicacion=timezone.now(),
+        fecha_limite=timezone.now() + timedelta(days=7),
+        estado='PUBLICADA'
+    )
+
+    return Response({
+        'message': f'Tarea duplicada exitosamente en "{nuevo_espacio.nombre}".',
+        'tarea': TareaSerializer(nueva_tarea, context={'request': request}).data
+    }, status=status.HTTP_201_CREATED)
 
 
 # ==============================================================================
@@ -766,7 +1283,7 @@ def api_student_dashboard(request):
     estudiante = user.perfil_estudiante
     progreso = estudiante.actualizar_progreso()
 
-    espacios_ids = estudiante.espacios_inscritos.values_list('espacio_id', flat=True)
+    espacios_ids = estudiante.get_espacios_ids()
     espacios = Espacio.objects.filter(id__in=espacios_ids)
     tareas = Tarea.objects.filter(espacio_id__in=espacios_ids, estado='PUBLICADA')
 

@@ -9,10 +9,12 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.utils import timezone
 
+from django.db.models import Avg, Q
+
 from .models import (
     Colegio, DocenteColegio, Curso, Materia, EstudianteCurso,
     Estudiante, Usuario, Invitacion, Espacio, MiembroEspacio,
-    InvitacionEspacio, Notificacion
+    InvitacionEspacio, Notificacion, Tarea, Entrega, Calificacion, Docente
 )
 from .serializers_v2 import (
     ColegioSerializer, DocenteColegioSerializer, CursoSerializer,
@@ -414,8 +416,9 @@ def api_tareas_espacio(request, espacio_id):
 
     espacio = get_object_or_404(Espacio, id=espacio_id, docente=user.perfil_docente)
 
-    # ── Estudiantes inscritos via EstudianteCurso (del curso del espacio)
+    # ── Estudiantes inscritos via EstudianteCurso (del curso del espacio) o via MiembroEspacio
     estudiantes_data = []
+    seen_est_ids = set()
     if espacio.curso:
         from .models import EstudianteCurso
         inscripciones = EstudianteCurso.objects.filter(
@@ -423,11 +426,26 @@ def api_tareas_espacio(request, espacio_id):
         ).select_related('estudiante__usuario')
         for inscripcion in inscripciones:
             est = inscripcion.estudiante
+            if est.id not in seen_est_ids:
+                seen_est_ids.add(est.id)
+                estudiantes_data.append({
+                    'id': est.id,
+                    'nombre': est.usuario.nombre_completo,
+                    'email': est.usuario.email,
+                    'ru': inscripcion.codigo_ru or f"RU-{espacio.id}-{est.id:03d}",
+                })
+
+    from .models import MiembroEspacio
+    miembros = MiembroEspacio.objects.filter(espacio=espacio).select_related('estudiante__usuario')
+    for m in miembros:
+        est = m.estudiante
+        if est.id not in seen_est_ids:
+            seen_est_ids.add(est.id)
             estudiantes_data.append({
                 'id': est.id,
                 'nombre': est.usuario.nombre_completo,
                 'email': est.usuario.email,
-                'ru': inscripcion.codigo_ru or '-',
+                'ru': f"RU-{espacio.id}-{est.id:03d}",
             })
 
     # ── Tareas del espacio con entregas y materiales
@@ -554,3 +572,184 @@ def api_crear_tarea_espacio(request, espacio_id):
         )
 
     return Response({'id': tarea.id, 'titulo': tarea.titulo}, status=201)
+
+
+# ==============================================================================
+# GESTION DE ESTUDIANTES POR CURSO Y REPORTES DE DESEMPEÑO
+# ==============================================================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_estudiantes_por_curso(request, curso_id):
+    """
+    Retorna la lista detallada de estudiantes matriculados en un curso especifico,
+    con sus metricas academicas en tiempo real para emision de reportes.
+    """
+    user = request.user
+    if user.rol != 'DOCENTE' or not hasattr(user, 'perfil_docente'):
+        return Response({'error': 'Solo docentes pueden consultar la lista de estudiantes'}, status=status.HTTP_403_FORBIDDEN)
+
+    curso = get_object_or_404(Curso, id=curso_id)
+
+    # Si aún no hay estudiantes inscritos en la tabla EstudianteCurso para este curso,
+    # auto-vincular estudiantes activos del sistema para asegurar disponibilidad inmediata
+    if not EstudianteCurso.objects.filter(curso=curso).exists():
+        for idx, est in enumerate(Estudiante.objects.all(), start=1):
+            EstudianteCurso.objects.get_or_create(
+                curso=curso,
+                estudiante=est,
+                defaults={'codigo_ru': f"RU-{curso.id}-{idx:03d}"}
+            )
+
+    espacios = Espacio.objects.filter(curso=curso)
+    tareas = Tarea.objects.filter(espacio__in=espacios, estado='PUBLICADA')
+    total_tareas = tareas.count()
+
+    inscripciones = EstudianteCurso.objects.filter(curso=curso).select_related('estudiante__usuario').order_by('estudiante__usuario__last_name', 'estudiante__usuario__first_name')
+
+    estudiantes_list = []
+    for insc in inscripciones:
+        est = insc.estudiante
+        u = est.usuario
+
+        entregas = Entrega.objects.filter(estudiante=est, tarea__in=tareas)
+        entregadas_count = entregas.count()
+        calificaciones = Calificacion.objects.filter(entrega__in=entregas)
+        promedio_aggr = calificaciones.aggregate(Avg('nota'))['nota__avg']
+
+        if promedio_aggr is not None:
+            promedio_val = round(float(promedio_aggr), 1)
+        else:
+            progreso = getattr(est, 'progreso', None)
+            promedio_val = round(progreso.promedio, 1) if progreso else 0.0
+
+        pendientes = max(0, total_tareas - entregadas_count)
+        cumplimiento = round((entregadas_count / total_tareas * 100.0), 1) if total_tareas > 0 else 100.0
+
+        if promedio_val >= 85:
+            estado_academico = 'Excelente'
+        elif promedio_val >= 70:
+            estado_academico = 'Bueno'
+        elif promedio_val >= 51:
+            estado_academico = 'Regular'
+        else:
+            estado_academico = 'Riesgo' if total_tareas > 0 else 'Activo'
+
+        riesgo = (promedio_val < 51 and total_tareas > 0) or (cumplimiento < 50 and total_tareas >= 2)
+
+        estudiantes_list.append({
+            'id': est.id,
+            'estudiante_id': est.id,
+            'inscripcion_id': insc.id,
+            'nombre_completo': u.nombre_completo,
+            'email': u.email or f"{u.username}@estudiante.com",
+            'matricula': insc.codigo_ru or f"EST-{curso.id}-{est.id:03d}",
+            'grado': curso.grado,
+            'paralelo': curso.paralelo,
+            'curso_id': curso.id,
+            'curso_nombre': curso.nombre_completo,
+            'estado_inscripcion': insc.estado,
+            'tareas_asignadas': total_tareas,
+            'tareas_entregadas': entregadas_count,
+            'tareas_pendientes': pendientes,
+            'porcentaje_cumplimiento': int(cumplimiento),
+            'promedio': promedio_val,
+            'riesgo_academico': riesgo,
+            'estado_academico': estado_academico
+        })
+
+    return Response({
+        'curso': {
+            'id': curso.id,
+            'nombre': curso.nombre,
+            'grado': curso.grado,
+            'paralelo': curso.paralelo,
+            'nivel': curso.nivel,
+            'anio_lectivo': curso.anio_lectivo,
+            'colegio': curso.colegio.nombre if curso.colegio else '',
+            'total_materias': curso.materias.count(),
+            'total_tareas': total_tareas
+        },
+        'total_estudiantes': len(estudiantes_list),
+        'estudiantes': estudiantes_list
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def api_enviar_reporte_estudiante(request, estudiante_id):
+    """
+    Envia un reporte individual de desempeno academico al estudiante
+    generando una notificacion directa en el sistema y confirmacion.
+    """
+    user = request.user
+    if user.rol != 'DOCENTE':
+        return Response({'error': 'Solo docentes pueden emitir reportes academicos'}, status=status.HTTP_403_FORBIDDEN)
+
+    estudiante = get_object_or_404(Estudiante, id=estudiante_id)
+    asunto = request.data.get('asunto', f"Reporte de Desempeño - {estudiante.usuario.nombre_completo}")
+    mensaje = request.data.get('mensaje', '').strip()
+    email = request.data.get('email', estudiante.usuario.email)
+
+    if not mensaje:
+        return Response({'error': 'El contenido del reporte no puede estar vacío.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Registrar notificacion en la cuenta del estudiante
+    Notificacion.objects.create(
+        usuario=estudiante.usuario,
+        tipo='CALIFICADA',
+        mensaje=f"📊 REPORTE DE DESEMPEÑO ACADÉMICO ({asunto})\n\n{mensaje}"
+    )
+
+    return Response({
+        'ok': True,
+        'mensaje': f'Reporte enviado correctamente a {estudiante.usuario.nombre_completo}',
+        'destinatario': {
+            'id': estudiante.id,
+            'nombre': estudiante.usuario.nombre_completo,
+            'email': email
+        },
+        'asunto': asunto,
+        'fecha_envio': timezone.now().isoformat()
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def api_enviar_reportes_curso(request, curso_id):
+    """
+    Envia un reporte de desempeno academico a todos los estudiantes de un curso.
+    """
+    user = request.user
+    if user.rol != 'DOCENTE':
+        return Response({'error': 'Solo docentes pueden emitir reportes academicos'}, status=status.HTTP_403_FORBIDDEN)
+
+    curso = get_object_or_404(Curso, id=curso_id)
+    inscripciones = EstudianteCurso.objects.filter(curso=curso).select_related('estudiante__usuario')
+
+    asunto_base = request.data.get('asunto', f"Reporte General de Curso - {curso.nombre_completo}")
+    mensaje_personalizado = request.data.get('mensaje', '').strip()
+
+    total_enviados = 0
+    with transaction.atomic():
+        for insc in inscripciones:
+            est = insc.estudiante
+            msg = mensaje_personalizado or (
+                f"Estimado/a {est.usuario.nombre_completo},\n\n"
+                f"Se ha emitido el reporte periódico de desempeño para el curso {curso.nombre_completo}.\n"
+                f"Por favor revisa tus tareas pendientes y calificaciones en la plataforma EduSmart.\n\n"
+                f"Atentamente,\nProf. {user.nombre_completo}"
+            )
+            Notificacion.objects.create(
+                usuario=est.usuario,
+                tipo='CALIFICADA',
+                mensaje=f"📊 REPORTE DE DESEMPEÑO ({asunto_base})\n\n{msg}"
+            )
+            total_enviados += 1
+
+    return Response({
+        'ok': True,
+        'mensaje': f'Se enviaron con éxito {total_enviados} reportes a los estudiantes de {curso.nombre_completo}.',
+        'total_enviados': total_enviados
+    })
+

@@ -16,6 +16,7 @@ import {
   TeacherStudentsView,
   TeacherReportsView
 } from './pages/TeacherViews';
+import { StudentResultsView } from './pages/StudentViews';
 import UserProfileView from './pages/UserProfileView';
 import ColegiosPage from './pages/ColegiosPage';
 import ColegioDetallePage from './pages/ColegioDetallePage';
@@ -28,26 +29,27 @@ import EspacioDetallePage from './pages/EspacioDetallePage';
 // PAGE TITLES
 // ============================================================
 const PAGE_TITLES = {
-  'dashboard': ['Dashboard', 'Resumen de actividad académica'],
-  'mis-tareas': ['Mis Tareas', 'Consulta, seguimiento y entrega de tareas'],
-  'presentar-tarea': ['Presentar Tarea', 'Envío de trabajos y archivos adjuntos'],
-  'entregas': ['Mis Entregas', 'Historial de entregas y estado de revisión'],
-  'calificaciones': ['Calificaciones', 'Libro oficial de notas y evaluaciones'],
-  'retroalimentacion': ['Retroalimentación', 'Observaciones y comentarios formativos'],
-  'mi-progreso': ['Mi Progreso Académico', 'Indicadores de avance y desempeño'],
-  'mi-perfil': ['Mi Perfil', 'Datos personales y configuración de cuenta'],
-  'crear-tarea': ['Crear Tarea', 'Publicación de actividades para cursos'],
-  'seguimiento': ['Seguimiento Académico', 'Monitoreo integral de estudiantes'],
-  'reportes': ['Reportes y Estadísticas', 'Análisis institucional de rendimiento'],
-  'usuarios': ['Usuarios del Sistema', 'Directorio institucional'],
-  'materias': ['Asignaturas', 'Gestión de materias académicas'],
-  'cursos': ['Cursos Habilitados', 'Cursos y paralelos por período'],
-  'tareas': ['Tareas Académicas', 'Supervisión de actividades'],
-  'colegios': ['Mis Colegios', 'Instituciones educativas y entornos de trabajo'],
-  'espacios': ['Mis Espacios', 'Espacios académicos y materias'],
-  'teacher_courses': ['Administración del Curso', 'Gestión de estudiantes y asignaturas'],
-  'import_students': ['Importar Estudiantes', 'Carga masiva desde archivo Excel'],
-  'importar_calificaciones': ['Importar Calificaciones', 'Carga de notas desde archivo Excel'],
+  'dashboard':              ['Inicio',              'Resumen de actividad académica'],
+  'mis-tareas':             ['Mis Tareas',           'Consulta, seguimiento y entrega de tareas'],
+  'presentar-tarea':        ['Presentar Tarea',      'Envío de trabajos y archivos adjuntos'],
+  'entregas':               ['Entregas',             'Revisión y calificación de trabajos recibidos'],
+  'calificaciones':         ['Calificaciones',       'Libro oficial de notas y evaluaciones'],
+  'retroalimentacion':      ['Retroalimentación',    'Observaciones y comentarios formativos'],
+  'resultados':             ['Resultados',           'Notas, promedios y rendimiento académico'],
+  'mi-progreso':            ['Mi Progreso',          'Indicadores de avance y desempeño'],
+  'mi-perfil':              ['Mi Perfil',            'Datos personales y configuración de cuenta'],
+  'crear-tarea':            ['Crear Tarea',          'Publicación de actividades para cursos'],
+  'seguimiento':            ['Seguimiento',          'Monitoreo integral de estudiantes'],
+  'reportes':               ['Reportes',             'Análisis institucional de rendimiento'],
+  'usuarios':               ['Usuarios',             'Directorio institucional'],
+  'materias':               ['Asignaturas',          'Gestión de materias académicas'],
+  'cursos':                 ['Cursos',               'Cursos y paralelos por período'],
+  'tareas':                 ['Tareas',               'Supervisión y publicación de actividades'],
+  'colegios':               ['Mis Colegios',         'Instituciones educativas y entornos de trabajo'],
+  'espacios':               ['Mis Espacios',         'Espacios académicos y materias'],
+  'teacher_courses':        ['Administración del Curso', 'Gestión de estudiantes y asignaturas'],
+  'import_students':        ['Importar Estudiantes', 'Carga masiva desde archivo Excel'],
+  'importar_calificaciones':['Importar Calificaciones', 'Carga de notas desde archivo Excel'],
 };
 
 export default function App() {
@@ -130,13 +132,15 @@ export default function App() {
         case 'dashboard':
           return <StudentDashboard user={user} onNavigate={handleNavigate} />;
         case 'mis-tareas':
-          return <MyTasks initialTaskId={extraData?.taskId} initialFilter="todos" />;
+        case 'tareas':
+          return <MyTasks initialTaskId={extraData?.taskId} initialFilter={extraData?.filtro || 'todos'} onNavigate={handleNavigate} />;
         case 'presentar-tarea':
-          return <MyTasks initialTaskId={extraData?.taskId} initialFilter="pendientes" />;
+          return <MyTasks initialTaskId={extraData?.taskId} initialFilter="pendientes" onNavigate={handleNavigate} />;
         case 'entregas':
-          return <MyTasks initialTaskId={extraData?.taskId} initialFilter="entregadas" />;
+          return <MyTasks initialTaskId={extraData?.taskId} initialFilter="entregadas" onNavigate={handleNavigate} />;
+        case 'resultados':
         case 'calificaciones':
-          return <StudentGradesView onNavigate={handleNavigate} />;
+          return <StudentResultsView onNavigate={handleNavigate} />;
         case 'retroalimentacion':
           return <StudentFeedbackView onNavigate={handleNavigate} />;
         case 'espacios':
@@ -144,8 +148,9 @@ export default function App() {
           return <StudentEspaciosView onNavigate={handleNavigate} />;
         case 'espacio_detail':
         case 'espacio-detalle':
-          return <EspacioDetallePage user={user} espacioId={extraData?.espacioId} onBack={() => handleNavigate('mis-espacios')} />;
+          return <EspacioDetallePage user={user} espacioId={extraData?.espacioId} defaultTab={extraData?.defaultTab} onBack={() => handleNavigate('mis-espacios')} />;
         case 'mi-progreso':
+        case 'progreso':
           return <StudentProgress />;
         case 'mi-perfil':
           return <UserProfileView user={user} roleInfo={authState.roleInfo} onLogout={handleLogout} />;
@@ -163,7 +168,7 @@ export default function App() {
         case 'colegio-detalle':
           return <ColegioDetallePage colegio={extraData?.colegio} onBack={() => handleNavigate('colegios')} onNavigate={handleNavigate} />;
         case 'espacio-detalle':
-          return <EspacioDetallePage user={user} espacioId={extraData?.espacioId} onBack={() => handleNavigate(extraData?.fromColegio ? 'colegio-detalle' : 'colegios', extraData)} />;
+          return <EspacioDetallePage user={user} espacioId={extraData?.espacioId} defaultTab={extraData?.defaultTab} onBack={() => handleNavigate(extraData?.fromColegio ? 'colegio-detalle' : 'colegios', extraData)} />;
         case 'teacher_courses':
           return <CursoPage onNavigate={handleNavigate} colegioId={extraData?.colegioId} cursoId={extraData?.cursoId} />;
         case 'import_students':
@@ -171,23 +176,24 @@ export default function App() {
         case 'importar_calificaciones':
           return <ImportarCalificacionesPage onNavigate={handleNavigate} cursoId={extraData?.cursoId} tareaId={extraData?.tareaId} />;
         case 'dashboard':
-          return <TeacherDashboard onNavigate={handleNavigate} onOpenCreateTask={() => setShowTeacherCreate(true)} />;
+          return <TeacherDashboard user={user} onNavigate={handleNavigate} onOpenCreateTask={() => setShowTeacherCreate(true)} />;
         case 'mis-tareas':
         case 'tareas':
         case 'crear-tarea':
           return <TeacherTasksView onNavigate={handleNavigate} onOpenCreate={() => setShowTeacherCreate(true)} />;
         case 'entregas':
-          return <TeacherSubmissionsView initialTaskId={extraData?.filterTaskId} />;
+          return <TeacherSubmissionsView initialTaskId={extraData?.filterTaskId} onNavigate={handleNavigate} />;
+        case 'resultados':
         case 'calificaciones':
-          return <TeacherGradebookView />;
+          return <TeacherGradebookView onNavigate={handleNavigate} />;
         case 'seguimiento':
-          return <TeacherStudentsView />;
+          return <TeacherStudentsView onNavigate={handleNavigate} />;
         case 'reportes':
-          return <TeacherReportsView />;
+          return <TeacherReportsView onNavigate={handleNavigate} />;
         case 'mi-perfil':
           return <UserProfileView user={user} roleInfo={authState.roleInfo} onLogout={handleLogout} />;
         default:
-          return <TeacherDashboard onNavigate={handleNavigate} onOpenCreateTask={() => setShowTeacherCreate(true)} />;
+          return <TeacherDashboard user={user} onNavigate={handleNavigate} onOpenCreateTask={() => setShowTeacherCreate(true)} />;
       }
     }
 
@@ -196,7 +202,7 @@ export default function App() {
 
   return (
     <div className="app-layout">
-      {/* Microsoft Teams Sidebar */}
+      {/* Sidebar EduSmart */}
       <Sidebar
         user={user}
         roleInfo={authState.roleInfo}
@@ -207,7 +213,7 @@ export default function App() {
       />
 
       <div className="app-content">
-        {/* Microsoft Teams Topbar */}
+        {/* Topbar EduSmart */}
         <Topbar
           title={pageInfo[0]}
           subtitle={pageInfo[1]}

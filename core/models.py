@@ -134,6 +134,15 @@ class Estudiante(models.Model):
         progreso.recalcular()
         return progreso
 
+    def get_espacios_ids(self):
+        directos = set(self.espacios_inscritos.values_list('espacio_id', flat=True))
+        cursos_ids = list(self.cursos_inscritos.filter(estado='ACTIVO').values_list('curso_id', flat=True))
+        from django.apps import apps
+        EspacioModel = apps.get_model('core', 'Espacio')
+        de_cursos = set(EspacioModel.objects.filter(curso_id__in=cursos_ids).values_list('id', flat=True))
+        return list(directos.union(de_cursos))
+
+
 
 class EstudianteCurso(models.Model):
     ESTADOS = (('ACTIVO', 'Activo'), ('RETIRADO', 'Retirado'), ('SUSPENDIDO', 'Suspendido'))
@@ -305,9 +314,18 @@ class Material(models.Model):
 
 
 class Entrega(models.Model):
-    ESTADOS = (('ASIGNADA', 'Asignada'), ('EN_PROCESO', 'En proceso'), ('ENTREGADO', 'Entregada'),
-               ('EN_REVISION', 'En revision'), ('CALIFICADO', 'Calificada'),
-               ('RETROALIMENTADA', 'Retroalimentada'), ('VENCIDA', 'Vencida'), ('ATRASADO', 'Atrasado'))
+    ESTADOS = (
+        ('ASIGNADA', 'Asignada'),
+        ('EN_PROCESO', 'En proceso'),
+        ('ENTREGADO', 'Entregada'),
+        ('EN_REVISION', 'En revision'),
+        ('CALIFICADO', 'Calificada'),
+        ('RETROALIMENTADA', 'Retroalimentada'),
+        ('DEVUELTA', 'Devuelta para corrección'),
+        ('REENTREGADA', 'Reentregada'),
+        ('VENCIDA', 'Vencida'),
+        ('ATRASADO', 'Atrasado')
+    )
     tarea = models.ForeignKey(Tarea, on_delete=models.CASCADE, related_name='entregas')
     estudiante = models.ForeignKey(Estudiante, on_delete=models.CASCADE, related_name='entregas')
     fecha_entrega = models.DateTimeField(default=timezone.now)
@@ -316,7 +334,8 @@ class Entrega(models.Model):
     archivo_nombre = models.CharField(max_length=255, blank=True)
     archivo_tamano = models.CharField(max_length=30, blank=True, default='1.8 MB')
     observaciones = models.TextField(blank=True)
-    estado = models.CharField(max_length=20, choices=ESTADOS, default='ENTREGADO')
+    estado = models.CharField(max_length=30, choices=ESTADOS, default='ENTREGADO')
+    version = models.IntegerField(default=1)
 
     class Meta:
         db_table = 'entregas'
@@ -324,13 +343,33 @@ class Entrega(models.Model):
         ordering = ['-fecha_entrega']
 
     def __str__(self):
-        return f"Entrega de {self.estudiante.usuario.nombre_completo} - {self.tarea.titulo}"
+        return f"Entrega v{self.version} de {self.estudiante.usuario.nombre_completo} - {self.tarea.titulo}"
 
     def save(self, *args, **kwargs):
         if self.fecha_entrega > self.tarea.fecha_limite and self.estado in ['ENTREGADO', 'EN_PROCESO']:
             self.estado = 'ATRASADO'
         super().save(*args, **kwargs)
         self.estudiante.actualizar_progreso()
+
+
+class VersionEntrega(models.Model):
+    entrega = models.ForeignKey(Entrega, on_delete=models.CASCADE, related_name='versiones')
+    numero_version = models.IntegerField(default=1)
+    archivo_url = models.CharField(max_length=500, blank=True)
+    archivo_nombre = models.CharField(max_length=255, blank=True)
+    archivo_tamano = models.CharField(max_length=30, blank=True, default='1.8 MB')
+    comentario = models.TextField(blank=True)
+    fecha_envio = models.DateTimeField(default=timezone.now)
+    estado = models.CharField(max_length=30, default='ENTREGADO')
+    nota = models.FloatField(null=True, blank=True)
+    retroalimentacion = models.TextField(blank=True)
+
+    class Meta:
+        db_table = 'versiones_entrega'
+        ordering = ['-numero_version']
+
+    def __str__(self):
+        return f"v{self.numero_version} de {self.entrega}"
 
 
 class Calificacion(models.Model):
@@ -450,7 +489,9 @@ class ProgresoAcademico(models.Model):
 class Notificacion(models.Model):
     TIPOS = (('NUEVA_TAREA', 'Nueva Tarea'), ('PROXIMA_VENCER', 'Proxima a Vencer'),
              ('VENCIDA', 'Vencida'), ('CALIFICADA', 'Calificada'), ('RETROALIMENTACION', 'Retroalimentacion'),
-             ('INVITACION_ESPACIO', 'Espacio'), ('ENTREGA_CONFIRMADA', 'Entrega'), ('INVITACION_COLEGIO', 'Colegio'))
+             ('CORRECCION_SOLICITADA', 'Corrección Solicitada'), ('REENTREGA', 'Reentrega'),
+             ('AVISO_NUEVO', 'Nuevo Aviso'), ('INVITACION_ESPACIO', 'Espacio'),
+             ('ENTREGA_CONFIRMADA', 'Entrega'), ('INVITACION_COLEGIO', 'Colegio'))
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='notificaciones')
     tipo = models.CharField(max_length=30, choices=TIPOS, default='NUEVA_TAREA')
     mensaje = models.TextField()
@@ -465,6 +506,86 @@ class Notificacion(models.Model):
 
     def __str__(self):
         return f"Notif [{self.tipo}] -> {self.usuario.username}"
+
+
+class AvisoEspacio(models.Model):
+    espacio = models.ForeignKey('Espacio', on_delete=models.CASCADE, related_name='avisos')
+    docente = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='avisos')
+    titulo = models.CharField(max_length=200)
+    contenido = models.TextField()
+    fijado = models.BooleanField(default=False)
+    importante = models.BooleanField(default=False)
+    fecha_creacion = models.DateTimeField(default=timezone.now)
+    fecha_expiracion = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'avisos_espacio'
+        ordering = ['-fijado', '-fecha_creacion']
+
+    def __str__(self):
+        return f"Aviso: {self.titulo} ({self.espacio.nombre})"
+
+
+class RecursoEspacio(models.Model):
+    TIPOS = (
+        ('PDF', 'PDF'),
+        ('DOCUMENTO', 'Documento'),
+        ('PRESENTACION', 'Presentación'),
+        ('ENLACE', 'Enlace'),
+        ('VIDEO', 'Video'),
+        ('GUIA', 'Guía de Estudio'),
+        ('OTRO', 'Otro')
+    )
+    espacio = models.ForeignKey('Espacio', on_delete=models.CASCADE, related_name='recursos')
+    docente = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='recursos_creados')
+    titulo = models.CharField(max_length=200)
+    descripcion = models.TextField(blank=True)
+    tipo = models.CharField(max_length=30, choices=TIPOS, default='PDF')
+    archivo = models.FileField(upload_to='recursos_espacio/', null=True, blank=True)
+    archivo_url = models.CharField(max_length=500, blank=True)
+    enlace_url = models.CharField(max_length=500, blank=True)
+    tamano = models.CharField(max_length=30, blank=True, default='1.5 MB')
+    fecha_subida = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = 'recursos_espacio'
+        ordering = ['-fecha_subida']
+
+    def __str__(self):
+        return f"{self.titulo} [{self.tipo}] ({self.espacio.nombre})"
+
+
+class ExtensionFechaTarea(models.Model):
+    tarea = models.ForeignKey('Tarea', on_delete=models.CASCADE, related_name='extensiones')
+    estudiante = models.ForeignKey(Estudiante, on_delete=models.CASCADE, related_name='extensiones_tarea')
+    docente = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='extensiones_otorgadas')
+    nueva_fecha_limite = models.DateTimeField()
+    motivo = models.CharField(max_length=255, blank=True)
+    fecha_creacion = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = 'extensiones_tarea'
+        unique_together = ('tarea', 'estudiante')
+
+    def __str__(self):
+        return f"Extensión {self.estudiante} en {self.tarea.titulo} hasta {self.nueva_fecha_limite}"
+
+
+class PlantillaTarea(models.Model):
+    docente = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='plantillas_tarea')
+    titulo = models.CharField(max_length=200)
+    descripcion = models.TextField()
+    indicaciones = models.TextField(blank=True)
+    puntaje_maximo = models.IntegerField(default=100)
+    criterios_json = models.TextField(blank=True, default='[]')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'plantillas_tarea'
+        ordering = ['-fecha_creacion']
+
+    def __str__(self):
+        return f"Plantilla: {self.titulo}"
 
 # ==============================================================================
 # GAMIFICACIÓN PREMIUM
@@ -493,17 +614,39 @@ class UserBadge(models.Model):
         unique_together = ('usuario', 'badge')
 
 class Challenge(models.Model):
+    TIPOS = (
+        ('TAREAS', 'Entregar Tareas'),
+        ('PUNTAJE', 'Obtener Puntaje'),
+        ('ASISTENCIA', 'Asistencia'),
+        ('GENERAL', 'General'),
+    )
     titulo = models.CharField(max_length=150)
     descripcion = models.TextField()
+    tipo = models.CharField(max_length=20, choices=TIPOS, default='GENERAL')
+    espacio = models.ForeignKey(
+        'Espacio', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='retos',
+        help_text='Si está vacío, el reto es global para todos los estudiantes.'
+    )
+    creado_por = models.ForeignKey(
+        'Docente', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='retos_creados'
+    )
     recompensa_puntos = models.IntegerField(default=10)
     recompensa_coins = models.IntegerField(default=5)
+    meta = models.IntegerField(default=1, help_text='Número de veces que se debe completar la acción')
     activo = models.BooleanField(default=True)
+    fecha_inicio = models.DateTimeField(default=timezone.now)
     fecha_limite = models.DateTimeField(null=True, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'challenges'
+        ordering = ['-fecha_creacion']
 
     def __str__(self):
+        if self.espacio:
+            return f"{self.titulo} ({self.espacio.nombre})"
         return self.titulo
 
 class UserChallenge(models.Model):

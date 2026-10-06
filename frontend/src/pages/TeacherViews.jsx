@@ -743,6 +743,7 @@ export function TeacherGradebookView() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [reportStudent, setReportStudent] = useState(null);
 
   useEffect(() => {
     teacherAPI.studentsList()
@@ -798,6 +799,7 @@ export function TeacherGradebookView() {
                 <th>Cumplimiento</th>
                 <th>Promedio Actual</th>
                 <th>Rendimiento</th>
+                <th style={{ textAlign: 'center' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -825,6 +827,16 @@ export function TeacherGradebookView() {
                         {s.estado_academico}
                       </span>
                     </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        className="btn btn-outline btn-sm"
+                        style={{ fontSize: 11, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                        onClick={() => setReportStudent(s)}
+                        title="Enviar reporte de desempeño académico"
+                      >
+                        <Send size={11} /> Reporte
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -832,6 +844,188 @@ export function TeacherGradebookView() {
           </table>
         </div>
       )}
+
+      {/* Modal: Send report */}
+      {reportStudent && (
+        <Modal
+          open={true}
+          onClose={() => setReportStudent(null)}
+          title={`📊 Reporte Académico — ${reportStudent.nombre_completo}`}
+        >
+          <SendReportModal
+            student={reportStudent}
+            onClose={() => setReportStudent(null)}
+          />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// MODAL: SEND ACADEMIC REPORT TO STUDENT
+// ============================================================
+function SendReportModal({ student, onClose }) {
+  const [asunto, setAsunto] = useState(`Reporte de Desempeño Académico - ${student.nombre_completo}`);
+  const [mensaje, setMensaje] = useState(
+    `Estimado/a ${student.nombre_completo},\n\n` +
+    `Le informamos su situación académica actual:\n\n` +
+    `• Tareas entregadas: ${student.tareas_entregadas} de ${student.tareas_asignadas}\n` +
+    `• Tareas pendientes: ${student.tareas_pendientes}\n` +
+    `• Porcentaje de cumplimiento: ${student.porcentaje_cumplimiento}%\n` +
+    `• Promedio actual: ${student.promedio > 0 ? student.promedio + '/100' : 'Sin calificaciones aún'}\n` +
+    `• Estado académico: ${student.estado_academico}\n\n` +
+    `${student.riesgo_academico ? '⚠️ ATENCIÓN: El estudiante presenta indicadores de riesgo académico. Se recomienda atención adicional.\n\n' : ''}` +
+    `Saludos,\nEquipo Docente EduSmart`
+  );
+  const [incluirCalif, setIncluirCalif] = useState(true);
+  const [incluirProgreso, setIncluirProgreso] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSend = async () => {
+    setSending(true);
+    setError('');
+    try {
+      await teacherAPI.sendReport(student.id, {
+        email: student.email,
+        asunto,
+        mensaje,
+        incluir_calificaciones: incluirCalif,
+        incluir_progreso: incluirProgreso,
+      });
+      setSent(true);
+    } catch (err) {
+      setError(err.message || 'Error al enviar el reporte.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (sent) {
+    return (
+      <div style={{ textAlign: 'center', padding: '28px 16px' }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 16px', fontSize: 28
+        }}>✅</div>
+        <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#065F46', marginBottom: 6 }}>
+          ¡Reporte enviado exitosamente!
+        </h3>
+        <p style={{ color: '#616161', fontSize: '12.5px', marginBottom: 4 }}>
+          Se envió el informe de desempeño a:
+        </p>
+        <p style={{ color: '#5B5FC7', fontWeight: 600, fontSize: '13px' }}>{student.email}</p>
+        <button className="btn btn-secondary" style={{ marginTop: 18 }} onClick={onClose}>
+          Cerrar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {error && <Alert type="error" onClose={() => setError('')}>{error}</Alert>}
+
+      {/* Student header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        background: '#F0F4FF', borderRadius: 8, padding: '12px 14px', marginBottom: 18,
+        border: '1px solid #C7D2FE'
+      }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: '50%',
+          backgroundColor: '#5B5FC7', color: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 700, fontSize: '14px', flexShrink: 0
+        }}>
+          {student.nombre_completo.slice(0, 2).toUpperCase()}
+        </div>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: '13.5px', color: '#1E3A8A' }}>{student.nombre_completo}</div>
+          <div style={{ fontSize: '11.5px', color: '#4B5563' }}>
+            📧 {student.email} · {student.matricula}
+          </div>
+        </div>
+        {student.riesgo_academico && (
+          <span style={{
+            marginLeft: 'auto', background: '#FEF2F2', color: '#B91C1C',
+            border: '1px solid #FECACA', borderRadius: 6,
+            padding: '3px 8px', fontSize: '11px', fontWeight: 600
+          }}>
+            ⚠️ Riesgo
+          </span>
+        )}
+      </div>
+
+      {/* Metrics summary */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 18 }}>
+        {[
+          { label: 'Promedio', value: student.promedio > 0 ? `${student.promedio}/100` : '—', color: getNoteColor(student.promedio) },
+          { label: 'Cumplimiento', value: `${student.porcentaje_cumplimiento}%`, color: student.porcentaje_cumplimiento >= 80 ? '#107C41' : '#CA5010' },
+          { label: 'Pendientes', value: student.tareas_pendientes, color: student.tareas_pendientes > 0 ? '#CA5010' : '#616161' },
+        ].map((m, i) => (
+          <div key={i} style={{
+            background: '#FAF9F8', border: '1px solid #EDEBE9',
+            borderRadius: 6, padding: '10px', textAlign: 'center'
+          }}>
+            <div style={{ fontWeight: 700, fontSize: '16px', color: m.color }}>{m.value}</div>
+            <div style={{ fontSize: '10.5px', color: '#8A8886', marginTop: 2 }}>{m.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Options */}
+      <div style={{ marginBottom: 14, display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '12.5px', color: '#242424', cursor: 'pointer' }}>
+          <input type="checkbox" checked={incluirCalif} onChange={e => setIncluirCalif(e.target.checked)} />
+          Incluir calificaciones detalladas
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '12.5px', color: '#242424', cursor: 'pointer' }}>
+          <input type="checkbox" checked={incluirProgreso} onChange={e => setIncluirProgreso(e.target.checked)} />
+          Incluir gráfico de progreso
+        </label>
+      </div>
+
+      {/* Subject */}
+      <div className="form-group" style={{ marginBottom: 12 }}>
+        <label className="form-label">Asunto del correo</label>
+        <input
+          className="form-control"
+          value={asunto}
+          onChange={e => setAsunto(e.target.value)}
+          placeholder="Asunto..."
+        />
+      </div>
+
+      {/* Message body */}
+      <div className="form-group" style={{ marginBottom: 16 }}>
+        <label className="form-label">Mensaje personalizado</label>
+        <textarea
+          className="form-control"
+          rows={8}
+          value={mensaje}
+          onChange={e => setMensaje(e.target.value)}
+          style={{ fontFamily: 'monospace', fontSize: '12px', lineHeight: 1.6 }}
+        />
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+        <button className="btn btn-secondary" onClick={onClose} disabled={sending}>
+          Cancelar
+        </button>
+        <button
+          className="btn btn-primary"
+          onClick={handleSend}
+          disabled={sending || !asunto.trim()}
+        >
+          <Send size={14} /> {sending ? 'Enviando...' : 'Enviar reporte'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -842,6 +1036,8 @@ export function TeacherGradebookView() {
 export function TeacherStudentsView() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [reportStudent, setReportStudent] = useState(null);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     teacherAPI.studentsList()
@@ -850,29 +1046,54 @@ export function TeacherStudentsView() {
       .finally(() => setLoading(false));
   }, []);
 
+  const filtered = students.filter(s =>
+    !search ||
+    s.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
+    s.matricula.includes(search)
+  );
+
   return (
     <div className="page-container">
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#242424', marginBottom: 4 }}>
-          Seguimiento Académico de Estudiantes
-        </h2>
-        <p style={{ color: '#616161', fontSize: '12.5px' }}>
-          Monitoreo del desempeño, ritmo de entrega y estado de riesgo académico de tus estudiantes.
-        </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#242424', marginBottom: 4 }}>
+            Seguimiento Académico de Estudiantes
+          </h2>
+          <p style={{ color: '#616161', fontSize: '12.5px' }}>
+            Monitoreo del desempeño, ritmo de entrega y estado de riesgo académico. Envía reportes personalizados directamente al correo del estudiante.
+          </p>
+        </div>
+        <div style={{ position: 'relative', width: 240 }}>
+          <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
+          <input
+            className="form-control"
+            style={{ paddingLeft: 28, height: 32, fontSize: '12.5px' }}
+            placeholder="Buscar estudiante..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       {loading ? (
         <Loading text="Cargando expedientes de estudiantes..." />
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={Users} title="Sin resultados" description="No se encontró ningún estudiante con ese criterio." />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-          {students.map(est => (
-            <div key={est.id} className="card" style={{ padding: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: 16 }}>
+          {filtered.map(est => (
+            <div key={est.id} className="card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {/* Header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                 <div style={{
                   width: 40, height: 40, borderRadius: '50%',
-                  backgroundColor: '#5B5FC7', color: '#FFFFFF',
+                  background: est.riesgo_academico
+                    ? 'linear-gradient(135deg, #FEE2E2, #FECACA)'
+                    : 'linear-gradient(135deg, #5B5FC7, #4338CA)',
+                  color: est.riesgo_academico ? '#B91C1C' : '#FFFFFF',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 600, fontSize: '14px', flexShrink: 0
+                  fontWeight: 700, fontSize: '14px', flexShrink: 0,
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.12)'
                 }}>
                   {est.nombre_completo.slice(0, 2).toUpperCase()}
                 </div>
@@ -880,8 +1101,8 @@ export function TeacherStudentsView() {
                   <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#242424', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {est.nombre_completo}
                   </div>
-                  <div style={{ fontSize: '11.5px', color: '#616161' }}>
-                    Matrícula: {est.matricula} · {est.grado} "{est.paralelo}"
+                  <div style={{ fontSize: '11px', color: '#616161' }}>
+                    {est.matricula} · {est.grado} "{est.paralelo}"
                   </div>
                 </div>
                 <span className={`badge ${est.estado_academico === 'Excelente' ? 'badge-calificada' : est.estado_academico === 'Regular' ? 'badge-pendiente' : 'badge-vencida'}`}>
@@ -889,24 +1110,58 @@ export function TeacherStudentsView() {
                 </span>
               </div>
 
+              {/* Progress bar */}
               <div style={{ marginBottom: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#616161', marginBottom: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#616161', marginBottom: 4 }}>
                   <span>Progreso de tareas</span>
-                  <span style={{ fontWeight: 600 }}>{est.tareas_entregadas} de {est.tareas_asignadas} ({est.porcentaje_cumplimiento}%)</span>
+                  <span style={{ fontWeight: 600 }}>{est.tareas_entregadas}/{est.tareas_asignadas} ({est.porcentaje_cumplimiento}%)</span>
                 </div>
-                <ProgressBar value={est.porcentaje_cumplimiento} color={est.porcentaje_cumplimiento >= 80 ? 'success' : 'warning'} height={6} />
+                <ProgressBar value={est.porcentaje_cumplimiento} color={est.porcentaje_cumplimiento >= 80 ? 'success' : est.porcentaje_cumplimiento >= 50 ? 'warning' : 'danger'} height={6} />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTop: '1px solid #EDEBE9' }}>
-                <span style={{ fontSize: '11.5px', color: '#8A8886' }}>Promedio asignado</span>
-                <span style={{ fontWeight: 700, fontSize: '14px', color: getNoteColor(est.promedio) }}>
-                  {est.promedio > 0 ? `${est.promedio}/100` : '—'}
-                </span>
+              {/* Average + risk flag */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTop: '1px solid #EDEBE9', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: '11px', color: '#8A8886' }}>Promedio:</span>
+                  <span style={{ fontWeight: 700, fontSize: '14px', color: getNoteColor(est.promedio) }}>
+                    {est.promedio > 0 ? `${est.promedio}/100` : '—'}
+                  </span>
+                </div>
+                {est.riesgo_academico && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#B91C1C', fontSize: '11px', fontWeight: 600 }}>
+                    <AlertTriangle size={12} />
+                    Riesgo académico
+                  </div>
+                )}
               </div>
+
+              {/* Send report button */}
+              <button
+                className="btn btn-primary"
+                style={{ width: '100%', justifyContent: 'center', fontSize: '12.5px' }}
+                onClick={() => setReportStudent(est)}
+              >
+                <Send size={13} />
+                Enviar reporte de desempeño
+              </button>
             </div>
           ))}
         </div>
       )}
+
+      {/* Send Report Modal */}
+      <Modal
+        open={!!reportStudent}
+        onClose={() => setReportStudent(null)}
+        title={`📊 Reporte Académico — ${reportStudent?.nombre_completo || ''}`}
+      >
+        {reportStudent && (
+          <SendReportModal
+            student={reportStudent}
+            onClose={() => setReportStudent(null)}
+          />
+        )}
+      </Modal>
     </div>
   );
 }

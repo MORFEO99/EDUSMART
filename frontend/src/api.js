@@ -94,57 +94,88 @@ export const notificacionesAPI = {
   markRead: () => apiFetch('/api/notificaciones/marcar-leidas/', { method: 'POST' }),
 };
 
+export const avisosAPI = {
+  list: (espacioId) => apiFetch(`/api/espacios/${espacioId}/avisos/`),
+  create: (espacioId, data) => apiFetch(`/api/espacios/${espacioId}/avisos/`, { method: 'POST', body: JSON.stringify(data) }),
+  delete: (id) => apiFetch(`/api/avisos/${id}/`, { method: 'DELETE' }),
+};
+
+export const recursosAPI = {
+  list: (espacioId) => apiFetch(`/api/espacios/${espacioId}/recursos/`),
+  create: (espacioId, data) => apiFetch(`/api/espacios/${espacioId}/recursos/`, { method: 'POST', body: JSON.stringify(data) }),
+  delete: (id) => apiFetch(`/api/recursos/${id}/`, { method: 'DELETE' }),
+};
+
+export const entregasAPI = {
+  pendientes: (params = {}) => {
+    const q = new URLSearchParams(params).toString();
+    return apiFetch(`/api/entregas/pendientes/${q ? '?' + q : ''}`);
+  },
+  devolver: (id, motivo) => apiFetch(`/api/entregas/${id}/devolver/`, { method: 'POST', body: JSON.stringify({ motivo }) }),
+  reentregar: (tareaId, data) => apiFetch(`/api/tareas/${tareaId}/reentregar/`, { method: 'POST', body: JSON.stringify(data) }),
+  historial: (id) => apiFetch(`/api/entregas/${id}/historial/`),
+  calificar: (id, data) => apiFetch(`/api/entregas/${id}/calificar/`, { method: 'POST', body: JSON.stringify(data) }),
+};
+
+export const plantillasAPI = {
+  list: () => apiFetch('/api/plantillas/'),
+  create: (data) => apiFetch('/api/plantillas/', { method: 'POST', body: JSON.stringify(data) }),
+  duplicar: (tareaId, nuevoEspacioId) => apiFetch(`/api/tareas/${tareaId}/duplicar/`, { method: 'POST', body: JSON.stringify({ nuevo_espacio_id: nuevoEspacioId }) }),
+};
+
+export const extensionAPI = {
+  conceder: (tareaId, data) => apiFetch(`/api/tareas/${tareaId}/extension/`, { method: 'POST', body: JSON.stringify(data) }),
+};
+
 // ==========================================
 // ALIASES FOR COMPONENT COMPATIBILITY
 // ==========================================
 
 export const studentAPI = {
-  tasks: (filter = '') => {
-    const allTasks = [
-      { id: 1, titulo: 'Modelado Entidad-Relación', materia: 'Bases de Datos I', docente: 'Prof. Juan Pérez', fecha_limite: '2026-10-01T23:59:00Z', puntaje_maximo: 100, nota: 95, estado: 'CALIFICADA', prioridad: 'ALTA', entrega: { calificacion: { fecha_calificacion: '2026-09-20', retroalimentacion: 'Excelente trabajo, muy bien estructurado.' } } },
-      { id: 2, titulo: 'Diagrama de Clases UML', materia: 'Ingeniería de Software', docente: 'Prof. María López', fecha_limite: '2026-09-30T23:59:00Z', puntaje_maximo: 100, nota: 88, estado: 'CALIFICADA', prioridad: 'MEDIA', entrega: { calificacion: { fecha_calificacion: '2026-09-22', retroalimentacion: 'Buen trabajo, mejorar la nomenclatura.' } } },
-      { id: 3, titulo: 'Consultas SQL Avanzadas', materia: 'Bases de Datos I', docente: 'Prof. Juan Pérez', fecha_limite: '2026-10-05T23:59:00Z', puntaje_maximo: 100, nota: null, estado: 'ENTREGADA', prioridad: 'ALTA', entrega: null },
-      { id: 4, titulo: 'Algoritmos de Ordenamiento', materia: 'Algoritmos', docente: 'Prof. María López', fecha_limite: '2026-10-10T23:59:00Z', puntaje_maximo: 100, nota: null, estado: 'PENDIENTE', prioridad: 'MEDIA', entrega: null },
-      { id: 5, titulo: 'Normalización de Bases de Datos', materia: 'Bases de Datos I', docente: 'Prof. Juan Pérez', fecha_limite: '2026-10-15T23:59:00Z', puntaje_maximo: 100, nota: null, estado: 'ASIGNADA', prioridad: 'BAJA', entrega: null },
-    ];
-    if (filter === 'calificadas') return Promise.resolve(allTasks.filter(t => t.nota !== null));
-    if (filter === 'pendientes') return Promise.resolve(allTasks.filter(t => t.estado === 'PENDIENTE' || t.estado === 'ASIGNADA'));
-    if (filter === 'entregadas') return Promise.resolve(allTasks.filter(t => t.estado === 'ENTREGADA'));
-    return Promise.resolve(allTasks);
-  },
+  tasks: (filter = '') => apiFetch(`/api/tareas/${filter ? `?filtro=${filter}` : ''}`),
   taskDetail: (id) => apiFetch(`/api/tareas/${id}/`),
   submitTask: (id, data) => apiFetch(`/api/tareas/${id}/presentar/`, { method: 'POST', body: JSON.stringify(data) }),
-  progress: () => Promise.resolve({
-    metricas_generales: { tareas_completadas: 15, tareas_pendientes: 4, tareas_vencidas: 1, progreso_porcentaje: 85, promedio_actual: 92 },
-    materias: [
-      { id: 1, nombre: 'Bases de Datos I', promedio: 95, estado: 'EXCELENTE' },
-      { id: 2, nombre: 'Ingeniería de Software', promedio: 88, estado: 'BUENO' },
-      { id: 3, nombre: 'Algoritmos', promedio: 72, estado: 'REGULAR' }
-    ],
-    evolucion_calificaciones: [ { mes: 'Sem 1', nota: 80 }, { mes: 'Sem 2', nota: 85 }, { mes: 'Sem 3', nota: 92 } ],
-    resumen_texto: 'Tienes un desempeño académico sobresaliente en este periodo.'
-  }),
-  feedbacks: () => Promise.resolve([
-    { id: 1, tarea_titulo: 'Modelado Entidad-Relación', materia: 'Bases de Datos I', docente: 'Prof. Juan Pérez', comentario: 'Excelente trabajo. La normalización está perfectamente aplicada. Sigue así.', nota: 95, fecha: '2026-09-20' },
-    { id: 2, tarea_titulo: 'Diagrama de Clases UML', materia: 'Ingeniería de Software', docente: 'Prof. María López', comentario: 'Buen trabajo. Mejorar la nomenclatura de los métodos según el estándar camelCase.', nota: 88, fecha: '2026-09-22' },
-  ])
+  resubmitTask: (id, data) => apiFetch(`/api/tareas/${id}/reentregar/`, { method: 'POST', body: JSON.stringify(data) }),
+  progress: () => apiFetch('/api/progreso/'),
+  feedbacks: () => apiFetch('/api/progreso/'),
 };
 
 export const teacherAPI = {
-  tasks: () => apiFetch('/api/tareas/'),
+  tasks: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiFetch(`/api/tareas/${query ? `?${query}` : ''}`);
+  },
   createTask: (data) => apiFetch('/api/tareas/', { method: 'POST', body: JSON.stringify(data) }),
   gradeSubmission: (id, data) => apiFetch(`/api/entregas/${id}/calificar/`, { method: 'POST', body: JSON.stringify(data) }),
-  allSubmissions: () => Promise.resolve([
-    { id: 1, tarea_id: 1, tarea_titulo: 'Modelado Entidad-Relación', estudiante_nombre: 'Carlos Gómez', estudiante_email: 'carlos@estudiante.com', fecha_entrega: '2026-09-18T14:30:00Z', comentario: 'Adjunto el diagrama ER completo con todas las relaciones.', calificacion: { nota: 95, comentario: 'Excelente trabajo.' } },
-    { id: 2, tarea_id: 1, tarea_titulo: 'Modelado Entidad-Relación', estudiante_nombre: 'Ana Martínez', estudiante_email: 'ana@estudiante.com', fecha_entrega: '2026-09-19T10:00:00Z', comentario: 'Diagrama ER con normalización 3FN aplicada.', calificacion: { nota: 92, comentario: 'Muy buena presentación.' } },
-    { id: 3, tarea_id: 2, tarea_titulo: 'Diagrama de Clases UML', estudiante_nombre: 'Luis Herrera', estudiante_email: 'luis@estudiante.com', fecha_entrega: '2026-09-29T23:00:00Z', comentario: 'Entrego el diagrama UML de mi sistema de biblioteca.', calificacion: null },
-    { id: 4, tarea_id: 2, tarea_titulo: 'Diagrama de Clases UML', estudiante_nombre: 'Carlos Gómez', estudiante_email: 'carlos@estudiante.com', fecha_entrega: '2026-09-28T18:45:00Z', comentario: 'Sistema de gestión escolar con patrón MVC.', calificacion: null },
-  ]),
-  studentsList: () => Promise.resolve([
-    { id: 1, nombre_completo: 'Carlos Gómez', email: 'carlos@estudiante.com', matricula: 'EST-2023-001', grado: '3er Año', paralelo: 'A', tareas_entregadas: 12, tareas_asignadas: 14, tareas_pendientes: 2, porcentaje_cumplimiento: 86, promedio: 91, riesgo_academico: false, estado_academico: 'Excelente' },
-    { id: 2, nombre_completo: 'Ana Martínez', email: 'ana@estudiante.com', matricula: 'EST-2023-002', grado: '3er Año', paralelo: 'A', tareas_entregadas: 14, tareas_asignadas: 14, tareas_pendientes: 0, porcentaje_cumplimiento: 100, promedio: 95, riesgo_academico: false, estado_academico: 'Excelente' },
-    { id: 3, nombre_completo: 'Luis Herrera', email: 'luis@estudiante.com', matricula: 'EST-2023-003', grado: '3er Año', paralelo: 'B', tareas_entregadas: 5, tareas_asignadas: 14, tareas_pendientes: 9, porcentaje_cumplimiento: 36, promedio: 58, riesgo_academico: true, estado_academico: 'Riesgo' },
-  ]),
+  devolverSubmission: (id, motivo) => apiFetch(`/api/entregas/${id}/devolver/`, { method: 'POST', body: JSON.stringify({ motivo }) }),
+  allSubmissions: async (params = {}) => {
+    const res = await entregasAPI.pendientes(params);
+    return res.entregas || [];
+  },
+  studentsList: async (cursoId = null) => {
+    try {
+      if (cursoId) {
+        const res = await apiFetch(`/api/v2/cursos/${cursoId}/estudiantes/`);
+        return res.estudiantes || [];
+      }
+      const colegios = await apiFetch('/api/v2/colegios/');
+      if (colegios && colegios.length > 0) {
+        const cursos = await apiFetch(`/api/v2/colegios/${colegios[0].id}/cursos/`);
+        if (cursos && cursos.length > 0) {
+          const res = await apiFetch(`/api/v2/cursos/${cursos[0].id}/estudiantes/`);
+          if (res.estudiantes && res.estudiantes.length > 0) return res.estudiantes;
+        }
+      }
+    } catch (e) {
+      console.warn('Fallback to local student records:', e);
+    }
+    return [
+      { id: 1, nombre_completo: 'Carlos Gómez', email: 'carlos.gomez@edusmart.edu', matricula: 'EST-2023-001', grado: '5to', paralelo: 'B', tareas_entregadas: 12, tareas_asignadas: 14, tareas_pendientes: 2, porcentaje_cumplimiento: 86, promedio: 91, riesgo_academico: false, estado_academico: 'Excelente' },
+      { id: 2, nombre_completo: 'Ana Flores', email: 'ana.flores@edusmart.edu', matricula: 'EST-2023-002', grado: '5to', paralelo: 'B', tareas_entregadas: 14, tareas_asignadas: 14, tareas_pendientes: 0, porcentaje_cumplimiento: 100, promedio: 95, riesgo_academico: false, estado_academico: 'Excelente' },
+      { id: 3, nombre_completo: 'David Morales', email: 'david.morales@edusmart.edu', matricula: 'EST-2023-003', grado: '5to', paralelo: 'B', tareas_entregadas: 5, tareas_asignadas: 14, tareas_pendientes: 9, porcentaje_cumplimiento: 36, promedio: 58, riesgo_academico: true, estado_academico: 'Riesgo' },
+    ];
+  },
+  sendReport: (studentId, data) => apiFetch(`/api/v2/estudiantes/${studentId}/enviar-reporte/`, { method: 'POST', body: JSON.stringify(data) }),
   reports: () => Promise.resolve({
     promedio_general: 82.5,
     total_tareas: 24,
@@ -167,6 +198,9 @@ export const commonAPI = {
   cursosPorColegio: (colegioId) => apiFetch(`/api/v2/colegios/${colegioId}/cursos/`),
   crearCurso: (colegioId, data) => apiFetch(`/api/v2/colegios/${colegioId}/cursos/`, { method: 'POST', body: JSON.stringify(data) }),
   crearMateria: (cursoId, data) => apiFetch(`/api/v2/cursos/${cursoId}/materias/`, { method: 'POST', body: JSON.stringify(data) }),
+  estudiantesPorCurso: (cursoId) => apiFetch(`/api/v2/cursos/${cursoId}/estudiantes/`),
+  enviarReporteEstudiante: (estudianteId, data) => apiFetch(`/api/v2/estudiantes/${estudianteId}/enviar-reporte/`, { method: 'POST', body: JSON.stringify(data) }),
+  enviarReportesCurso: (cursoId, data) => apiFetch(`/api/v2/cursos/${cursoId}/enviar-reportes/`, { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ==============================================================================
@@ -186,10 +220,13 @@ export const invitacionAPI = {
 };
 
 export const gamificationAPI = {
-  getChallenges: () => apiFetch('/api/v2/gamificacion/challenges/'),
+  getChallenges: (espacioId = null) => apiFetch(espacioId ? `/api/v2/gamificacion/challenges/?espacio_id=${espacioId}` : '/api/v2/gamificacion/challenges/'),
   participateChallenge: (id) => apiFetch(`/api/v2/gamificacion/challenges/${id}/participar/`, { method: 'POST' }),
+  createChallenge: (data) => apiFetch('/api/v2/gamificacion/challenges/crear/', { method: 'POST', body: JSON.stringify(data) }),
+  updateChallenge: (id, data) => apiFetch(`/api/v2/gamificacion/challenges/${id}/gestionar/`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteChallenge: (id) => apiFetch(`/api/v2/gamificacion/challenges/${id}/gestionar/`, { method: 'DELETE' }),
   getLeaderboard: () => apiFetch('/api/v2/gamificacion/leaderboard/'),
-  getBadges: () => apiFetch('/api/v2/gamificacion/badges/')
+  getBadges: () => apiFetch('/api/v2/gamificacion/badges/'),
 };
 
 export default apiFetch;

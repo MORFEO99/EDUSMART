@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft, Building, GraduationCap, BookOpen, Plus,
   Users, FolderOpen, ChevronRight, ArrowRight, AlertCircle,
-  Layers, Calendar, X
+  Layers, Calendar, X, Target
 } from 'lucide-react';
 import { Loading, EmptyState, Modal } from '../components';
 import { commonAPI } from '../api';
@@ -297,6 +297,14 @@ export default function ColegioDetallePage({ colegio, onBack, onNavigate }) {
                                 title="Código de invitación para estudiantes"
                               >
                                 <Users size={12} /> Código
+                              </button>
+                              <button
+                                className="btn btn-outline btn-sm"
+                                style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, borderColor: '#C7D2FE', color: '#4F46E5' }}
+                                onClick={() => onNavigate('espacio-detalle', { espacioId: mat.espacio_id, colegio, fromColegio: true, defaultTab: 'retos' })}
+                                title="Retos de aprendizaje con IA de esta materia"
+                              >
+                                <Target size={12} /> Retos IA
                               </button>
                               <button
                                 className="btn btn-primary btn-sm"

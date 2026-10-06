@@ -125,7 +125,7 @@ export default function StudentDashboard({ user, onNavigate }) {
         {/* Left Column: Próximas Tareas */}
         <div>
           {/* Retos Educativos */}
-          <ChallengeBoard />
+          <ChallengeBoard userRole={user?.rol} />
 
           {/* Próximas Tareas */}
           <div style={{ marginBottom: 28 }}>

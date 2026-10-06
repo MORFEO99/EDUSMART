@@ -4,7 +4,7 @@ import {
   User, LogOut, Plus, Bell, X, Check, ChevronRight, FileText,
   Clock, Award, MessageSquare, AlertCircle, AlertTriangle, UploadCloud,
   Download, Eye, Share2, Layers, BookOpen, Code, Database, Cpu, Menu,
-  CheckCircle2, ArrowRight, Building
+  CheckCircle2, ArrowRight, Building, Inbox, BarChart2, Search, Sparkles, Target
 } from 'lucide-react';
 
 // ============================================================
@@ -17,7 +17,7 @@ export function EdusmartLogo({ size = 34, showText = true, subtitle = true }) {
         width: size,
         height: size,
         borderRadius: 8,
-        background: 'linear-gradient(135deg, #1E3A8A 0%, #0284C7 100%)',
+        background: 'linear-gradient(135deg, #0F1E3D 0%, #1E3A8A 50%, #0284C7 100%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -43,7 +43,7 @@ export function EdusmartLogo({ size = 34, showText = true, subtitle = true }) {
           </div>
           {subtitle && (
             <div style={{ fontSize: 9.5, fontWeight: 700, color: '#0284C7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Tareas Académicas
+              Plataforma Educativa
             </div>
           )}
         </div>
@@ -53,20 +53,25 @@ export function EdusmartLogo({ size = 34, showText = true, subtitle = true }) {
 }
 
 // ============================================================
-// 2. SIDEBAR (SECTION 8 INSTRUCTION: Inicio, Mis espacios, Tareas, Actividad, Progreso, Perfil)
+// 2. SIDEBAR EDUSMART (NAVEGACIÓN DIRECTA Y LIMPIA)
 // ============================================================
 export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount = 0, isOpen = false, onCloseMobile }) {
   const role = user?.rol || 'ESTUDIANTE';
 
-  const NAV_ITEMS = [
+  // Navegación canónica según requerimiento oficial
+  const NAV_ITEMS = role === 'DOCENTE' ? [
     { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
-    ...(role === 'DOCENTE' ? [{ id: 'colegios', label: 'Mis Colegios', icon: Building }] : []),
-    ...(role === 'ESTUDIANTE' ? [
-      { id: 'mis-espacios', label: 'Mis Cursos', icon: BookOpen },
-      { id: 'mi-progreso', label: 'Progreso', icon: TrendingUp }
-    ] : []),
-    ...(role === 'DOCENTE' ? [{ id: 'seguimiento', label: 'Estudiantes', icon: Activity }, { id: 'reportes', label: 'Reportes', icon: TrendingUp }] : []),
-    { id: 'mi-perfil', label: 'Perfil', icon: User },
+    { id: 'espacios', label: 'Mis espacios', icon: BookOpen },
+    { id: 'tareas', label: 'Tareas', icon: CheckSquare },
+    { id: 'entregas', label: 'Entregas', icon: Inbox },
+    { id: 'resultados', label: 'Resultados', icon: BarChart2 },
+    { id: 'reportes', label: 'Reportes', icon: FileText },
+  ] : [
+    { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
+    { id: 'espacios', label: 'Mis espacios', icon: BookOpen },
+    { id: 'mis-tareas', label: 'Mis tareas', icon: CheckSquare },
+    { id: 'resultados', label: 'Resultados', icon: TrendingUp },
+    { id: 'dashboard', label: 'Retos IA', icon: Target, highlight: true },
   ];
 
   return (
@@ -82,12 +87,12 @@ export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount 
 
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         {/* Brand */}
-        <div className="sidebar-header">
+        <div className="sidebar-header" style={{ cursor: 'pointer' }} onClick={() => onNavigate('dashboard')}>
           <EdusmartLogo size={36} />
         </div>
 
         {/* User Card */}
-        <div className="sidebar-user">
+        <div className="sidebar-user" onClick={() => onNavigate('mi-perfil')} style={{ cursor: 'pointer' }}>
           <div className="sidebar-avatar">
             {user?.avatar_url ? (
               <img src={user.avatar_url} alt={user.nombre_completo} />
@@ -127,8 +132,16 @@ export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount 
           })}
         </nav>
 
-        {/* Footer Logout */}
+        {/* Footer Menu: Perfil y Logout */}
         <div className="sidebar-footer">
+          <button
+            className={`btn-logout ${activeSection === 'mi-perfil' ? 'active' : ''}`}
+            onClick={() => onNavigate('mi-perfil')}
+            style={{ marginBottom: 6 }}
+          >
+            <User size={16} />
+            <span>Mi perfil</span>
+          </button>
           <button className="btn-logout" onClick={onLogout}>
             <LogOut size={16} />
             <span>Cerrar sesión</span>
@@ -140,7 +153,7 @@ export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount 
 }
 
 // ============================================================
-// 3. TOPBAR
+// 3. TOPBAR EDUSMART CON BÚSQUEDA GLOBAL Y ACCIONES RÁPIDAS
 // ============================================================
 export function Topbar({
   title,
@@ -149,9 +162,18 @@ export function Topbar({
   notifCount = 0,
   onOpenNotifications,
   onOpenQuickAction,
-  onToggleMobileMenu
+  onToggleMobileMenu,
+  onNavigate,
+  onSearch
 }) {
   const isDocente = user?.rol === 'DOCENTE';
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchTerm(val);
+    onSearch?.(val);
+  };
 
   return (
     <header className="topbar">
@@ -171,17 +193,46 @@ export function Topbar({
         </div>
       </div>
 
+      {/* Global Search Bar */}
+      <div style={{ flex: 1, maxWidth: 360, margin: '0 20px', position: 'relative' }}>
+        <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+        <input
+          type="text"
+          className="form-control"
+          placeholder="Buscar espacios, tareas, notas..."
+          value={searchTerm}
+          onChange={handleSearchChange}
+          style={{
+            paddingLeft: 34,
+            paddingRight: 12,
+            height: 36,
+            borderRadius: 20,
+            fontSize: 12.5,
+            border: '1px solid #E2E8F0',
+            background: '#F8FAFC'
+          }}
+        />
+      </div>
+
       <div className="topbar-right">
         {/* Quick action button depending on role */}
         {isDocente ? (
-          <button className="topbar-action-btn" onClick={onOpenQuickAction}>
+          <button
+            className="topbar-action-btn"
+            onClick={onOpenQuickAction}
+            style={{ background: '#1E3A8A', color: 'white', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
             <Plus size={16} />
-            <span>Nueva Tarea</span>
+            <span>Nueva tarea</span>
           </button>
         ) : (
-          <button className="topbar-action-btn" onClick={onOpenQuickAction} style={{ background: '#0284C7' }}>
+          <button
+            className="topbar-action-btn"
+            onClick={onOpenQuickAction}
+            style={{ background: '#0284C7', color: 'white', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
             <Plus size={16} />
-            <span>Unirme a Espacio</span>
+            <span>Unirme a espacio</span>
           </button>
         )}
 
@@ -190,11 +241,39 @@ export function Topbar({
           className="btn-icon"
           onClick={onOpenNotifications}
           aria-label="Notificaciones"
-          title="Notificaciones académicas"
+          title="Centro de Notificaciones"
+          style={{ position: 'relative' }}
         >
           <Bell size={18} />
           {notifCount > 0 && <span className="notif-badge">{notifCount}</span>}
         </button>
+
+        {/* User Mini Avatar Link */}
+        <div
+          onClick={() => onNavigate?.('mi-perfil')}
+          title="Ver mi perfil"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            cursor: 'pointer', padding: '4px 8px', borderRadius: 8,
+            background: '#F1F5F9', border: '1px solid #E2E8F0'
+          }}
+        >
+          <div style={{
+            width: 28, height: 28, borderRadius: '50%',
+            overflow: 'hidden', background: '#1E3A8A',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'white', fontSize: 11, fontWeight: 700
+          }}>
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              user?.nombre_completo?.charAt(0) || 'U'
+            )}
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
+            {user?.first_name || user?.nombre_completo?.split(' ')[0]}
+          </span>
+        </div>
       </div>
     </header>
   );

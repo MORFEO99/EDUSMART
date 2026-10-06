@@ -1,8 +1,9 @@
 from rest_framework import serializers
 from .models import (
     Usuario, Docente, Estudiante, Espacio, MiembroEspacio,
-    Tarea, Material, Entrega, Calificacion, Retroalimentacion,
-    ProgresoAcademico, Notificacion
+    Tarea, Material, Entrega, VersionEntrega, Calificacion, Retroalimentacion,
+    ProgresoAcademico, Notificacion, AvisoEspacio, RecursoEspacio,
+    ExtensionFechaTarea, PlantillaTarea
 )
 
 class UsuarioSerializer(serializers.ModelSerializer):
@@ -98,20 +99,33 @@ class CalificacionSerializer(serializers.ModelSerializer):
         return obj.docente.usuario.nombre_completo if obj.docente else 'Docente'
 
 
+class VersionEntregaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VersionEntrega
+        fields = [
+            'id', 'numero_version', 'archivo_url', 'archivo_nombre',
+            'archivo_tamano', 'comentario', 'fecha_envio', 'estado',
+            'nota', 'retroalimentacion'
+        ]
+
+
 class EntregaSerializer(serializers.ModelSerializer):
     estudiante_nombre = serializers.SerializerMethodField()
     estudiante_avatar = serializers.SerializerMethodField()
+    estudiante_matricula = serializers.SerializerMethodField()
     tarea_titulo = serializers.SerializerMethodField()
     espacio_nombre = serializers.SerializerMethodField()
     calificacion = CalificacionSerializer(read_only=True)
+    versiones = VersionEntregaSerializer(many=True, read_only=True)
 
     class Meta:
         model = Entrega
         fields = [
             'id', 'tarea', 'tarea_titulo', 'espacio_nombre',
-            'estudiante', 'estudiante_nombre', 'estudiante_avatar',
+            'estudiante', 'estudiante_nombre', 'estudiante_avatar', 'estudiante_matricula',
             'fecha_entrega', 'archivo_url', 'archivo_nombre',
-            'archivo_tamano', 'observaciones', 'estado', 'calificacion'
+            'archivo_tamano', 'observaciones', 'estado', 'version',
+            'calificacion', 'versiones'
         ]
 
     def get_estudiante_nombre(self, obj):
@@ -119,6 +133,9 @@ class EntregaSerializer(serializers.ModelSerializer):
 
     def get_estudiante_avatar(self, obj):
         return obj.estudiante.usuario.avatar_url
+
+    def get_estudiante_matricula(self, obj):
+        return f"EST-{obj.estudiante.id:04d}"
 
     def get_tarea_titulo(self, obj):
         return obj.tarea.titulo
@@ -170,7 +187,11 @@ class TareaSerializer(serializers.ModelSerializer):
             from django.utils import timezone
             entrega = Entrega.objects.filter(tarea=obj, estudiante=request.user.perfil_estudiante).first()
             if entrega:
-                if hasattr(entrega, 'calificacion'):
+                if entrega.estado == 'DEVUELTA':
+                    return 'DEVUELTA'
+                elif entrega.estado == 'REENTREGADA':
+                    return 'REENTREGADA'
+                elif hasattr(entrega, 'calificacion'):
                     return 'CALIFICADA'
                 elif entrega.estado == 'EN_PROCESO':
                     return 'EN_PROCESO'
@@ -205,3 +226,37 @@ class NotificacionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notificacion
         fields = ['id', 'tipo', 'mensaje', 'fecha', 'leida', 'espacio_id', 'tarea_id']
+
+
+class AvisoEspacioSerializer(serializers.ModelSerializer):
+    docente_nombre = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AvisoEspacio
+        fields = [
+            'id', 'espacio', 'docente', 'docente_nombre', 'titulo',
+            'contenido', 'fijado', 'importante', 'fecha_creacion', 'fecha_expiracion'
+        ]
+
+    def get_docente_nombre(self, obj):
+        return obj.docente.usuario.nombre_completo if obj.docente else 'Docente'
+
+
+class RecursoEspacioSerializer(serializers.ModelSerializer):
+    docente_nombre = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RecursoEspacio
+        fields = [
+            'id', 'espacio', 'docente', 'docente_nombre', 'titulo',
+            'descripcion', 'tipo', 'archivo_url', 'enlace_url', 'tamano', 'fecha_subida'
+        ]
+
+    def get_docente_nombre(self, obj):
+        return obj.docente.usuario.nombre_completo if obj.docente else 'Docente'
+
+
+class PlantillaTareaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlantillaTarea
+        fields = ['id', 'docente', 'titulo', 'descripcion', 'indicaciones', 'puntaje_maximo', 'criterios_json', 'fecha_creacion']
