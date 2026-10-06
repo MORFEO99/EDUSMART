@@ -10,7 +10,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import os
 from pathlib import Path
+from dotenv import load_dotenv
+import dj_database_url
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +25,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-iz*w2-5=)(akuo=ht+r%8%j#tj2a3ogm9w*a22^t(t-=d+e6mn'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-iz*w2-5=)(akuo=ht+r%8%j#tj2a3ogm9w*a22^t(t-=d+e6mn')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# On Render it will be False, locally it will be True unless overridden
+DEBUG = os.environ.get('RENDER', '') == ''
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*'] # En producción en Render puedes poner tu dominio .onrender.com
 
 
 # Application definition
@@ -47,6 +53,7 @@ AUTH_USER_MODEL = 'core.Usuario'
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -89,19 +96,23 @@ TEMPLATES = [
 WSGI_APPLICATION = 'edusmart_config.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
+# ==============================================================
+# DATABASE - PARTE 1: MySQL (XAMPP local) o DB en Render
+# ==============================================================
+# dj_database_url usa DATABASE_URL en Render (ej. PostgreSQL),
+# y si no existe usa la configuración MySQL local de XAMPP.
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'edusmart_db',
-        'USER': 'root',
-        'PASSWORD': '',
-        'HOST': 'localhost',
-        'PORT': '3306',
-    }
+    'default': dj_database_url.config(
+        default='mysql://root:@localhost:3306/edusmart_db',
+        conn_max_age=600
+    )
 }
+
+# ==============================================================
+# DATABASE - PARTE 2: MongoDB para datos no relacionales
+# ==============================================================
+MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/')
+MONGODB_NAME = os.environ.get('MONGODB_NAME', 'BD_EDUESMART')
 
 
 # Password validation
