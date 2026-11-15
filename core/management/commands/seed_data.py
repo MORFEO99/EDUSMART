@@ -10,7 +10,14 @@ from core.models import (
 class Command(BaseCommand):
     help = 'Poblar la base de datos de EDUSMART con datos académicos representativos'
 
+    def add_arguments(self, parser):
+        parser.add_argument('--if-empty', action='store_true', help='Only seed if database has no users')
+
     def handle(self, *args, **options):
+        if options.get('if_empty') and Usuario.objects.exists():
+            self.stdout.write(self.style.SUCCESS("La base de datos ya contiene datos. Omitiendo seed."))
+            return
+
         self.stdout.write("Poblando datos de EDUSMART (Docente y Estudiante)...")
 
         # Clear existing data safely
@@ -409,6 +416,19 @@ class Command(BaseCommand):
             fecha=now - timedelta(hours=14)
         )
 
+        # Crear superusuario para acceso a Django Admin
+        if not Usuario.objects.filter(username='admin').exists():
+            Usuario.objects.create_superuser(
+                username='admin',
+                email='admin@edusmart.edu',
+                password='adminpassword123',
+                first_name='Admin',
+                last_name='EduSmart',
+                rol='DOCENTE'
+            )
+            self.stdout.write(self.style.SUCCESS("Superusuario creado: admin / adminpassword123"))
+
         self.stdout.write(self.style.SUCCESS("¡Base de datos EDUSMART inicializada exitosamente!"))
+        self.stdout.write("Superusuario: admin / adminpassword123")
         self.stdout.write("Docente: prof_juan@edusmart.edu / password123")
         self.stdout.write("Estudiante: carlos.gomez@edusmart.edu / password123")

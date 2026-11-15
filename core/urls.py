@@ -7,8 +7,9 @@ from . import api_ai_practice
 from . import mongo_panel_views
 
 urlpatterns = [
-    # Root portal - automatically redirects to React frontend
+    # Root portal - automatically redirects to React frontend / landing
     path('', views.root_portal, name='root_portal'),
+    path('demo/', views.demo_view, name='demo_view'),
 
     # 1. Auth & Me (strictly DOCENTE & ESTUDIANTE)
     path('api/auth/login/', api_views.api_login, name='api_login'),
