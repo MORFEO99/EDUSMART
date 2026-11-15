@@ -17,6 +17,8 @@ yarn-error.log
 .DS_Store
 build/
 dist/
+!frontend/dist/
+!frontend/dist/**
 
 # IDE / Editor
 .vscode/

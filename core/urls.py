@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 from . import views
 from . import api_views
 from . import api_v2
@@ -7,9 +7,9 @@ from . import api_ai_practice
 from . import mongo_panel_views
 
 urlpatterns = [
-    # Root portal - automatically redirects to React frontend / landing
-    path('', views.root_portal, name='root_portal'),
+    # Rutas auxiliares
     path('demo/', views.demo_view, name='demo_view'),
+    path('portal/', views.root_portal, name='root_portal'),
 
     # 1. Auth & Me (strictly DOCENTE & ESTUDIANTE)
     path('api/auth/login/', api_views.api_login, name='api_login'),
@@ -107,4 +107,7 @@ urlpatterns = [
     path('mongo/panel/', mongo_panel_views.mongo_panel_html,           name='mongo_panel'),
     path('mongo/api/colecciones/', mongo_panel_views.api_mongo_colecciones, name='mongo_api_colecciones'),
     path('mongo/api/colecciones/<str:coleccion>/', mongo_panel_views.api_mongo_documentos, name='mongo_api_documentos'),
+
+    # SPA React Catch-all (sirve index.html en / y en cualquier ruta del frontend)
+    re_path(r'^.*$', views.serve_react_app, name='react_spa'),
 ]

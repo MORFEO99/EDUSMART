@@ -163,6 +163,9 @@ STATICFILES_DIRS = [
 ]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# WhiteNoise sirve los archivos del build de React desde la raiz
+WHITENOISE_ROOT = BASE_DIR / 'frontend' / 'dist'
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 

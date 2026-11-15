@@ -15,6 +15,14 @@ from .models import (
     ProgresoAcademico, Notificacion
 )
 
+def serve_react_app(request, *args, **kwargs):
+    """Sirve la aplicación React SPA compilada (frontend/dist/index.html)"""
+    dist_index = Path(settings.BASE_DIR) / 'frontend' / 'dist' / 'index.html'
+    if dist_index.exists():
+        with open(dist_index, 'r', encoding='utf-8') as f:
+            return HttpResponse(f.read(), content_type='text/html')
+    return root_portal(request)
+
 def demo_view(request):
     """Sirve la maqueta y simulador interactivo completo de EduSmart"""
     demo_file = Path(settings.BASE_DIR) / 'demo_edusmart.html'
