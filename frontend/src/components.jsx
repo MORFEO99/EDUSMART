@@ -71,8 +71,9 @@ export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount 
     { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
     { id: 'espacios', label: 'Mis espacios', icon: BookOpen },
     { id: 'mis-tareas', label: 'Mis tareas', icon: CheckSquare },
+    { id: 'practicas', label: 'Simuladores IA', icon: Sparkles, highlight: true },
     { id: 'resultados', label: 'Resultados', icon: TrendingUp },
-    { id: 'retos', label: 'Retos IA', icon: Target, highlight: true },
+    { id: 'retos', label: 'Retos Gamificados', icon: Target },
   ];
 
   return (

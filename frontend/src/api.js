@@ -226,6 +226,31 @@ export const topicTrackerAPI = {
 };
 
 // ==============================================================================
+// SIMULADORES DE EXAMEN Y PRÁCTICAS CON IA POR AVANCE TEMÁTICO
+// ==============================================================================
+export const aiPracticeAPI = {
+  // Docente: Generar o regenerar simulador de examen para un tema
+  generarPracticaTema: (temaId, data = {}) =>
+    apiFetch(`/api/v2/temas/${temaId}/generar-practica/`, { method: 'POST', body: JSON.stringify(data) }),
+
+  // Estudiante: Listar prácticas disponibles de sus materias avanzadas
+  estudiantePracticas: () => apiFetch('/api/v2/estudiante/practicas/'),
+
+  // Estudiante: Obtener preguntas del simulador para resolver
+  getPracticaDetail: (practicaId) => apiFetch(`/api/v2/practicas/${practicaId}/`),
+
+  // Estudiante: Enviar respuestas y recibir evaluación instantánea con explicaciones
+  submitPractica: (practicaId, respuestas, tiempoSegundos = 0) =>
+    apiFetch(`/api/v2/practicas/${practicaId}/enviar/`, {
+      method: 'POST',
+      body: JSON.stringify({ respuestas, tiempo_empleado_segundos: tiempoSegundos }),
+    }),
+
+  // Docente: Resumen de desempeño de estudiantes para el examen por materia
+  resumenMateria: (materiaId) => apiFetch(`/api/v2/docente/materias/${materiaId}/practicas-resumen/`),
+};
+
+// ==============================================================================
 // INVITACIONES A ESPACIOS
 // ==============================================================================
 export const invitacionAPI = {

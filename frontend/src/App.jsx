@@ -25,12 +25,17 @@ import ImportStudentsPage from './pages/ImportStudentsPage';
 import ImportarCalificacionesPage from './pages/ImportarCalificacionesPage';
 import EspacioDetallePage from './pages/EspacioDetallePage';
 import ListaExcelDocente from './pages/ListaExcelDocente';
+import StudentPracticeView from './pages/StudentPracticeView';
+import ChallengeBoard from './components/ChallengeBoard';
 
 // ============================================================
 // PAGE TITLES
 // ============================================================
 const PAGE_TITLES = {
   'dashboard':              ['Inicio',              'Resumen de actividad académica'],
+  'practicas':              ['Simuladores de Examen IA', 'Ejercicios didácticos y práctica por avance docente'],
+  'simuladores':            ['Simuladores de Examen IA', 'Ejercicios didácticos y práctica por avance docente'],
+  'retos':                  ['Retos Gamificados',    'Desafíos de aprendizaje y recompensas con IA'],
   'mis-tareas':             ['Mis Tareas',           'Consulta, seguimiento y entrega de tareas'],
   'presentar-tarea':        ['Presentar Tarea',      'Envío de trabajos y archivos adjuntos'],
   'entregas':               ['Entregas',             'Revisión y calificación de trabajos recibidos'],
@@ -133,6 +138,16 @@ export default function App() {
       switch (section) {
         case 'dashboard':
           return <StudentDashboard user={user} onNavigate={handleNavigate} />;
+        case 'practicas':
+        case 'simuladores':
+        case 'practicas-ia':
+          return <StudentPracticeView onNavigate={handleNavigate} />;
+        case 'retos':
+          return (
+            <div style={{ maxWidth: 1100, margin: '0 auto', padding: '1.5rem 1rem' }}>
+              <ChallengeBoard userRole="ESTUDIANTE" />
+            </div>
+          );
         case 'mis-tareas':
         case 'tareas':
           return <MyTasks initialTaskId={extraData?.taskId} initialFilter={extraData?.filtro || 'todos'} onNavigate={handleNavigate} />;

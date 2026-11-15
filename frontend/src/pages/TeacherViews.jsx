@@ -5,9 +5,9 @@ import {
   Send, AlertTriangle, Paperclip, Calendar, FileSpreadsheet,
   BookOpen, CheckSquare, Square, Layers, Trash2, Edit3, X, TrendingUp,
   ChevronDown, ChevronUp, RefreshCw, EyeOff, Bell, ExternalLink, RotateCcw,
-  Check, FileText, School, GraduationCap
+  Check, FileText, School, GraduationCap, Sparkles
 } from 'lucide-react';
-import { teacherAPI, commonAPI, topicTrackerAPI } from '../api';
+import { teacherAPI, commonAPI, topicTrackerAPI, aiPracticeAPI } from '../api';
 import { Loading, EmptyState, Modal, Alert, ProgressBar, StatCard, MiniBarChart } from '../components';
 import { formatDate, formatDateTime, getNoteColor, getPriorityBadge, getTaskBadge } from '../utils';
 import RubricaEditor from '../components/RubricaEditor';
@@ -602,6 +602,8 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
   const [filterEstado, setFilterEstado] = useState('TODOS');
   const [toggling, setToggling] = useState(null);  // tema id being toggled
   const [deleting, setDeleting] = useState(null);
+  const [generatingAi, setGeneratingAi] = useState(null); // tema id generating AI practice
+  const [aiSuccessMsg, setAiSuccessMsg] = useState(null);
 
   // 
   // Cascade selectors
@@ -680,7 +682,17 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
     setToggling(tema.id);
     try {
       const updated = await topicTrackerAPI.actualizarTema(selectedMateriaId, tema.id, { estado: nextState });
-      setTemas(prev => prev.map(t => t.id === tema.id ? { ...t, ...updated } : t));
+      setTemas(prev => prev.map(t => t.id === tema.id ? {
+        ...t, ...updated,
+        tiene_practica: updated.tiene_simulador_examen !== undefined ? updated.tiene_simulador_examen : t.tiene_practica,
+        practica_id: updated.practica_id || t.practica_id
+      } : t));
+
+      if (updated.tiene_simulador_examen) {
+        setAiSuccessMsg(`✨ ¡Tema completado! Se ha generado automáticamente el simulador de examen con IA para los estudiantes.`);
+        setTimeout(() => setAiSuccessMsg(null), 5000);
+      }
+
       // Recalc stats
       setTemas(prev => {
         const all = prev;
@@ -695,6 +707,20 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
       console.error('Error toggling tema:', err);
     } finally {
       setToggling(null);
+    }
+  };
+
+  const handleGenerarPractica = async (tema) => {
+    setGeneratingAi(tema.id);
+    try {
+      const res = await aiPracticeAPI.generarPracticaTema(tema.id, { cantidad: 5, dificultad: 'INTERMEDIO' });
+      setTemas(prev => prev.map(t => t.id === tema.id ? { ...t, tiene_practica: true, practica_id: res.practica_id } : t));
+      setAiSuccessMsg(`✨ ¡Simulador con IA generado con éxito para "${tema.titulo}" (${res.total_preguntas} ejercicios)! Notificaciones enviadas.`);
+      setTimeout(() => setAiSuccessMsg(null), 5000);
+    } catch (err) {
+      alert('Error generando simulador con IA: ' + (err.message || 'Error del servidor'));
+    } finally {
+      setGeneratingAi(null);
     }
   };
 
@@ -921,6 +947,16 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
           background: '#FFFFFF', borderRadius: 12, border: '1px solid #E2E8F0',
           boxShadow: '0 2px 8px rgba(0,0,0,0.04)', overflow: 'hidden'
         }}>
+          {/* AI Success Alert */}
+          {aiSuccessMsg && (
+            <div style={{
+              background: '#F0FDF4', borderBottom: '1.5px solid #BBF7D0', color: '#166534',
+              padding: '10px 16px', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8
+            }}>
+              <Sparkles size={16} color="#16A34A" /> {aiSuccessMsg}
+            </div>
+          )}
+
           {/* Toolbar */}
           <div style={{
             padding: '12px 16px', borderBottom: '1px solid #F1F5F9',
@@ -1050,7 +1086,40 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
                     </div>
 
                     {/* Actions */}
-                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      {/* AI Exam Practice Action */}
+                      {tema.tiene_practica ? (
+                        <button
+                          onClick={() => handleGenerarPractica(tema)}
+                          disabled={generatingAi === tema.id}
+                          title="El simulador con IA está activo para tus alumnos. Clic para regenerar."
+                          style={{
+                            padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                            background: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE',
+                            cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          <Sparkles size={11} color="#4338CA" />
+                          {generatingAi === tema.id ? 'Regenerando...' : 'Simulador IA Activo'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleGenerarPractica(tema)}
+                          disabled={generatingAi === tema.id}
+                          title="Genera un simulador de examen con ejercicios didácticos para que practiquen tus alumnos."
+                          style={{
+                            padding: '4px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                            background: 'linear-gradient(135deg, #4F46E5, #6366F1)', color: '#FFFFFF',
+                            border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
+                            whiteSpace: 'nowrap', boxShadow: '0 1px 3px rgba(79, 70, 229, 0.25)'
+                          }}
+                        >
+                          <Sparkles size={11} />
+                          {generatingAi === tema.id ? 'Generando...' : 'Generar Simulador IA'}
+                        </button>
+                      )}
+
                       <button
                         onClick={() => handleToggleEstado(tema)}
                         disabled={isToggling}

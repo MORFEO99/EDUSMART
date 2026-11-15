@@ -743,3 +743,67 @@ class TareaVisualizacion(models.Model):
     def __str__(self):
         return f"{self.estudiante.usuario.nombre_completo} vio {self.tarea.titulo} ({self.total_vistas} veces)"
 
+
+# ==============================================================================
+# RETOS Y PRÁCTICAS CON IA POR AVANCE DE TEMAS (AI Practice & Exam Simulator)
+# ==============================================================================
+
+class PracticaTema(models.Model):
+    """
+    Batería de ejercicios didácticos o simulador de examen generado con IA
+    a partir de un tema avanzado y completado por el docente en una materia.
+    """
+    tema = models.ForeignKey(TemaAvance, on_delete=models.CASCADE, related_name='practicas')
+    materia = models.ForeignKey(Materia, on_delete=models.CASCADE, related_name='practicas_ia')
+    docente = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='practicas_creadas')
+    titulo = models.CharField(max_length=250)
+    descripcion = models.TextField(blank=True)
+    preguntas = models.JSONField(default=list, help_text="Lista de preguntas y ejercicios didácticos estructurados")
+    dificultad = models.CharField(max_length=20, default='INTERMEDIO', choices=(
+        ('FACIL', 'Básico / Nivel Inicial'),
+        ('INTERMEDIO', 'Intermedio / Preparación Examen'),
+        ('AVANZADO', 'Avanzado / Reto Olímpico'),
+    ))
+    tiempo_limite_minutos = models.PositiveIntegerField(default=15)
+    total_puntos = models.PositiveIntegerField(default=100)
+    recompensa_xp = models.PositiveIntegerField(default=40)
+    recompensa_coins = models.PositiveIntegerField(default=20)
+    activo = models.BooleanField(default=True)
+    generado_con_ia = models.BooleanField(default=True)
+    motor_ia = models.CharField(max_length=80, default='Gemini / Heurístico Didáctico')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'practicas_tema'
+        ordering = ['-fecha_creacion']
+
+    def __str__(self):
+        return f"Práctica: {self.titulo} - {self.materia.nombre}"
+
+
+class IntentoPracticaEstudiante(models.Model):
+    """
+    Registra el intento de resolución de un estudiante en un simulador de examen / práctica con IA,
+    incluyendo calificación instantánea, respuestas, explicaciones y retroalimentación pedagógica.
+    """
+    practica = models.ForeignKey(PracticaTema, on_delete=models.CASCADE, related_name='intentos')
+    estudiante = models.ForeignKey(Estudiante, on_delete=models.CASCADE, related_name='intentos_practica')
+    puntaje_obtenido = models.FloatField(default=0.0)
+    total_preguntas = models.PositiveIntegerField(default=0)
+    respuestas_correctas = models.PositiveIntegerField(default=0)
+    respuestas_alumno = models.JSONField(default=dict, help_text="{pregunta_id: respuesta_seleccionada}")
+    revision_detallada = models.JSONField(default=list, help_text="Detalle por pregunta con explicación y acierto")
+    retroalimentacion_ia = models.TextField(blank=True)
+    aprobado = models.BooleanField(default=False)
+    tiempo_empleado_segundos = models.PositiveIntegerField(default=0)
+    fecha_intento = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'intentos_practica_estudiante'
+        ordering = ['-fecha_intento']
+
+    def __str__(self):
+        return f"{self.estudiante.usuario.nombre_completo} - {self.practica.titulo} ({self.puntaje_obtenido} pts)"
+
+

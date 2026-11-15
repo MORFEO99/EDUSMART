@@ -3,6 +3,7 @@ from . import views
 from . import api_views
 from . import api_v2
 from . import api_gamification
+from . import api_ai_practice
 from . import mongo_panel_views
 
 urlpatterns = [
@@ -89,6 +90,15 @@ urlpatterns = [
     path('api/v2/gamificacion/challenges/<int:reto_id>/gestionar/', api_gamification.api_gestionar_reto, name='api_gestionar_reto'),
     path('api/v2/gamificacion/leaderboard/', api_gamification.api_leaderboard, name='api_leaderboard'),
     path('api/v2/gamificacion/badges/', api_gamification.api_badges, name='api_badges'),
+
+    # =======================================================
+    # SIMULADORES DE EXAMEN Y EJERCICIOS DIDÁCTICOS CON IA (AVANCE TEMÁTICO)
+    # =======================================================
+    path('api/v2/temas/<int:tema_id>/generar-practica/', api_ai_practice.api_generar_practica_tema, name='api_generar_practica_tema'),
+    path('api/v2/estudiante/practicas/', api_ai_practice.api_estudiante_practicas_list, name='api_estudiante_practicas_list'),
+    path('api/v2/practicas/<int:practica_id>/', api_ai_practice.api_practica_detail, name='api_practica_detail'),
+    path('api/v2/practicas/<int:practica_id>/enviar/', api_ai_practice.api_practica_submit, name='api_practica_submit'),
+    path('api/v2/docente/materias/<int:materia_id>/practicas-resumen/', api_ai_practice.api_docente_materia_practicas_resumen, name='api_docente_materia_practicas_resumen'),
 
     # =======================================================
     # PANEL VISUAL MONGODB (Solo desarrollo)

@@ -1709,6 +1709,9 @@ def api_temas_avance(request, materia_id):
 
     if request.method == 'GET':
         temas = TemaAvance.objects.filter(materia=materia, docente=docente)
+        from .models import PracticaTema
+        practicas_map = {p.tema_id: p for p in PracticaTema.objects.filter(tema__in=temas)}
+
         data = [
             {
                 'id': t.id,
@@ -1721,6 +1724,9 @@ def api_temas_avance(request, materia_id):
                 'fecha_fin': t.fecha_fin.isoformat() if t.fecha_fin else None,
                 'observaciones': t.observaciones,
                 'fecha_creacion': t.fecha_creacion.isoformat(),
+                'tiene_practica': t.id in practicas_map,
+                'practica_id': practicas_map[t.id].id if t.id in practicas_map else None,
+                'practica_total_preguntas': len(practicas_map[t.id].preguntas) if t.id in practicas_map else 0,
             }
             for t in temas
         ]
@@ -1792,12 +1798,48 @@ def api_tema_avance_detail(request, materia_id, tema_id):
                 val = None
             setattr(tema, field, val)
     tema.save()
+
+    # Si el tema fue marcado como COMPLETADO, generar automáticamente simulador de examen con IA si aún no existe
+    practica_id = None
+    if tema.estado == 'COMPLETADO':
+        from .models import PracticaTema
+        from .ai_practice_service import generate_exam_practice
+        practica = PracticaTema.objects.filter(tema=tema).first()
+        if not practica:
+            try:
+                ai_data = generate_exam_practice(
+                    materia_nombre=tema.materia.nombre,
+                    tema_titulo=tema.titulo,
+                    tema_descripcion=tema.descripcion,
+                    nivel_educativo=getattr(tema.materia.curso, 'nombre', ''),
+                    cantidad=5,
+                    dificultad='INTERMEDIO'
+                )
+                practica = PracticaTema.objects.create(
+                    tema=tema,
+                    materia=tema.materia,
+                    docente=docente,
+                    titulo=ai_data.get('titulo', f"Simulador de Examen: {tema.titulo}"),
+                    descripcion=ai_data.get('descripcion', ''),
+                    preguntas=ai_data.get('preguntas', []),
+                    dificultad='INTERMEDIO',
+                    tiempo_limite_minutos=ai_data.get('tiempo_limite_minutos', 15),
+                    motor_ia=ai_data.get('motor_ia', 'EduSmart AI'),
+                    activo=True
+                )
+            except Exception as e:
+                print(f"[Auto Practice] Error: {e}")
+        if practica:
+            practica_id = practica.id
+
     return Response({
         'id': tema.id, 'titulo': tema.titulo, 'descripcion': tema.descripcion,
         'unidad': tema.unidad, 'orden': tema.orden, 'estado': tema.estado,
         'fecha_inicio': tema.fecha_inicio.isoformat() if tema.fecha_inicio else None,
         'fecha_fin': tema.fecha_fin.isoformat() if tema.fecha_fin else None,
         'observaciones': tema.observaciones,
+        'practica_id': practica_id,
+        'tiene_simulador_examen': practica_id is not None
     })
 
 

@@ -33,6 +33,10 @@ DEBUG = os.environ.get('RENDER', '') == ''
 
 ALLOWED_HOSTS = ['*'] # En producción en Render puedes poner tu dominio .onrender.com
 
+# Integración con Modelos de Inteligencia Artificial (Google Gemini / OpenAI)
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+
 
 # Application definition
 
