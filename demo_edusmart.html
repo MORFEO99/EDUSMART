@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EduSmart – Demo del Sistema Completo</title>
+<style>
+  :root {
+    --bg: #0f172a; --card: #1e293b; --accent: #6366f1; --accent2: #22d3ee;
+    --green: #22c55e; --yellow: #f59e0b; --red: #ef4444; --text: #f1f5f9;
+    --muted: #94a3b8; --border: #334155;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; overflow-x:hidden; }
+
+  /* ─── TOP BAR ─── */
+  .topbar { background:var(--card); border-bottom:1px solid var(--border); padding:12px 24px;
+    display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+  .logo { font-size:1.4rem; font-weight:800; background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .badge { background:var(--accent); color:#fff; padding:4px 10px; border-radius:20px; font-size:.75rem; font-weight:600; }
+
+  /* ─── SCENE CONTAINER ─── */
+  #scene-wrap { max-width:1100px; margin:0 auto; padding:20px; }
+  .scene { display:none; animation:fadeIn .4s ease; }
+  .scene.active { display:block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ─── PROGRESS BAR ─── */
+  .progress-track { background:var(--border); border-radius:4px; height:6px; margin:16px 0; }
+  .progress-fill { background:linear-gradient(90deg,var(--accent),var(--accent2)); height:6px; border-radius:4px;
+    transition:width .6s ease; }
+  .steps-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
+  .step-dot { flex:1; min-width:60px; padding:6px 4px; text-align:center; border-radius:8px; font-size:.7rem;
+    border:1px solid var(--border); cursor:pointer; transition:.2s; }
+  .step-dot.done { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .step-dot.active { background:linear-gradient(135deg,var(--accent),var(--accent2)); border-color:transparent; color:#fff; font-weight:700; }
+  .step-dot:hover { border-color:var(--accent2); }
+
+  /* ─── SCENE HEADER ─── */
+  .scene-header { display:flex; align-items:center; gap:14px; margin-bottom:20px; }
+  .scene-num { background:linear-gradient(135deg,var(--accent),var(--accent2)); width:44px; height:44px;
+    border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.1rem; font-weight:800; flex-shrink:0; }
+  .scene-title { font-size:1.3rem; font-weight:700; }
+  .scene-sub { color:var(--muted); font-size:.9rem; margin-top:2px; }
+
+  /* ─── MOCK BROWSER ─── */
+  .mock-browser { background:#0d1117; border-radius:12px; overflow:hidden; border:1px solid var(--border); box-shadow:0 20px 60px rgba(0,0,0,.5); }
+  .browser-bar { background:#1c1c1e; padding:10px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border); }
+  .browser-dots { display:flex; gap:6px; }
+  .dot { width:12px; height:12px; border-radius:50%; }
+  .dot.r{background:#ff5f57;} .dot.y{background:#ffbd2e;} .dot.g{background:#28c840;}
+  .browser-url { flex:1; background:#2c2c2e; border-radius:6px; padding:4px 12px; font-size:.8rem; color:var(--muted); font-family:monospace; }
+
+  /* ─── LOGIN SCREEN ─── */
+  .login-box { max-width:380px; margin:40px auto; background:var(--card); border-radius:16px; padding:36px; border:1px solid var(--border); }
+  .login-logo { text-align:center; font-size:2rem; font-weight:900;
+    background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:4px; }
+  .login-tagline { text-align:center; color:var(--muted); font-size:.85rem; margin-bottom:28px; }
+  .form-group { margin-bottom:16px; }
+  .form-group label { display:block; font-size:.82rem; color:var(--muted); margin-bottom:6px; font-weight:500; }
+  .form-group input { width:100%; background:#0f172a; border:1px solid var(--border); border-radius:8px;
+    padding:10px 14px; color:var(--text); font-size:.9rem; }
+  .form-group input:focus { outline:none; border-color:var(--accent); }
+  .btn { width:100%; padding:12px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:.95rem;
+    background:linear-gradient(135deg,var(--accent),#8b5cf6); color:#fff; transition:.2s; }
+  .btn:hover { opacity:.9; transform:translateY(-1px); }
+  .role-pill { display:inline-block; padding:3px 10px; border-radius:20px; font-size:.72rem; font-weight:600; }
+  .role-docente { background:rgba(99,102,241,.2); color:var(--accent); border:1px solid var(--accent); }
+  .role-student { background:rgba(34,211,238,.2); color:var(--accent2); border:1px solid var(--accent2); }
+
+  /* ─── DASHBOARD DOCENTE ─── */
+  .dash-header { background:linear-gradient(135deg,var(--accent),#8b5cf6); padding:24px; color:#fff; }
+  .dash-header h2 { font-size:1.3rem; }
+  .dash-header p { opacity:.85; font-size:.88rem; margin-top:4px; }
+  .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; padding:16px; }
+  .stat-card { background:var(--card); border-radius:10px; padding:16px; border:1px solid var(--border); text-align:center; }
+  .stat-num { font-size:1.8rem; font-weight:800; }
+  .stat-lbl { color:var(--muted); font-size:.75rem; margin-top:2px; }
+
+  /* ─── TOPICS TABLE ─── */
+  .section { padding:0 16px 16px; }
+  .section-title { font-weight:700; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:#0f172a; padding:10px 12px; text-align:left; font-size:.8rem; color:var(--muted); font-weight:600; }
+  td { padding:10px 12px; border-bottom:1px solid var(--border); font-size:.85rem; }
+  tr:last-child td { border:none; }
+  .estado-badge { padding:3px 10px; border-radius:20px; font-size:.72rem; font-weight:600; }
+  .estado-completado { background:rgba(34,197,94,.15); color:var(--green); border:1px solid var(--green); }
+  .estado-progreso { background:rgba(245,158,11,.15); color:var(--yellow); border:1px solid var(--yellow); }
+  .estado-pendiente { background:rgba(148,163,184,.1); color:var(--muted); border:1px solid var(--border); }
+  .btn-sm { padding:5px 12px; border-radius:6px; border:none; cursor:pointer; font-size:.78rem; font-weight:600; }
+  .btn-complete { background:rgba(99,102,241,.2); color:var(--accent); border:1px solid var(--accent); }
+  .btn-ai { background:rgba(34,211,238,.15); color:var(--accent2); border:1px solid var(--accent2); }
+  .btn-ai.active { background:var(--accent2); color:#0f172a; }
+
+  /* ─── AI GENERATION ANIMATION ─── */
+  .ai-gen-box { margin:16px; background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(34,211,238,.1));
+    border:1px solid var(--accent); border-radius:12px; padding:20px; text-align:center; }
+  .ai-spinner { width:40px; height:40px; border:3px solid var(--border); border-top-color:var(--accent2);
+    border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 12px; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .ai-log { background:#0f172a; border-radius:8px; padding:12px; text-align:left; font-family:monospace;
+    font-size:.78rem; color:var(--accent2); margin-top:12px; }
+  .ai-log .line { opacity:0; animation:typeIn .3s ease forwards; }
+  .ai-log .line:nth-child(1){animation-delay:.2s}
+  .ai-log .line:nth-child(2){animation-delay:.8s}
+  .ai-log .line:nth-child(3){animation-delay:1.4s}
+  .ai-log .line:nth-child(4){animation-delay:2s}
+  .ai-log .line:nth-child(5){animation-delay:2.6s}
+  @keyframes typeIn { to{opacity:1} }
+
+  /* ─── STUDENT SIMULADORES ─── */
+  .sim-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; padding:16px; }
+  .sim-card { background:var(--card); border-radius:12px; border:1px solid var(--border); overflow:hidden; transition:.2s; cursor:pointer; }
+  .sim-card:hover { border-color:var(--accent); transform:translateY(-2px); }
+  .sim-card-header { padding:14px; background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(34,211,238,.1)); }
+  .sim-card-body { padding:14px; }
+  .sim-materia { font-size:.7rem; color:var(--accent2); font-weight:700; letter-spacing:.5px; text-transform:uppercase; }
+  .sim-title { font-weight:700; font-size:.9rem; margin:4px 0 2px; }
+  .sim-desc { color:var(--muted); font-size:.78rem; line-height:1.4; }
+  .sim-meta { display:flex; gap:12px; margin-top:10px; }
+  .sim-meta span { font-size:.75rem; color:var(--muted); display:flex; align-items:center; gap:4px; }
+  .xp-badge { background:rgba(245,158,11,.15); color:var(--yellow); padding:2px 8px; border-radius:20px; font-size:.72rem; font-weight:700; }
+
+  /* ─── EXAM MODAL ─── */
+  .exam-modal { background:#0d1117; border-radius:16px; border:1px solid var(--border); overflow:hidden; }
+  .exam-header { background:linear-gradient(135deg,var(--accent),#8b5cf6); padding:16px 20px;
+    display:flex; justify-content:space-between; align-items:center; }
+  .exam-header h3 { font-size:1rem; font-weight:700; }
+  .timer { background:rgba(0,0,0,.3); padding:6px 14px; border-radius:20px; font-family:monospace; font-size:1.1rem; font-weight:700; }
+  .exam-progress { background:#0f172a; padding:12px 20px; display:flex; align-items:center; gap:12px; }
+  .q-dots { display:flex; gap:6px; }
+  .q-dot { width:28px; height:28px; border-radius:50%; border:2px solid var(--border); display:flex; align-items:center;
+    justify-content:center; font-size:.72rem; font-weight:700; cursor:pointer; }
+  .q-dot.answered { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .q-dot.current { border-color:var(--accent2); color:var(--accent2); }
+  .exam-body { padding:24px; }
+  .question-num { color:var(--muted); font-size:.8rem; margin-bottom:8px; }
+  .question-text { font-size:1rem; font-weight:600; line-height:1.6; margin-bottom:20px; }
+  .options { display:grid; gap:10px; }
+  .option { background:var(--card); border:2px solid var(--border); border-radius:10px; padding:12px 16px;
+    cursor:pointer; transition:.2s; font-size:.88rem; }
+  .option:hover { border-color:var(--accent); background:rgba(99,102,241,.08); }
+  .option.selected { border-color:var(--accent2); background:rgba(34,211,238,.1); }
+  .option.correct { border-color:var(--green); background:rgba(34,197,94,.12); }
+  .option.wrong { border-color:var(--red); background:rgba(239,68,68,.1); }
+  .nav-btns { display:flex; justify-content:space-between; margin-top:20px; }
+  .btn-nav { padding:10px 24px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:.88rem; }
+  .btn-prev { background:var(--border); color:var(--text); }
+  .btn-next { background:linear-gradient(135deg,var(--accent),#8b5cf6); color:#fff; }
+  .btn-submit { background:linear-gradient(135deg,var(--green),#059669); color:#fff; padding:10px 24px;
+    border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:.88rem; }
+
+  /* ─── RESULTS ─── */
+  .results-box { padding:24px; text-align:center; }
+  .score-circle { width:120px; height:120px; border-radius:50%; border:6px solid var(--green);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; margin:0 auto 20px; }
+  .score-num { font-size:2.2rem; font-weight:900; color:var(--green); }
+  .score-lbl { font-size:.7rem; color:var(--muted); }
+  .result-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:20px 0; }
+  .result-stat { background:var(--card); border-radius:10px; padding:14px; border:1px solid var(--border); }
+  .result-stat .num { font-size:1.4rem; font-weight:800; }
+  .result-stat .lbl { color:var(--muted); font-size:.75rem; margin-top:2px; }
+  .explanation { background:rgba(34,211,238,.07); border:1px solid rgba(34,211,238,.3); border-radius:10px;
+    padding:14px; text-align:left; margin-top:16px; }
+  .explanation h4 { color:var(--accent2); font-size:.85rem; margin-bottom:8px; }
+  .explanation p { color:var(--muted); font-size:.82rem; line-height:1.6; }
+  .xp-earned { display:inline-flex; align-items:center; gap:6px; background:rgba(245,158,11,.15);
+    border:1px solid var(--yellow); border-radius:20px; padding:6px 16px; color:var(--yellow); font-weight:700; margin-top:16px; }
+
+  /* ─── CONTROLS ─── */
+  .controls { display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
+  .btn-prev-scene, .btn-next-scene { padding:10px 24px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:.9rem; transition:.2s; }
+  .btn-prev-scene { background:var(--border); color:var(--text); }
+  .btn-next-scene { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; }
+  .btn-prev-scene:hover, .btn-next-scene:hover { opacity:.85; transform:translateY(-1px); }
+  .btn-prev-scene:disabled, .btn-next-scene:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+
+  /* ─── NOTIFICATIONS ─── */
+  .notif { position:fixed; bottom:24px; right:24px; background:var(--card); border:1px solid var(--accent2);
+    border-radius:12px; padding:14px 20px; max-width:320px; z-index:999;
+    animation:slideUp .4s ease; box-shadow:0 8px 32px rgba(0,0,0,.4); }
+  @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  .notif.hide { animation:slideDown .3s ease forwards; }
+  @keyframes slideDown { to{opacity:0;transform:translateY(20px)} }
+  .notif-title { font-weight:700; color:var(--accent2); font-size:.9rem; }
+  .notif-msg { color:var(--muted); font-size:.82rem; margin-top:4px; }
+
+  /* ─── FINAL SCENE ─── */
+  .final-box { text-align:center; padding:40px 20px; }
+  .final-box h2 { font-size:2rem; font-weight:900; background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .final-box p { color:var(--muted); margin:12px 0; }
+  .tech-pills { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:20px 0; }
+  .tech-pill { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:6px 14px; font-size:.8rem; }
+  .repo-link { display:inline-block; margin-top:16px; padding:12px 28px; border-radius:8px;
+    background:linear-gradient(135deg,var(--accent),#8b5cf6); color:#fff; font-weight:700; text-decoration:none; font-size:.95rem; }
+
+  @media(max-width:600px){
+    .stats-row{grid-template-columns:repeat(2,1fr);}
+    .sim-grid{grid-template-columns:1fr;}
+    .result-grid{grid-template-columns:repeat(2,1fr);}
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <span class="logo">🎓 EduSmart</span>
+  <div style="display:flex;gap:10px;align-items:center">
+    <span style="color:var(--muted);font-size:.82rem">Demo Interactiva del Sistema</span>
+    <span class="badge">EN VIVO</span>
+  </div>
+</div>
+
+<div id="scene-wrap">
+
+  <!-- PROGRESS STEPS -->
+  <div class="steps-row" id="stepsRow"></div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+
+  <!-- ══════════════════════════════════════════════════════
+       ESCENA 1: LOGIN DOCENTE
+  ══════════════════════════════════════════════════════ -->
+  <div class="scene active" id="scene-1">
+    <div class="scene-header">
+      <div class="scene-num">1</div>
+      <div>
+        <div class="scene-title">Inicio de Sesión – Docente</div>
+        <div class="scene-sub">El profesor Juan Pérez accede al panel de gestión académica</div>
+      </div>
+    </div>
+    <div class="mock-browser">
+      <div class="browser-bar">
+        <div class="browser-dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div>
+        <div class="browser-url">🔒 localhost:5173/login</div>
+      </div>
+      <div style="padding:20px;background:#0d1117">
+        <div class="login-box">
+          <div class="login-logo">EduSmart</div>
+          <div class="login-tagline">Plataforma de Gestión Académica con IA</div>
+          <div class="form-group">
+            <label>Correo Electrónico</label>
+            <input type="email" value="prof_juan@edusmart.edu" readonly style="border-color:var(--accent)">
+          </div>
+          <div class="form-group">
+            <label>Contraseña</label>
+            <input type="password" value="••••••••••••" readonly>
+          </div>
+          <button class="btn" onclick="nextScene()">Iniciar Sesión →</button>
+          <div style="text-align:center;margin-top:12px">
+            <span class="role-pill role-docente">👨‍🏫 DOCENTE</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn-prev-scene" disabled onclick="prevScene()">← Anterior</button>
+      <span style="color:var(--muted);font-size:.82rem">Escena 1 de 7</span>
+      <button class="btn-next-scene" onclick="nextScene()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       ESCENA 2: DASHBOARD DOCENTE
+  ══════════════════════════════════════════════════════ -->
+  <div class="scene" id="scene-2">
+    <div class="scene-header">
+      <div class="scene-num">2</div>
+      <div>
+        <div class="scene-title">Dashboard del Docente</div>
+        <div class="scene-sub">Vista general con estadísticas del curso y temas en progreso</div>
+      </div>
+    </div>
+    <div class="mock-browser">
+      <div class="browser-bar">
+        <div class="browser-dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div>
+        <div class="browser-url">🔒 localhost:5173/dashboard</div>
+      </div>
+      <div style="background:#0d1117">
+        <div class="dash-header">
+          <h2>¡Bienvenido, Prof. Juan Pérez! 👋</h2>
+          <p>Panel de Gestión Académica · Colegio EduSmart · Curso 2026</p>
+        </div>
+        <div class="stats-row">
+          <div class="stat-card"><div class="stat-num" style="color:var(--accent)">6</div><div class="stat-lbl">📚 Materias</div></div>
+          <div class="stat-card"><div class="stat-num" style="color:var(--accent2)">42</div><div class="stat-lbl">👥 Estudiantes</div></div>
+          <div class="stat-card"><div class="stat-num" style="color:var(--green)">6</div><div class="stat-lbl">🤖 Simuladores IA</div></div>
+          <div class="stat-card"><div class="stat-num" style="color:var(--yellow)">78%</div><div class="stat-lbl">📈 Progreso Promedio</div></div>
+        </div>
+        <div class="section">
+          <div class="section-title">📋 Temas del Curso – Matemáticas</div>
+          <table>
+            <thead><tr><th>Tema</th><th>Unidad</th><th>Estado</th><th>Simulador IA</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Álgebra: Ecuaciones Lineales</td><td>Unidad 1</td>
+                <td><span class="estado-badge estado-completado">✓ Completado</span></td>
+                <td><span class="btn-sm btn-ai active">🤖 Generado</span></td>
+              </tr>
+              <tr>
+                <td>Geometría: Figuras y Áreas</td><td>Unidad 2</td>
+                <td><span class="estado-badge estado-progreso">⏳ En Progreso</span></td>
+                <td><span class="btn-sm btn-complete" onclick="showAIGen()">⚡ Generar IA</span></td>
+              </tr>
+              <tr>
+                <td>Trigonometría Básica</td><td>Unidad 3</td>
+                <td><span class="estado-badge estado-pendiente">○ Pendiente</span></td>
+                <td><span style="color:var(--muted);font-size:.78rem">—</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn-prev-scene" onclick="prevScene()">← Anterior</button>
+      <span style="color:var(--muted);font-size:.82rem">Escena 2 de 7</span>
+      <button class="btn-next-scene" onclick="nextScene()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       ESCENA 3: GENERACIÓN IA
+  ══════════════════════════════════════════════════════ -->
+  <div class="scene" id="scene-3">
+    <div class="scene-header">
+      <div class="scene-num">3</div>
+      <div>
+        <div class="scene-title">🤖 Generación Automática del Simulador IA</div>
+        <div class="scene-sub">Al marcar un tema como COMPLETADO, el sistema auto-genera el simulador de examen</div>
+      </div>
+    </div>
+    <div class="mock-browser">
+      <div class="browser-bar">
+        <div class="browser-dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div>
+        <div class="browser-url">🔒 localhost:5173/temas/geometria</div>
+      </div>
+      <div style="background:#0d1117">
+        <div class="dash-header" style="background:linear-gradient(135deg,#059669,#0891b2)">
+          <h2>✅ Tema Marcado como COMPLETADO</h2>
+          <p>Geometría: Figuras y Áreas · Matemáticas · Prof. Juan Pérez</p>
+        </div>
+        <div class="ai-gen-box" id="aiGenBox">
+          <div class="ai-spinner"></div>
+          <div style="font-weight:700;font-size:1rem;color:var(--accent2)">Motor Pedagógico EduSmart – Generando Simulador…</div>
+          <div style="color:var(--muted);font-size:.82rem;margin-top:4px">Creando 5 ejercicios didácticos para secundaria sobre Geometría</div>
+          <div class="ai-log">
+            <div class="line">▶ Detectando materia: Matemáticas (nivel colegio secundaria)</div>
+            <div class="line">▶ Seleccionando plantilla pedagógica: GEOMETRÍA_BASICA_v2</div>
+            <div class="line">▶ Generando 5 preguntas de opción múltiple con 4 opciones…</div>
+            <div class="line">▶ Calibrando dificultad: 2 FÁCIL · 2 INTERMEDIO · 1 DIFÍCIL</div>
+            <div class="line">✅ Simulador creado → 15 min · 100 pts · +40 XP · +20 Coins</div>
+          </div>
+        </div>
+        <div class="section" style="margin-top:8px">
+          <div style="background:rgba(34,197,94,.1);border:1px solid var(--green);border-radius:10px;padding:14px;display:flex;align-items:center;gap:12px;">
+            <span style="font-size:1.5rem">🎉</span>
+            <div>
+              <div style="font-weight:700;color:var(--green)">¡Simulador de Examen Generado Exitosamente!</div>
+              <div style="color:var(--muted);font-size:.82rem">Los estudiantes ya pueden acceder a "Simuladores IA" para practicar Geometría</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn-prev-scene" onclick="prevScene()">← Anterior</button>
+      <span style="color:var(--muted);font-size:.82rem">Escena 3 de 7</span>
+      <button class="btn-next-scene" onclick="nextScene()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       ESCENA 4: LOGIN ESTUDIANTE
+  ══════════════════════════════════════════════════════ -->
+  <div class="scene" id="scene-4">
+    <div class="scene-header">
+      <div class="scene-num">4</div>
+      <div>
+        <div class="scene-title">Inicio de Sesión – Estudiante</div>
+        <div class="scene-sub">Carlos Gómez accede a su perfil de estudiante</div>
+      </div>
+    </div>
+    <div class="mock-browser">
+      <div class="browser-bar">
+        <div class="browser-dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div>
+        <div class="browser-url">🔒 localhost:5173/login</div>
+      </div>
+      <div style="padding:20px;background:#0d1117">
+        <div class="login-box">
+          <div class="login-logo">EduSmart</div>
+          <div class="login-tagline">Plataforma de Gestión Académica con IA</div>
+          <div class="form-group">
+            <label>Correo Electrónico</label>
+            <input type="email" value="carlos.gomez@edusmart.edu" readonly style="border-color:var(--accent2)">
+          </div>
+          <div class="form-group">
+            <label>Contraseña</label>
+            <input type="password" value="••••••••••••" readonly>
+          </div>
+          <button class="btn" style="background:linear-gradient(135deg,var(--accent2),#0891b2);color:#0f172a" onclick="nextScene()">Iniciar Sesión →</button>
+          <div style="text-align:center;margin-top:12px">
+            <span class="role-pill role-student">🎓 ESTUDIANTE</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn-prev-scene" onclick="prevScene()">← Anterior</button>
+      <span style="color:var(--muted);font-size:.82rem">Escena 4 de 7</span>
+      <button class="btn-next-scene" onclick="nextScene()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       ESCENA 5: SIMULADORES ESTUDIANTE
+  ══════════════════════════════════════════════════════ -->
+  <div class="scene" id="scene-5">
+    <div class="scene-header">
+      <div class="scene-num">5</div>
+      <div>
+        <div class="scene-title">Simuladores IA – Panel del Estudiante</div>
+        <div class="scene-sub">Carlos ve todos los simuladores disponibles según temas completados por el docente</div>
+      </div>
+    </div>
+    <div class="mock-browser">
+      <div class="browser-bar">
+        <div class="browser-dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div>
+        <div class="browser-url">🔒 localhost:5173/simuladores</div>
+      </div>
+      <div style="background:#0d1117">
+        <div class="dash-header" style="background:linear-gradient(135deg,#0891b2,#059669)">
+          <h2>🤖 Simuladores de Examen con IA</h2>
+          <p>6 simuladores disponibles · Practica para tus exámenes de colegio</p>
+        </div>
+        <div class="sim-grid">
+          <div class="sim-card" onclick="nextScene()">
+            <div class="sim-card-header">
+              <div class="sim-materia">🔬 Biología</div>
+              <div class="sim-title">La Célula: Estructura, Organelos y Funciones Vitales</div>
+              <div class="sim-desc">5 ejercicios de opción múltiple sobre mitocondria, fotosíntesis y células</div>
+            </div>
+            <div class="sim-card-body">
+              <div class="sim-meta">
+                <span>⏱ 15 min</span><span>❓ 5 pregs</span><span>🎯 INTERMEDIO</span>
+              </div>
+              <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+                <span class="xp-badge">+40 XP · 🪙20</span>
+                <span style="color:var(--accent2);font-size:.8rem;font-weight:700">▶ Iniciar</span>
+              </div>
+            </div>
+          </div>
+          <div class="sim-card">
+            <div class="sim-card-header">
+              <div class="sim-materia">🧮 Matemáticas</div>
+              <div class="sim-title">Álgebra: Ecuaciones Lineales y Sistemas</div>
+              <div class="sim-desc">5 ejercicios sobre resolución de ecuaciones y gráficas</div>
+            </div>
+            <div class="sim-card-body">
+              <div class="sim-meta">
+                <span>⏱ 15 min</span><span>❓ 5 pregs</span><span>🎯 FÁCIL</span>
+              </div>
+              <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+                <span class="xp-badge" style="background:rgba(34,197,94,.15);color:var(--green);border-color:var(--green)">✓ Aprobado 90pts</span>
+                <span style="color:var(--green);font-size:.8rem;font-weight:700">↺ Repetir</span>
+              </div>
+            </div>
+          </div>
+          <div class="sim-card">
+            <div class="sim-card-header">
+              <div class="sim-materia">⚗️ Química</div>
+              <div class="sim-title">Tabla Periódica y Enlace Químico</div>
+              <div class="sim-desc">5 ejercicios sobre elementos, grupos y tipos de enlace</div>
+            </div>
+            <div class="sim-card-body">
+              <div class="sim-meta">
+                <span>⏱ 15 min</span><span>❓ 5 pregs</span><span>🎯 INTERMEDIO</span>
+              </div>
+              <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+                <span class="xp-badge">+40 XP · 🪙20</span>
+                <span style="color:var(--accent2);font-size:.8rem;font-weight:700">▶ Iniciar</span>
+              </div>
+            </div>
+          </div>
+          <div class="sim-card">
+            <div class="sim-card-header">
+              <div class="sim-materia">🌍 Ciencias Sociales</div>
+              <div class="sim-title">Geografía de Bolivia e Independencia</div>
+              <div class="sim-desc">5 ejercicios sobre historia y geografía nacional</div>
+            </div>
+            <div class="sim-card-body">
+              <div class="sim-meta">
+                <span>⏱ 15 min</span><span>❓ 5 pregs</span><span>🎯 INTERMEDIO</span>
+              </div>
+              <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+                <span class="xp-badge">+40 XP · 🪙20</span>
+                <span style="color:var(--accent2);font-size:.8rem;font-weight:700">▶ Iniciar</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn-prev-scene" onclick="prevScene()">← Anterior</button>
+      <span style="color:var(--muted);font-size:.82rem">Escena 5 de 7</span>
+      <button class="btn-next-scene" onclick="nextScene()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       ESCENA 6: EXAMEN INTERACTIVO
+  ══════════════════════════════════════════════════════ -->
+  <div class="scene" id="scene-6">
+    <div class="scene-header">
+      <div class="scene-num">6</div>
+      <div>
+        <div class="scene-title">Simulador de Examen – Biología en Vivo</div>
+        <div class="scene-sub">Carlos responde el simulador interactivo con temporizador y retroalimentación inmediata</div>
+      </div>
+    </div>
+    <div class="exam-modal">
+      <div class="exam-header">
+        <div>
+          <h3>🔬 La Célula: Estructura, Organelos y Funciones Vitales</h3>
+          <div style="font-size:.78rem;opacity:.85;margin-top:2px">Biología · Secundaria · Motor Pedagógico EduSmart</div>
+        </div>
+        <div class="timer" id="examTimer">12:47</div>
+      </div>
+      <div class="exam-progress">
+        <span style="color:var(--muted);font-size:.82rem">Pregunta</span>
+        <div class="q-dots">
+          <div class="q-dot answered">1</div>
+          <div class="q-dot answered">2</div>
+          <div class="q-dot current">3</div>
+          <div class="q-dot">4</div>
+          <div class="q-dot">5</div>
+        </div>
+        <span style="color:var(--muted);font-size:.82rem;margin-left:auto">3 / 5</span>
+      </div>
+      <div class="exam-body">
+        <div class="question-num">Pregunta 3 de 5 · 20 puntos · 🎯 INTERMEDIO</div>
+        <div class="question-text">
+          En el cuerpo humano y en relación a "La Célula", ¿cuál es la función principal de los glóbulos rojos (eritrocitos)?
+        </div>
+        <div class="options" id="examOptions">
+          <div class="option correct" onclick="selectOpt(this,0)">
+            A) Transportar el oxígeno desde los pulmones a todas las células del cuerpo mediante la hemoglobina.
+          </div>
+          <div class="option" onclick="selectOpt(this,1)">
+            B) Combatir las infecciones bacterianas como soldados de defensa.
+          </div>
+          <div class="option" onclick="selectOpt(this,2)">
+            C) Formar costras y coágulos ante las heridas en la piel.
+          </div>
+          <div class="option" onclick="selectOpt(this,3)">
+            D) Digerir las grasas dentro del estómago.
+          </div>
+        </div>
+        <div style="margin-top:16px;background:rgba(34,197,94,.1);border:1px solid var(--green);border-radius:8px;padding:12px;display:flex;gap:10px;align-items:flex-start;">
+          <span style="font-size:1.2rem">✅</span>
+          <div>
+            <div style="color:var(--green);font-weight:700;font-size:.85rem">¡Correcto! +20 puntos</div>
+            <div style="color:var(--muted);font-size:.8rem;margin-top:4px">Los eritrocitos contienen hemoglobina que se une al O₂ en los pulmones y lo transporta por el torrente sanguíneo a todos los tejidos del cuerpo.</div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-btns" style="padding:0 24px 20px">
+        <button class="btn-nav btn-prev">← Anterior</button>
+        <button class="btn-nav btn-next" onclick="nextScene()">Siguiente → (Pregunta 4)</button>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn-prev-scene" onclick="prevScene()">← Anterior</button>
+      <span style="color:var(--muted);font-size:.82rem">Escena 6 de 7</span>
+      <button class="btn-next-scene" onclick="nextScene()">Ver Resultados →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       ESCENA 7: RESULTADOS
+  ══════════════════════════════════════════════════════ -->
+  <div class="scene" id="scene-7">
+    <div class="scene-header">
+      <div class="scene-num">7</div>
+      <div>
+        <div class="scene-title">🏆 Resultados y Diagnóstico IA</div>
+        <div class="scene-sub">Carlos obtiene su calificación, retroalimentación pedagógica y recompensas</div>
+      </div>
+    </div>
+    <div class="exam-modal">
+      <div class="exam-header" style="background:linear-gradient(135deg,#059669,#0891b2)">
+        <div>
+          <h3>🏆 ¡Simulador Completado!</h3>
+          <div style="font-size:.78rem;opacity:.85;margin-top:2px">Biología · La Célula · Tiempo usado: 7:32 min</div>
+        </div>
+        <div class="timer" style="background:rgba(0,0,0,.3)">7:32</div>
+      </div>
+      <div class="results-box">
+        <div class="score-circle">
+          <div class="score-num">80</div>
+          <div class="score-lbl">puntos</div>
+        </div>
+        <div style="font-size:1.2rem;font-weight:800;color:var(--green)">¡Aprobado con Distinción! 🎉</div>
+        <div style="color:var(--muted);font-size:.85rem;margin-top:4px">Superaste el umbral de 60 puntos para aprobar</div>
+
+        <div class="result-grid">
+          <div class="result-stat">
+            <div class="num" style="color:var(--green)">4/5</div>
+            <div class="lbl">✅ Correctas</div>
+          </div>
+          <div class="result-stat">
+            <div class="num" style="color:var(--red)">1/5</div>
+            <div class="lbl">❌ Incorrectas</div>
+          </div>
+          <div class="result-stat">
+            <div class="num" style="color:var(--yellow)">80%</div>
+            <div class="lbl">📊 Precisión</div>
+          </div>
+        </div>
+
+        <div class="explanation">
+          <h4>🤖 Diagnóstico Pedagógico IA</h4>
+          <p>
+            <strong style="color:var(--accent2)">Fortalezas:</strong> Excelente comprensión de la estructura celular y procesos como la fotosíntesis y transporte de oxígeno. Dominas bien los conceptos fundamentales de Biología para tu nivel.<br><br>
+            <strong style="color:var(--yellow)">Área de mejora:</strong> Revisar la diferencia entre células eucariotas y procariotas — confundiste las características del núcleo celular. Te recomendamos repasar el Tema 1 Unidad 1 antes del examen.<br><br>
+            <strong style="color:var(--green)">Consejo:</strong> ¡Estás listo para el examen! Repasa solo el concepto de membrana nuclear y estarás al 100%.
+          </p>
+        </div>
+
+        <div class="xp-earned">
+          🏅 +40 XP ganados · 🪙 +20 Coins · 🔥 Racha de 3 días
+        </div>
+
+        <div style="margin-top:20px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+          <button class="btn-nav btn-prev" style="background:var(--border)">↺ Repetir Simulador</button>
+          <button class="btn-nav btn-next" onclick="prevScene()">📚 Ver Otros Simuladores</button>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn-prev-scene" onclick="prevScene()">← Anterior</button>
+      <span style="color:var(--muted);font-size:.82rem">Escena 7 de 7</span>
+      <button class="btn-next-scene" onclick="showFinal()">Ver Resumen Final →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       ESCENA FINAL
+  ══════════════════════════════════════════════════════ -->
+  <div class="scene" id="scene-final">
+    <div class="scene-header">
+      <div class="scene-num">🎓</div>
+      <div>
+        <div class="scene-title">Resumen del Sistema EduSmart</div>
+        <div class="scene-sub">Plataforma académica completa con IA pedagógica para colegio</div>
+      </div>
+    </div>
+    <div class="final-box">
+      <h2>EduSmart – Sistema Completo</h2>
+      <p>Plataforma de Gestión Académica con Inteligencia Artificial para Colegios de Secundaria</p>
+
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin:24px 0;text-align:left">
+        <div style="background:var(--card);border-radius:12px;padding:18px;border:1px solid var(--border)">
+          <div style="font-size:1.3rem;margin-bottom:8px">🏗️</div>
+          <div style="font-weight:700;margin-bottom:6px">Backend</div>
+          <div style="color:var(--muted);font-size:.82rem;line-height:1.6">Django 4.2 · Python 3.9<br>SQLite3 / MySQL<br>REST API con sesiones<br>Motor IA Pedagógico<br>Google Gemini API (integrado)</div>
+        </div>
+        <div style="background:var(--card);border-radius:12px;padding:18px;border:1px solid var(--border)">
+          <div style="font-size:1.3rem;margin-bottom:8px">🎨</div>
+          <div style="font-weight:700;margin-bottom:6px">Frontend</div>
+          <div style="color:var(--muted);font-size:.82rem;line-height:1.6">React 18 · Vite 5<br>TailwindCSS + Lucide<br>Axios + React Router<br>Componentes adaptativos<br>Simulador interactivo con timer</div>
+        </div>
+        <div style="background:var(--card);border-radius:12px;padding:18px;border:1px solid var(--border)">
+          <div style="font-size:1.3rem;margin-bottom:8px">🤖</div>
+          <div style="font-weight:700;margin-bottom:6px">Módulo IA</div>
+          <div style="color:var(--muted);font-size:.82rem;line-height:1.6">Motor Pedagógico EduSmart<br>Gemini Pro API (fallback automático)<br>6 materias de colegio<br>Dificultad adaptativa<br>Diagnóstico personalizado</div>
+        </div>
+        <div style="background:var(--card);border-radius:12px;padding:18px;border:1px solid var(--border)">
+          <div style="font-size:1.3rem;margin-bottom:8px">📊</div>
+          <div style="font-weight:700;margin-bottom:6px">Funciones Clave</div>
+          <div style="color:var(--muted);font-size:.82rem;line-height:1.6">Gestión docente de temas<br>Auto-generación de simuladores<br>Exámenes cronometrados<br>Sistema de XP y Gamificación<br>Seguimiento de progreso</div>
+        </div>
+      </div>
+
+      <div style="font-weight:700;margin-bottom:12px;color:var(--accent2)">🏫 Materias Escolares Incluidas</div>
+      <div class="tech-pills">
+        <span class="tech-pill">🧮 Matemáticas</span>
+        <span class="tech-pill">📖 Lenguaje y Literatura</span>
+        <span class="tech-pill">⚡ Física</span>
+        <span class="tech-pill">⚗️ Química</span>
+        <span class="tech-pill">🔬 Biología</span>
+        <span class="tech-pill">🌍 Ciencias Sociales</span>
+      </div>
+
+      <div style="margin-top:24px;padding:16px;background:rgba(99,102,241,.08);border-radius:12px;border:1px solid var(--accent)">
+        <div style="font-weight:700;color:var(--accent);margin-bottom:4px">📦 Repositorio GitHub</div>
+        <div style="font-family:monospace;font-size:.88rem;color:var(--accent2)">https://github.com/MORFEO99/EDUSMART.git</div>
+        <div style="color:var(--muted);font-size:.78rem;margin-top:4px">Branch: main · Commit: 8289ba9 · Incluye todas las mejoras IA</div>
+      </div>
+
+      <a href="http://localhost:5173" target="_blank" class="repo-link">🚀 Abrir Sistema en Vivo</a>
+    </div>
+    <div class="controls">
+      <button class="btn-prev-scene" onclick="backToScene(7)">← Volver</button>
+      <span style="color:var(--muted);font-size:.82rem">Demo completada ✓</span>
+      <button class="btn-next-scene" onclick="restartDemo()">↺ Reiniciar Demo</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- NOTIFICATION -->
+<div class="notif" id="notif" style="display:none">
+  <div class="notif-title" id="notifTitle"></div>
+  <div class="notif-msg" id="notifMsg"></div>
+</div>
+
+<script>
+  const STEPS = [
+    'Login Docente','Dashboard','Generación IA','Login Estudiante',
+    'Simuladores','Examen','Resultados'
+  ];
+  let current = 1;
+  const TOTAL = 7;
+
+  // Build step dots
+  const stepsRow = document.getElementById('stepsRow');
+  STEPS.forEach((s, i) => {
+    const d = document.createElement('div');
+    d.className = 'step-dot' + (i === 0 ? ' active' : '');
+    d.id = 'dot-' + (i+1);
+    d.textContent = s;
+    d.onclick = () => goToScene(i+1);
+    stepsRow.appendChild(d);
+  });
+
+  function updateProgress() {
+    const pct = ((current-1) / (TOTAL-1)) * 100;
+    document.getElementById('progressFill').style.width = pct + '%';
+    STEPS.forEach((_, i) => {
+      const d = document.getElementById('dot-' + (i+1));
+      if (!d) return;
+      d.className = 'step-dot';
+      if (i+1 < current) d.classList.add('done');
+      if (i+1 === current) d.classList.add('active');
+    });
+  }
+
+  function showScene(n) {
+    document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+    const el = document.getElementById('scene-' + n);
+    if (el) el.classList.add('active');
+    current = n;
+    updateProgress();
+    // Start timer on exam scene
+    if (n === 6) startExamTimer();
+    if (n === 3) {/* spinner already animated via CSS */}
+  }
+
+  function nextScene() { if (current < TOTAL) showScene(current + 1); }
+  function prevScene() { if (current > 1) showScene(current - 1); }
+  function goToScene(n) { if (n >= 1 && n <= TOTAL) showScene(n); }
+  function backToScene(n) {
+    document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+    document.getElementById('scene-' + n).classList.add('active');
+    current = n;
+    updateProgress();
+  }
+
+  function showFinal() {
+    document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+    document.getElementById('scene-final').classList.add('active');
+    document.getElementById('progressFill').style.width = '100%';
+    STEPS.forEach((_, i) => {
+      const d = document.getElementById('dot-' + (i+1));
+      if (d) { d.className = 'step-dot done'; }
+    });
+    showNotif('🎉 Demo completada', 'Has recorrido todas las funciones de EduSmart.');
+  }
+
+  function restartDemo() {
+    showScene(1);
+    document.getElementById('progressFill').style.width = '0%';
+  }
+
+  // Exam timer
+  let timerInterval;
+  function startExamTimer() {
+    clearInterval(timerInterval);
+    let secs = 767; // 12:47
+    function tick() {
+      secs--;
+      if (secs < 0) { clearInterval(timerInterval); return; }
+      const m = Math.floor(secs/60);
+      const s = secs % 60;
+      document.getElementById('examTimer').textContent =
+        String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+      if (secs < 60) document.getElementById('examTimer').style.color = '#ef4444';
+    }
+    timerInterval = setInterval(tick, 1000);
+  }
+
+  function selectOpt(el, idx) { /* demo only - correct already highlighted */ }
+
+  // Notifications
+  function showNotif(title, msg) {
+    const n = document.getElementById('notif');
+    document.getElementById('notifTitle').textContent = title;
+    document.getElementById('notifMsg').textContent = msg;
+    n.style.display = 'block';
+    n.classList.remove('hide');
+    setTimeout(() => {
+      n.classList.add('hide');
+      setTimeout(() => n.style.display = 'none', 300);
+    }, 4000);
+  }
+
+  // Notifications per scene
+  const sceneNotifs = {
+    2: ['✅ Login exitoso', 'Bienvenido Prof. Juan Pérez al panel docente'],
+    3: ['⚡ Tema completado', 'Auto-generando simulador de examen con IA...'],
+    4: ['🤖 Simulador creado', 'Los estudiantes ya pueden practicar Geometría'],
+    5: ['✅ Login estudiante', 'Bienvenido Carlos Gómez, tienes 6 simuladores disponibles'],
+    6: ['🎮 Examen iniciado', '15 minutos · 5 preguntas · Biología secundaria'],
+    7: ['🏆 ¡Aprobado!', 'Carlos obtuvo 80 puntos y ganó +40 XP']
+  };
+
+  // Intercept showScene for notifications
+  const _orig = showScene;
+  window.showScene = function(n) {
+    _orig(n);
+    if (sceneNotifs[n]) {
+      setTimeout(() => showNotif(sceneNotifs[n][0], sceneNotifs[n][1]), 300);
+    }
+  };
+
+  // init
+  updateProgress();
+</script>
+</body>
+</html>
+
