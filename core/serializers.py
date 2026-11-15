@@ -148,6 +148,17 @@ class TareaSerializer(serializers.ModelSerializer):
     espacio_nombre = serializers.SerializerMethodField()
     espacio_color = serializers.SerializerMethodField()
     docente_nombre = serializers.SerializerMethodField()
+    colegio_id = serializers.SerializerMethodField()
+    colegio_nombre = serializers.SerializerMethodField()
+    curso_id = serializers.SerializerMethodField()
+    curso_nombre = serializers.SerializerMethodField()
+    materia_id = serializers.SerializerMethodField()
+    materia_nombre = serializers.SerializerMethodField()
+    materia = serializers.SerializerMethodField()
+    entregadas = serializers.SerializerMethodField()
+    pendientes_calificacion = serializers.SerializerMethodField()
+    calificadas = serializers.SerializerMethodField()
+    total_alumnos = serializers.SerializerMethodField()
     materiales = MaterialSerializer(many=True, read_only=True)
     esta_vencida = serializers.ReadOnlyField()
     mi_entrega = serializers.SerializerMethodField()
@@ -158,6 +169,9 @@ class TareaSerializer(serializers.ModelSerializer):
         model = Tarea
         fields = [
             'id', 'espacio', 'espacio_nombre', 'espacio_color',
+            'colegio_id', 'colegio_nombre', 'curso_id', 'curso_nombre',
+            'materia_id', 'materia_nombre', 'materia',
+            'entregadas', 'pendientes_calificacion', 'calificadas', 'total_alumnos',
             'docente', 'docente_nombre', 'titulo', 'descripcion',
             'indicaciones', 'puntaje_maximo', 'fecha_publicacion',
             'fecha_limite', 'esta_vencida', 'estado', 'estado_estudiante', 'materiales',
@@ -165,13 +179,52 @@ class TareaSerializer(serializers.ModelSerializer):
         ]
 
     def get_espacio_nombre(self, obj):
-        return obj.espacio.nombre
+        return obj.espacio.nombre if obj.espacio else ''
 
     def get_espacio_color(self, obj):
-        return obj.espacio.color
+        return obj.espacio.color if obj.espacio else '#1E3A8A'
 
     def get_docente_nombre(self, obj):
         return obj.docente.usuario.nombre_completo if obj.docente else 'Docente'
+
+    def get_colegio_id(self, obj):
+        return obj.espacio.colegio_id if obj.espacio else None
+
+    def get_colegio_nombre(self, obj):
+        if obj.espacio and obj.espacio.colegio:
+            return obj.espacio.colegio.nombre
+        return ''
+
+    def get_curso_id(self, obj):
+        return obj.espacio.curso_id if obj.espacio else None
+
+    def get_curso_nombre(self, obj):
+        if obj.espacio and obj.espacio.curso:
+            return obj.espacio.curso.nombre_completo
+        return ''
+
+    def get_materia_id(self, obj):
+        return obj.espacio.materia_id if obj.espacio else None
+
+    def get_materia_nombre(self, obj):
+        if obj.espacio and obj.espacio.materia:
+            return obj.espacio.materia.nombre
+        return obj.espacio.nombre if obj.espacio else ''
+
+    def get_materia(self, obj):
+        return self.get_materia_nombre(obj)
+
+    def get_entregadas(self, obj):
+        return obj.entregas.count()
+
+    def get_pendientes_calificacion(self, obj):
+        return obj.entregas.filter(calificacion__isnull=True).count()
+
+    def get_calificadas(self, obj):
+        return obj.entregas.filter(calificacion__isnull=False).count()
+
+    def get_total_alumnos(self, obj):
+        return obj.espacio.miembros.count() if obj.espacio else 0
 
     def get_mi_entrega(self, obj):
         request = self.context.get('request')

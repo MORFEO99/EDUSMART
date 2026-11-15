@@ -12,7 +12,7 @@ from .models import (
     Usuario, Docente, Estudiante, Espacio, MiembroEspacio,
     Tarea, Material, Entrega, VersionEntrega, Calificacion, Retroalimentacion,
     ProgresoAcademico, Notificacion, AvisoEspacio, RecursoEspacio,
-    ExtensionFechaTarea, PlantillaTarea
+    ExtensionFechaTarea, PlantillaTarea, TareaVisualizacion
 )
 from .serializers import (
     UsuarioSerializer, DocenteSerializer, EstudianteSerializer,
@@ -573,6 +573,15 @@ def api_tarea_detail(request, pk):
 
     # Calculate Visual Pipeline state for student
     if user.is_authenticated and user.rol == 'ESTUDIANTE' and hasattr(user, 'perfil_estudiante'):
+        vista, created = TareaVisualizacion.objects.get_or_create(
+            tarea=tarea, estudiante=user.perfil_estudiante,
+            defaults={'fecha_primera_vista': timezone.now(), 'fecha_ultima_vista': timezone.now(), 'total_vistas': 1}
+        )
+        if not created:
+            vista.total_vistas += 1
+            vista.fecha_ultima_vista = timezone.now()
+            vista.save(update_fields=['total_vistas', 'fecha_ultima_vista'])
+
         entrega = Entrega.objects.filter(tarea=tarea, estudiante=user.perfil_estudiante).first()
         now = timezone.now()
 
@@ -1004,14 +1013,32 @@ def api_entregas_pendientes(request):
     docente = user.perfil_docente
     filtro = request.query_params.get('filtro', 'todos').lower()
     espacio_id = request.query_params.get('espacio_id')
+    colegio_id = request.query_params.get('colegio_id')
+    curso_id = request.query_params.get('curso_id')
+    materia_id = request.query_params.get('materia_id')
+    tarea_id = request.query_params.get('tarea_id')
     search = request.query_params.get('search', '').strip().lower()
 
     entregas = Entrega.objects.filter(tarea__docente=docente).select_related(
-        'tarea', 'tarea__espacio', 'estudiante__usuario', 'calificacion'
+        'tarea', 'tarea__espacio', 'tarea__espacio__colegio',
+        'tarea__espacio__curso', 'tarea__espacio__curso__colegio',
+        'tarea__espacio__materia', 'estudiante__usuario', 'calificacion',
+        'calificacion__retroalimentacion'
     )
 
     if espacio_id:
         entregas = entregas.filter(tarea__espacio_id=espacio_id)
+    if tarea_id:
+        entregas = entregas.filter(tarea_id=tarea_id)
+    if colegio_id:
+        entregas = entregas.filter(
+            Q(tarea__espacio__colegio_id=colegio_id) |
+            Q(tarea__espacio__curso__colegio_id=colegio_id)
+        )
+    if curso_id:
+        entregas = entregas.filter(tarea__espacio__curso_id=curso_id)
+    if materia_id:
+        entregas = entregas.filter(tarea__espacio__materia_id=materia_id)
 
     if filtro == 'pendientes':
         entregas = entregas.filter(calificacion__isnull=True)
@@ -1029,15 +1056,48 @@ def api_entregas_pendientes(request):
             Q(tarea__titulo__icontains=search)
         )
 
+    # Pre-cargar mapa de visualizaciones de tareas
+    tarea_ids = set(entregas.values_list('tarea_id', flat=True))
+    vistas_lookup = {}
+    for v in TareaVisualizacion.objects.filter(tarea_id__in=tarea_ids):
+        vistas_lookup[(v.tarea_id, v.estudiante_id)] = v
+
     result = []
     for e in entregas.order_by('-fecha_entrega'):
+        esp = e.tarea.espacio
+        cur = esp.curso
+        col = esp.colegio or (cur.colegio if cur else None)
+        mat = esp.materia
+
+        col_id = col.id if col else None
+        col_nom = col.nombre if col else 'Colegio Don Bosco'
+
+        cur_id = cur.id if cur else None
+        cur_nom = cur.nombre_completo if cur else 'Curso'
+
+        mat_id = mat.id if mat else None
+        mat_nom = mat.nombre if mat else esp.nombre
+
+        vista = vistas_lookup.get((e.tarea_id, e.estudiante_id))
+        ha_visto = bool(vista) or True
+        fecha_vista = vista.fecha_ultima_vista.strftime('%d/%m/%Y %H:%M') if vista else e.fecha_entrega.strftime('%d/%m/%Y %H:%M')
+        es_tardia = bool(e.tarea.fecha_limite and e.fecha_entrega > e.tarea.fecha_limite) or (e.estado == 'ATRASADO')
+
         result.append({
             'id': e.id,
             'entrega_id': e.id,
             'tarea_id': e.tarea.id,
             'tarea_titulo': e.tarea.titulo,
-            'espacio_id': e.tarea.espacio.id,
-            'espacio_nombre': e.tarea.espacio.nombre,
+            'fecha_limite': e.tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') if e.tarea.fecha_limite else None,
+            'puntaje_maximo': e.tarea.puntaje_maximo,
+            'colegio_id': col_id,
+            'colegio_nombre': col_nom,
+            'curso_id': cur_id,
+            'curso_nombre': cur_nom,
+            'materia_id': mat_id,
+            'materia_nombre': mat_nom,
+            'espacio_id': esp.id,
+            'espacio_nombre': esp.nombre,
             'estudiante_id': e.estudiante.id,
             'estudiante_nombre': e.estudiante.usuario.nombre_completo,
             'estudiante_matricula': f"EST-{e.estudiante.id:04d}",
@@ -1048,13 +1108,171 @@ def api_entregas_pendientes(request):
             'version': e.version,
             'nota': e.calificacion.nota if hasattr(e, 'calificacion') else None,
             'retroalimentacion': e.calificacion.retroalimentacion.comentario if hasattr(e, 'calificacion') and hasattr(e.calificacion, 'retroalimentacion') else '',
-            'observaciones': e.observaciones
+            'observaciones': e.observaciones,
+            'ha_visto': ha_visto,
+            'fecha_vista': fecha_vista,
+            'es_tardia': es_tardia
         })
 
     return Response({
         'total': len(result),
         'pendientes_count': entregas.filter(calificacion__isnull=True).count(),
+        'calificadas_count': entregas.filter(calificacion__isnull=False).count(),
         'entregas': result
+    })
+
+
+@api_view(['GET'])
+def api_tarea_vistas(request, pk):
+    """
+    Seguimiento detallado de lectura y visualización de una tarea por los estudiantes del curso.
+    """
+    user = request.user
+    if user.rol != 'DOCENTE' or not hasattr(user, 'perfil_docente'):
+        return Response({'error': 'Solo docentes pueden consultar las vistas.'}, status=status.HTTP_403_FORBIDDEN)
+
+    tarea = get_object_or_404(Tarea, id=pk, docente=user.perfil_docente)
+    espacio = tarea.espacio
+    cur = espacio.curso
+    col = espacio.colegio or (cur.colegio if cur else None)
+    mat = espacio.materia
+
+    # Estudiantes del curso/espacio
+    if cur:
+        estudiantes = Estudiante.objects.filter(cursos_inscritos__curso=cur, cursos_inscritos__estado='ACTIVO').select_related('usuario').distinct()
+    else:
+        estudiantes = Estudiante.objects.filter(espacios_inscritos__espacio=espacio).select_related('usuario').distinct()
+
+    if not estudiantes.exists():
+        est_ids = set(espacio.miembros.values_list('estudiante_id', flat=True)) | set(tarea.entregas.values_list('estudiante_id', flat=True))
+        estudiantes = Estudiante.objects.filter(id__in=est_ids).select_related('usuario')
+
+    entregas_map = {e.estudiante_id: e for e in tarea.entregas.select_related('calificacion', 'calificacion__retroalimentacion')}
+    vistas_map = {v.estudiante_id: v for v in TareaVisualizacion.objects.filter(tarea=tarea)}
+
+    listado = []
+    total_vieron = 0
+    total_entregaron = 0
+    total_calificadas = 0
+
+    for est in estudiantes.order_by('usuario__last_name', 'usuario__first_name'):
+        entrega = entregas_map.get(est.id)
+        vista = vistas_map.get(est.id)
+
+        ha_visto = bool(vista) or bool(entrega)
+        if ha_visto:
+            total_vieron += 1
+        if entrega:
+            total_entregaron += 1
+            if hasattr(entrega, 'calificacion'):
+                total_calificadas += 1
+
+        estado_entrega = 'SIN_ENTREGA'
+        if entrega:
+            if hasattr(entrega, 'calificacion'):
+                estado_entrega = 'CALIFICADO'
+            elif entrega.estado == 'ATRASADO':
+                estado_entrega = 'ATRASADO'
+            else:
+                estado_entrega = 'PENDIENTE_REVISION'
+
+        listado.append({
+            'estudiante_id': est.id,
+            'nombre_completo': est.usuario.nombre_completo,
+            'matricula': f"EST-{est.id:04d}",
+            'email': est.usuario.email,
+            'ha_visto': ha_visto,
+            'fecha_primera_vista': vista.fecha_primera_vista.strftime('%d/%m/%Y %H:%M') if vista else (entrega.fecha_entrega.strftime('%d/%m/%Y %H:%M') if entrega else None),
+            'fecha_ultima_vista': vista.fecha_ultima_vista.strftime('%d/%m/%Y %H:%M') if vista else (entrega.fecha_entrega.strftime('%d/%m/%Y %H:%M') if entrega else None),
+            'total_vistas': vista.total_vistas if vista else (1 if entrega else 0),
+            'ha_entregado': bool(entrega),
+            'entrega_id': entrega.id if entrega else None,
+            'archivo_nombre': entrega.archivo_nombre if entrega else None,
+            'archivo_url': entrega.archivo_url if entrega else None,
+            'fecha_entrega': entrega.fecha_entrega.strftime('%d/%m/%Y %H:%M') if entrega else None,
+            'estado_entrega': estado_entrega,
+            'nota': entrega.calificacion.nota if entrega and hasattr(entrega, 'calificacion') else None,
+            'retroalimentacion': entrega.calificacion.retroalimentacion.comentario if entrega and hasattr(entrega, 'calificacion') and hasattr(entrega.calificacion, 'retroalimentacion') else ''
+        })
+
+    total_est = len(listado)
+    sin_ver = total_est - total_vieron
+    porcentaje_visto = round((total_vieron / total_est * 100)) if total_est > 0 else 0
+
+    return Response({
+        'tarea': {
+            'id': tarea.id,
+            'titulo': tarea.titulo,
+            'fecha_limite': tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') if tarea.fecha_limite else None,
+            'puntaje_maximo': tarea.puntaje_maximo,
+            'colegio_nombre': col.nombre if col else 'Colegio Don Bosco',
+            'curso_nombre': cur.nombre_completo if cur else 'Curso',
+            'materia_nombre': mat.nombre if mat else espacio.nombre,
+        },
+        'stats': {
+            'total_alumnos': total_est,
+            'vieron': total_vieron,
+            'sin_ver': sin_ver,
+            'porcentaje_visto': porcentaje_visto,
+            'entregaron': total_entregaron,
+            'pendientes_entrega': total_est - total_entregaron,
+            'calificadas': total_calificadas,
+        },
+        'estudiantes': listado
+    })
+
+
+@api_view(['POST'])
+def api_tarea_recordatorio_vistas(request, pk):
+    """
+    Envía notificaciones de recordatorio a los estudiantes que no han visto la tarea o no la han entregado.
+    """
+    user = request.user
+    if user.rol != 'DOCENTE' or not hasattr(user, 'perfil_docente'):
+        return Response({'error': 'Solo docentes pueden enviar recordatorios.'}, status=status.HTTP_403_FORBIDDEN)
+
+    tarea = get_object_or_404(Tarea, id=pk, docente=user.perfil_docente)
+    tipo_destinatarios = request.data.get('tipo', 'sin_ver')
+
+    espacio = tarea.espacio
+    cur = espacio.curso
+
+    if cur:
+        estudiantes = Estudiante.objects.filter(cursos_inscritos__curso=cur, cursos_inscritos__estado='ACTIVO').select_related('usuario')
+    else:
+        estudiantes = Estudiante.objects.filter(espacios_inscritos__espacio=espacio).select_related('usuario')
+
+    entregas_ids = set(tarea.entregas.values_list('estudiante_id', flat=True))
+    vistas_ids = set(TareaVisualizacion.objects.filter(tarea=tarea).values_list('estudiante_id', flat=True))
+
+    enviados = 0
+    for est in estudiantes:
+        ha_entregado = est.id in entregas_ids
+        ha_visto = est.id in vistas_ids or ha_entregado
+
+        should_send = False
+        if tipo_destinatarios == 'sin_ver' and not ha_visto:
+            should_send = True
+        elif tipo_destinatarios == 'sin_entregar' and not ha_entregado:
+            should_send = True
+        elif tipo_destinatarios == 'todos':
+            should_send = True
+
+        if should_send:
+            limite_txt = tarea.fecha_limite.strftime('%d/%m/%Y %H:%M') if tarea.fecha_limite else 'pronto'
+            Notificacion.objects.create(
+                usuario=est.usuario,
+                tipo='PROXIMA_VENCER',
+                mensaje=f"Recordatorio de {user.nombre_completo}: Tienes pendiente la tarea '{tarea.titulo}'. Fecha límite: {limite_txt}.",
+                espacio_id=espacio.id,
+                tarea_id=tarea.id
+            )
+            enviados += 1
+
+    return Response({
+        'success': True,
+        'enviados': enviados,
+        'mensaje': f'Se enviaron {enviados} notificaciones de recordatorio.'
     })
 
 

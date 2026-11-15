@@ -39,6 +39,8 @@ urlpatterns = [
     path('api/espacios/<int:espacio_id>/recursos/', api_views.api_espacio_recursos, name='api_espacio_recursos'),
     path('api/recursos/<int:pk>/', api_views.api_eliminar_recurso, name='api_eliminar_recurso'),
     path('api/tareas/<int:pk>/extension/', api_views.api_tarea_extension, name='api_tarea_extension'),
+    path('api/tareas/<int:pk>/vistas/', api_views.api_tarea_vistas, name='api_tarea_vistas'),
+    path('api/tareas/<int:pk>/recordatorio-vistas/', api_views.api_tarea_recordatorio_vistas, name='api_tarea_recordatorio_vistas'),
     path('api/plantillas/', api_views.api_plantillas_tarea, name='api_plantillas_tarea'),
     path('api/tareas/<int:pk>/duplicar/', api_views.api_duplicar_tarea, name='api_duplicar_tarea'),
 
@@ -64,6 +66,10 @@ urlpatterns = [
     path('api/v2/cursos/<int:curso_id>/estudiantes/', api_v2.api_estudiantes_por_curso, name='api_v2_estudiantes_curso'),
     path('api/v2/cursos/<int:curso_id>/enviar-reportes/', api_v2.api_enviar_reportes_curso, name='api_v2_enviar_reportes_curso'),
     path('api/v2/estudiantes/<int:estudiante_id>/enviar-reporte/', api_v2.api_enviar_reporte_estudiante, name='api_v2_enviar_reporte_estudiante'),
+    path('api/v2/docente/lista-excel/', api_v2.api_lista_excel_docente, name='api_v2_lista_excel_docente'),
+    path('api/v2/docente/materias-con-temas/', api_v2.api_materias_con_temas, name='api_v2_materias_con_temas'),
+    path('api/v2/materias/<int:materia_id>/temas/', api_v2.api_temas_avance, name='api_v2_temas_avance'),
+    path('api/v2/materias/<int:materia_id>/temas/<int:tema_id>/', api_v2.api_tema_avance_detail, name='api_v2_tema_avance_detail'),
 
     # Invitaciones a Espacios (V2)
     path('api/espacios/<int:espacio_id>/invitacion/', api_v2.api_consultar_invitacion, name='api_consultar_invitacion'),

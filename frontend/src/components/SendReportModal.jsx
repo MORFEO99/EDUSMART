@@ -1,37 +1,55 @@
 import React, { useState } from 'react';
-import { Send, CheckCircle, AlertTriangle, Users, Mail, BookOpen } from 'lucide-react';
+import { Send, CheckCircle, AlertTriangle, Users, Mail, BookOpen, UserX, ShieldAlert } from 'lucide-react';
 import { commonAPI } from '../api';
 
 const getNoteColor = (nota) => {
   if (!nota && nota !== 0) return '#616161';
   if (nota >= 90) return '#107C41';
-  if (nota >= 70) return '#0078D4';
-  if (nota >= 50) return '#CA5010';
-  return '#A80000';
+  if (nota >= 51) return '#0078D4';
+  return '#B91C1C';
 };
 
-export default function SendReportModal({ student, course, onClose, onSent }) {
+export default function SendReportModal({ student, course, isRiskOnly = false, atRiskStudents = [], onClose, onSent }) {
   const isBulk = !student && !!course;
 
-  // Single student initial state
-  const initialSubject = isBulk
-    ? `Reporte General de Desempeño - Curso ${course.grado} "${course.paralelo}"`
-    : `Reporte de Desempeño Académico - ${student?.nombre_completo || ''}`;
+  // Single student initial state vs risk group vs entire course
+  let initialSubject = '';
+  let initialMessage = '';
 
-  const initialMessage = isBulk
-    ? `Estimados estudiantes y representantes del curso ${course?.grado} "${course?.paralelo}":\n\n` +
-      `Se ha actualizado el registro de calificaciones y entregas en la plataforma EduSmart.\n` +
-      `Les recordamos la importancia de mantener al día las entregas de tareas y revisar la retroalimentación de los docentes.\n\n` +
-      `Saludos cordiales,\nEquipo Docente EduSmart`
-    : `Estimado/a ${student?.nombre_completo || ''},\n\n` +
-      `Le informamos sobre su estado de desempeño académico actual:\n\n` +
+  if (isRiskOnly) {
+    initialSubject = `⚠️ ALERTA ACADÉMICA Y PLAN DE REFUERZO - ${course?.grado} "${course?.paralelo}"`;
+    initialMessage = 
+      `Estimados estudiantes y padres de familia:\n\n` +
+      `Nos comunicamos formalmente para notificarles que se ha registrado una alerta de riesgo académico en la materia, ` +
+      `debido a calificaciones por debajo de la nota mínima de aprobación (51/100) o tareas y actividades pendientes de entrega.\n\n` +
+      `Es indispensable coordinar con el docente a la brevedad posible para acceder al plan de reforzamiento pedagógico y regularizar sus evaluaciones antes del cierre del trimestre.\n\n` +
+      `Saludos cordiales,\nPlantel Docente y Dirección Académica\nEduSmart Bolivia`;
+  } else if (isBulk) {
+    initialSubject = `📊 Reporte Trimestral de Desempeño - Curso ${course?.grado} "${course?.paralelo}"`;
+    initialMessage = 
+      `Estimados estudiantes y padres de familia del curso ${course?.grado} "${course?.paralelo}":\n\n` +
+      `Se ha actualizado el informe periódico de calificaciones, cumplimiento de tareas y desempeño académico en la plataforma EduSmart.\n\n` +
+      `Les invitamos a revisar sus calificaciones individuales y retroalimentación para mantener el compromiso y la excelencia académica.\n\n` +
+      `Atentamente,\nProfesor(a) de la Asignatura\nEduSmart Bolivia`;
+  } else {
+    const enRiesgo = student?.riesgo_academico || (student?.promedio != null && student.promedio < 51);
+    initialSubject = enRiesgo
+      ? `⚠️ Alerta de Rendimiento Académico - ${student?.nombre_completo || ''}`
+      : `📊 Reporte Periódico de Calificaciones - ${student?.nombre_completo || ''}`;
+    initialMessage = 
+      `Estimado/a ${student?.nombre_completo || ''} y familia:\n\n` +
+      `Le informamos su estado académico actual registrado en la plataforma EduSmart:\n\n` +
+      `• Código RUDE: ${student?.matricula || '—'}\n` +
       `• Tareas entregadas: ${student?.tareas_entregadas || 0} de ${student?.tareas_asignadas || 0}\n` +
       `• Tareas pendientes: ${student?.tareas_pendientes || 0}\n` +
       `• Porcentaje de cumplimiento: ${student?.porcentaje_cumplimiento || 0}%\n` +
-      `• Promedio acumulado: ${student?.promedio > 0 ? student.promedio + '/100' : 'Sin notas registradas'}\n` +
+      `• Promedio acumulado: ${student?.promedio > 0 ? student.promedio + '/100 pts' : 'Sin notas registradas'}\n` +
       `• Estado académico: ${student?.estado_academico || 'En curso'}\n\n` +
-      `${student?.riesgo_academico ? '⚠️ ATENCIÓN: Se detectan alertas de riesgo académico debido a tareas pendientes o promedio inferior al mínimo. Se sugiere contacto inmediato con el docente para tutoría.\n\n' : 'Continúa con el excelente compromiso en tus actividades académicas.\n\n'}` +
+      (enRiesgo
+        ? `⚠️ AVISO DE REFUERZO: Te encuentras en situación de riesgo académico. Te recomendamos presentarte a las horas de apoyo pedagógico para regularizar tus entregas y asegurar tu aprobación.\n\n`
+        : `¡Felicitaciones por tu esfuerzo y constancia en el desarrollo de las actividades académicas!\n\n`) +
       `Atentamente,\nEquipo Docente EduSmart`;
+  }
 
   const [asunto, setAsunto] = useState(initialSubject);
   const [mensaje, setMensaje] = useState(initialMessage);
@@ -51,7 +69,21 @@ export default function SendReportModal({ student, course, onClose, onSent }) {
     setError('');
 
     try {
-      if (isBulk) {
+      if (isRiskOnly) {
+        // Send bulk to at-risk students only
+        const ids = (atRiskStudents || []).map(e => e.id || e.estudiante_id);
+        const res = await commonAPI.enviarReportesCurso(course.id, {
+          asunto,
+          mensaje,
+          estudiante_ids: ids,
+          solo_riesgo: true,
+          incluir_calificaciones: incluirCalif,
+          incluir_progreso: incluirProgreso,
+        });
+        setResultData(res);
+        setSent(true);
+        if (onSent) onSent(res);
+      } else if (isBulk) {
         const res = await commonAPI.enviarReportesCurso(course.id, {
           asunto,
           mensaje,
@@ -82,35 +114,39 @@ export default function SendReportModal({ student, course, onClose, onSent }) {
 
   if (sent) {
     return (
-      <div style={{ textAlign: 'center', padding: '24px 16px' }}>
+      <div style={{ textAlign: 'center', padding: '28px 16px' }}>
         <div style={{
-          width: 56, height: 56, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)',
+          width: 58, height: 58, borderRadius: '50%',
+          background: isRiskOnly
+            ? 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)'
+            : 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          margin: '0 auto 16px', color: '#065F46'
+          margin: '0 auto 16px', color: isRiskOnly ? '#B91C1C' : '#065F46'
         }}>
-          <CheckCircle size={32} />
+          <CheckCircle size={34} />
         </div>
-        <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#065F46', marginBottom: 6 }}>
-          ¡Reporte Académico Emitido con Éxito!
+        <h3 style={{ fontSize: '17px', fontWeight: 800, color: isRiskOnly ? '#991B1B' : '#065F46', marginBottom: 6 }}>
+          {isRiskOnly ? '¡Alertas de Riesgo Enviadas Exitosamente!' : '¡Reporte Académico Enviado!'}
         </h3>
-        <p style={{ color: '#4B5563', fontSize: '13px', marginBottom: 12 }}>
-          {isBulk
-            ? `Se notificó a todos los estudiantes matriculados en ${course?.grado} "${course?.paralelo}".`
+        <p style={{ color: '#4B5563', fontSize: '13.5px', marginBottom: 12 }}>
+          {isRiskOnly
+            ? `Se notificó individualmente a los ${atRiskStudents.length} estudiantes en riesgo de ${course?.grado} "${course?.paralelo}".`
+            : isBulk
+            ? `Se emitió el reporte general a todos los estudiantes de ${course?.grado} "${course?.paralelo}".`
             : `El informe fue registrado y notificado al estudiante:`}
         </p>
         {!isBulk && (
           <div style={{
             background: '#F0F4FF', border: '1px solid #C7D2FE',
-            borderRadius: 6, padding: '8px 14px', display: 'inline-block',
+            borderRadius: 6, padding: '8px 16px', display: 'inline-block',
             fontWeight: 600, fontSize: '13px', color: '#1E3A8A', marginBottom: 18
           }}>
-            📧 {student?.email}
+            📧 {student?.email} (RUDE: {student?.matricula || 'Registrado'})
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 14 }}>
-          <button className="btn btn-primary" onClick={onClose}>
-            Aceptar y Cerrar
+          <button className="btn btn-primary" onClick={onClose} style={{ background: '#1E3A8A' }}>
+            Aceptar y Volver a la Lista
           </button>
         </div>
       </div>
@@ -120,65 +156,91 @@ export default function SendReportModal({ student, course, onClose, onSent }) {
   return (
     <div>
       {error && (
-        <div style={{ padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 6, color: '#DC2626', fontSize: '12.5px', marginBottom: 14 }}>
+        <div style={{ padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, color: '#DC2626', fontSize: '12.5px', marginBottom: 14 }}>
           {error}
         </div>
       )}
 
       {/* Target Info Header */}
-      {!isBulk ? (
+      {isRiskOnly ? (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          background: '#F0F4FF', borderRadius: 8, padding: '12px 14px', marginBottom: 16,
-          border: '1px solid #C7D2FE'
+          display: 'flex', alignItems: 'center', gap: 14,
+          background: '#FEF2F2', borderRadius: 10, padding: '14px 16px', marginBottom: 16,
+          border: '1px solid #FECACA'
         }}>
           <div style={{
-            width: 42, height: 42, borderRadius: '50%',
-            backgroundColor: student.riesgo_academico ? '#EF4444' : '#1E3A8A',
-            color: '#fff',
+            width: 44, height: 44, borderRadius: 8,
+            backgroundColor: '#DC2626', color: '#fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 700, fontSize: '14px', flexShrink: 0
+            fontWeight: 700, fontSize: '16px', flexShrink: 0
           }}>
-            {student.nombre_completo ? student.nombre_completo.slice(0, 2).toUpperCase() : 'ES'}
+            <ShieldAlert size={22} />
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: '14px', color: '#1E3A8A', display: 'flex', alignItems: 'center', gap: 6 }}>
-              {student.nombre_completo}
-              {student.riesgo_academico && (
-                <span style={{
-                  background: '#FEF2F2', color: '#B91C1C',
-                  border: '1px solid #FECACA', borderRadius: 4,
-                  padding: '2px 6px', fontSize: '10.5px', fontWeight: 700
-                }}>
-                  ⚠️ Riesgo
-                </span>
-              )}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: '14px', color: '#991B1B', display: 'flex', alignItems: 'center', gap: 8 }}>
+              Envío Masivo a Estudiantes en Riesgo Académico
+              <span style={{ background: '#F87171', color: 'white', padding: '2px 8px', borderRadius: 12, fontSize: '11px', fontWeight: 700 }}>
+                {atRiskStudents.length} estudiantes
+              </span>
+            </div>
+            <div style={{ fontSize: '12px', color: '#7F1D1D', marginTop: 3 }}>
+              Curso: <strong>{course?.grado} "{course?.paralelo}"</strong> · Nota &lt; 51 pts o tareas pendientes.
+            </div>
+          </div>
+        </div>
+      ) : isBulk ? (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 14,
+          background: '#EFF6FF', borderRadius: 10, padding: '14px 16px', marginBottom: 16,
+          border: '1px solid #BFDBFE'
+        }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 8,
+            backgroundColor: '#1E3A8A', color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 700, fontSize: '16px', flexShrink: 0
+          }}>
+            <Users size={22} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '14px', color: '#1E3A8A' }}>
+              Reporte General para: {course?.grado} "{course?.paralelo}"
             </div>
             <div style={{ fontSize: '12px', color: '#4B5563', marginTop: 2 }}>
-              📧 {student.email} · RU: {student.matricula}
+              Se emitirá el reporte a todos los estudiantes inscritos en el curso.
             </div>
           </div>
         </div>
       ) : (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 12,
-          background: '#F0FDF4', borderRadius: 8, padding: '12px 14px', marginBottom: 16,
-          border: '1px solid #BBF7D0'
+          background: student.riesgo_academico ? '#FEF2F2' : '#F0F4FF',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+          border: student.riesgo_academico ? '1px solid #FECACA' : '1px solid #C7D2FE'
         }}>
           <div style={{
-            width: 42, height: 42, borderRadius: 8,
-            backgroundColor: '#16A34A', color: '#fff',
+            width: 44, height: 44, borderRadius: '50%',
+            backgroundColor: student.riesgo_academico ? '#DC2626' : '#1E3A8A',
+            color: '#fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 700, fontSize: '16px', flexShrink: 0
+            fontWeight: 800, fontSize: '14px', flexShrink: 0
           }}>
-            <Users size={20} />
+            {student.nombre_completo ? student.nombre_completo.slice(0, 2).toUpperCase() : 'ES'}
           </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '14px', color: '#14532D' }}>
-              Reporte General para: {course?.grado} "{course?.paralelo}"
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: '14px', color: student.riesgo_academico ? '#991B1B' : '#1E3A8A', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {student.nombre_completo}
+              {student.riesgo_academico && (
+                <span style={{
+                  background: '#DC2626', color: '#FFF',
+                  borderRadius: 4, padding: '2px 7px', fontSize: '10.5px', fontWeight: 800
+                }}>
+                  ⚠️ EN RIESGO ACADÉMICO
+                </span>
+              )}
             </div>
             <div style={{ fontSize: '12px', color: '#4B5563', marginTop: 2 }}>
-              Se emitirá el reporte a todos los estudiantes inscritos en este curso.
+              📧 {student.email} · Código RUDE: <strong>{student.matricula}</strong>
             </div>
           </div>
         </div>
@@ -198,7 +260,7 @@ export default function SendReportModal({ student, course, onClose, onSent }) {
               borderRadius: 6, padding: '8px 4px', textAlign: 'center'
             }}>
               <div style={{ fontWeight: 700, fontSize: '14px', color: m.color }}>{m.value}</div>
-              <div style={{ fontSize: '10px', color: '#8A8886', marginTop: 2 }}>{m.label}</div>
+              <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: 2 }}>{m.label}</div>
             </div>
           ))}
         </div>
@@ -208,17 +270,17 @@ export default function SendReportModal({ student, course, onClose, onSent }) {
       <div style={{ marginBottom: 14, display: 'flex', gap: 18, flexWrap: 'wrap' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '12px', color: '#242424', cursor: 'pointer' }}>
           <input type="checkbox" checked={incluirCalif} onChange={e => setIncluirCalif(e.target.checked)} />
-          Incluir desglose de notas y tareas
+          Incluir desglose de notas y tareas calificadas
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '12px', color: '#242424', cursor: 'pointer' }}>
           <input type="checkbox" checked={incluirProgreso} onChange={e => setIncluirProgreso(e.target.checked)} />
-          Incluir indicador de cumplimiento
+          Incluir porcentaje de cumplimiento y asistencia
         </label>
       </div>
 
       {/* Subject */}
       <div className="form-group" style={{ marginBottom: 12 }}>
-        <label className="form-label" style={{ fontSize: '12px', fontWeight: 600 }}>Asunto del reporte</label>
+        <label className="form-label" style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>Asunto de la Notificación</label>
         <input
           className="form-control"
           value={asunto}
@@ -230,13 +292,13 @@ export default function SendReportModal({ student, course, onClose, onSent }) {
 
       {/* Message body */}
       <div className="form-group" style={{ marginBottom: 16 }}>
-        <label className="form-label" style={{ fontSize: '12px', fontWeight: 600 }}>Contenido del reporte</label>
+        <label className="form-label" style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>Mensaje Oficial / Recomendaciones Pedagógicas</label>
         <textarea
           className="form-control"
           rows={7}
           value={mensaje}
           onChange={e => setMensaje(e.target.value)}
-          style={{ fontFamily: 'monospace', fontSize: '11.5px', lineHeight: 1.5 }}
+          style={{ fontSize: '12px', lineHeight: 1.5, fontFamily: 'inherit' }}
         />
       </div>
 
@@ -249,9 +311,13 @@ export default function SendReportModal({ student, course, onClose, onSent }) {
           className="btn btn-primary btn-sm"
           onClick={handleSend}
           disabled={sending || !asunto.trim() || !mensaje.trim()}
-          style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: isRiskOnly ? '#DC2626' : '#1E3A8A',
+            border: isRiskOnly ? '1px solid #B91C1C' : 'none'
+          }}
         >
-          <Send size={13} /> {sending ? 'Enviando reporte...' : isBulk ? 'Emitir a todo el curso' : 'Enviar reporte'}
+          <Send size={13} /> {sending ? 'Enviando...' : isRiskOnly ? `Notificar a los ${atRiskStudents.length} en riesgo` : isBulk ? 'Emitir a todo el curso' : 'Enviar reporte individual'}
         </button>
       </div>
     </div>

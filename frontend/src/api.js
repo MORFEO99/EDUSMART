@@ -152,6 +152,8 @@ export const teacherAPI = {
     const res = await entregasAPI.pendientes(params);
     return res.entregas || [];
   },
+  taskViews: (taskId) => apiFetch(`/api/tareas/${taskId}/vistas/`),
+  sendViewsReminder: (taskId, data = {}) => apiFetch(`/api/tareas/${taskId}/recordatorio-vistas/`, { method: 'POST', body: JSON.stringify(data) }),
   studentsList: async (cursoId = null) => {
     try {
       if (cursoId) {
@@ -201,6 +203,26 @@ export const commonAPI = {
   estudiantesPorCurso: (cursoId) => apiFetch(`/api/v2/cursos/${cursoId}/estudiantes/`),
   enviarReporteEstudiante: (estudianteId, data) => apiFetch(`/api/v2/estudiantes/${estudianteId}/enviar-reporte/`, { method: 'POST', body: JSON.stringify(data) }),
   enviarReportesCurso: (cursoId, data) => apiFetch(`/api/v2/cursos/${cursoId}/enviar-reportes/`, { method: 'POST', body: JSON.stringify(data) }),
+  listaExcel: () => apiFetch('/api/v2/docente/lista-excel/'),
+};
+
+// ==============================================================================
+// GESTOR DE AVANCE DE TEMAS
+// ==============================================================================
+export const topicTrackerAPI = {
+  // Returns all materias with topic stats, organized by Colegio -> Curso
+  materiasConTemas: () => apiFetch('/api/v2/docente/materias-con-temas/'),
+  // Returns topics + stats for a specific materia
+  temas: (materiaId) => apiFetch(`/api/v2/materias/${materiaId}/temas/`),
+  // Create a new topic in a materia
+  crearTema: (materiaId, data) =>
+    apiFetch(`/api/v2/materias/${materiaId}/temas/`, { method: 'POST', body: JSON.stringify(data) }),
+  // Update topic (state toggle, edit fields)
+  actualizarTema: (materiaId, temaId, data) =>
+    apiFetch(`/api/v2/materias/${materiaId}/temas/${temaId}/`, { method: 'PATCH', body: JSON.stringify(data) }),
+  // Delete topic
+  eliminarTema: (materiaId, temaId) =>
+    apiFetch(`/api/v2/materias/${materiaId}/temas/${temaId}/`, { method: 'DELETE' }),
 };
 
 // ==============================================================================

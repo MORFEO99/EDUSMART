@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   FolderGit2, CheckSquare, Inbox, Award, Plus, ArrowRight,
-  Clock, CheckCircle2, AlertCircle, FileText, User
+  Clock, CheckCircle2, AlertCircle, FileText, User, FileSpreadsheet
 } from 'lucide-react';
 import { dashboardAPI } from '../api';
 import { Loading } from '../components';
@@ -36,7 +36,14 @@ export default function TeacherDashboard({ user, onNavigate, onOpenCreateTask })
           <p>Supervisa tus espacios académicos, publica tareas y evalúa los trabajos de tus estudiantes.</p>
         </div>
 
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => onNavigate('espacios', { tab: 'excel' })}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, borderColor: '#1E3A8A', color: '#1E3A8A', fontWeight: 600 }}
+          >
+            <FileSpreadsheet size={16} color="#1E3A8A" /> Lista Estudiantes (Excel)
+          </button>
           <button className="btn btn-secondary" onClick={() => onNavigate('espacios')}>
             <FolderGit2 size={16} /> Ver espacios
           </button>

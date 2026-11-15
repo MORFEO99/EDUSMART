@@ -45,7 +45,7 @@ class Docente(models.Model):
 class Colegio(models.Model):
     nombre = models.CharField(max_length=200)
     ciudad = models.CharField(max_length=100, blank=True)
-    pais = models.CharField(max_length=100, blank=True, default='Ecuador')
+    pais = models.CharField(max_length=100, blank=True, default='Bolivia')
     direccion = models.CharField(max_length=300, blank=True)
     telefono = models.CharField(max_length=30, blank=True)
     logo_url = models.CharField(max_length=500, blank=True)
@@ -678,3 +678,68 @@ class CoinTransaction(models.Model):
 
     class Meta:
         db_table = 'coin_transactions'
+
+
+# ==============================================================================
+# GESTOR DE AVANCE DE TEMAS (Topic Progress Tracker)
+# ==============================================================================
+
+class TemaAvance(models.Model):
+    """
+    Represents a single curricular topic/unit that a teacher tracks as
+    covered (or not yet covered) within a specific Materia.
+    """
+    ESTADOS = (
+        ('PENDIENTE', 'Pendiente'),
+        ('EN_PROGRESO', 'En Progreso'),
+        ('COMPLETADO', 'Completado'),
+    )
+    materia = models.ForeignKey(
+        Materia, on_delete=models.CASCADE, related_name='temas'
+    )
+    docente = models.ForeignKey(
+        Docente, on_delete=models.CASCADE, related_name='temas_avance'
+    )
+    titulo = models.CharField(max_length=250)
+    descripcion = models.TextField(blank=True)
+    unidad = models.CharField(max_length=100, blank=True, help_text='Ej: Unidad 1, Bimestre 2')
+    orden = models.PositiveIntegerField(default=0)
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='PENDIENTE')
+    fecha_inicio = models.DateField(null=True, blank=True)
+    fecha_fin = models.DateField(null=True, blank=True)
+    observaciones = models.TextField(blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'temas_avance'
+        ordering = ['orden', 'fecha_creacion']
+        unique_together = ('materia', 'titulo', 'docente')
+
+    def __str__(self):
+        return f"[{self.estado}] {self.titulo} - {self.materia.nombre}"
+
+
+# ==============================================================================
+# SEGUIMIENTO DE LECTURA / VISTAS DE TAREAS (Task View Tracking)
+# ==============================================================================
+
+class TareaVisualizacion(models.Model):
+    """
+    Registra cuando un estudiante abre o visualiza una tarea asignada,
+    permitiendo al docente verificar la trazabilidad y lectura de la tarea.
+    """
+    tarea = models.ForeignKey(Tarea, on_delete=models.CASCADE, related_name='visualizaciones')
+    estudiante = models.ForeignKey(Estudiante, on_delete=models.CASCADE, related_name='vistas_tarea')
+    fecha_primera_vista = models.DateTimeField(default=timezone.now)
+    fecha_ultima_vista = models.DateTimeField(default=timezone.now)
+    total_vistas = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        db_table = 'tareas_visualizaciones'
+        unique_together = ('tarea', 'estudiante')
+        ordering = ['-fecha_ultima_vista']
+
+    def __str__(self):
+        return f"{self.estudiante.usuario.nombre_completo} vio {self.tarea.titulo} ({self.total_vistas} veces)"
+

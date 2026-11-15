@@ -24,6 +24,7 @@ import CursoPage from './pages/CursoPage';
 import ImportStudentsPage from './pages/ImportStudentsPage';
 import ImportarCalificacionesPage from './pages/ImportarCalificacionesPage';
 import EspacioDetallePage from './pages/EspacioDetallePage';
+import ListaExcelDocente from './pages/ListaExcelDocente';
 
 // ============================================================
 // PAGE TITLES
@@ -50,6 +51,7 @@ const PAGE_TITLES = {
   'teacher_courses':        ['Administración del Curso', 'Gestión de estudiantes y asignaturas'],
   'import_students':        ['Importar Estudiantes', 'Carga masiva desde archivo Excel'],
   'importar_calificaciones':['Importar Calificaciones', 'Carga de notas desde archivo Excel'],
+  'lista-excel':            ['Lista de Estudiantes (Excel)', 'Registro académico por colegio, curso y materia con notas y estados'],
 };
 
 export default function App() {
@@ -183,6 +185,8 @@ export default function App() {
           return <TeacherTasksView onNavigate={handleNavigate} onOpenCreate={() => setShowTeacherCreate(true)} />;
         case 'entregas':
           return <TeacherSubmissionsView initialTaskId={extraData?.filterTaskId} onNavigate={handleNavigate} />;
+        case 'lista-excel':
+          return <ListaExcelDocente onNavigate={handleNavigate} />;
         case 'resultados':
         case 'calificaciones':
           return <TeacherGradebookView onNavigate={handleNavigate} />;
@@ -231,7 +235,7 @@ export default function App() {
           />
         )}
 
-        <main style={{ flex: 1 }}>
+        <main className="main-view-wrapper" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {renderCurrentView()}
         </main>
       </div>

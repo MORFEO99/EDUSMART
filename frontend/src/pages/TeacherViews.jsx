@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   ClipboardList, Plus, InboxIcon, Award, Users, BarChart2,
   Clock, CheckCircle, Search, Filter, Eye, Download, ChevronRight,
-  Send, AlertTriangle, Paperclip, Calendar
+  Send, AlertTriangle, Paperclip, Calendar, FileSpreadsheet,
+  BookOpen, CheckSquare, Square, Layers, Trash2, Edit3, X, TrendingUp,
+  ChevronDown, ChevronUp, RefreshCw, EyeOff, Bell, ExternalLink, RotateCcw,
+  Check, FileText, School, GraduationCap
 } from 'lucide-react';
-import { teacherAPI, commonAPI } from '../api';
+import { teacherAPI, commonAPI, topicTrackerAPI } from '../api';
 import { Loading, EmptyState, Modal, Alert, ProgressBar, StatCard, MiniBarChart } from '../components';
 import { formatDate, formatDateTime, getNoteColor, getPriorityBadge, getTaskBadge } from '../utils';
 import RubricaEditor from '../components/RubricaEditor';
@@ -23,7 +26,7 @@ export function GradeSubmissionModal({ entrega, onClose, onSuccess }) {
     e.preventDefault();
     const val = parseFloat(nota);
     if (isNaN(val) || val < 0 || val > 100) {
-      setError('La calificación debe ser un valor numérico entre 0 y 100.');
+      setError('La calificacion debe ser un valor numerico entre 0 y 100.');
       return;
     }
     setLoading(true);
@@ -39,7 +42,7 @@ export function GradeSubmissionModal({ entrega, onClose, onSuccess }) {
         onClose?.();
       }, 1000);
     } catch (err) {
-      setError(err.message || 'Error al guardar la calificación.');
+      setError(err.message || 'Error al guardar la calificacion.');
     } finally {
       setLoading(false);
     }
@@ -56,10 +59,10 @@ export function GradeSubmissionModal({ entrega, onClose, onSuccess }) {
           <CheckCircle size={26} />
         </div>
         <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#107C41', marginBottom: 4 }}>
-          Calificación guardada
+          Calificacion guardada
         </h3>
         <p style={{ color: '#616161', fontSize: '12.5px' }}>
-          La nota y retroalimentación se registraron en el expediente de {entrega.estudiante_nombre}.
+          La nota y retroalimentacion se registraron en el expediente de {entrega.estudiante_nombre}.
         </p>
       </div>
     );
@@ -73,7 +76,7 @@ export function GradeSubmissionModal({ entrega, onClose, onSuccess }) {
       <div style={{ background: '#FAF9F8', border: '1px solid #EDEBE9', borderRadius: '4px', padding: '12px 14px', marginBottom: 16 }}>
         <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#242424' }}>{entrega.estudiante_nombre}</div>
         <div style={{ fontSize: '11.5px', color: '#616161', marginTop: 2 }}>
-          Matrícula: {entrega.estudiante_matricula} · Entregado el {entrega.fecha_entrega}
+          Matricula: {entrega.estudiante_matricula} - Entregado el {entrega.fecha_entrega}
         </div>
         <div style={{ fontSize: '12px', color: '#5B5FC7', fontWeight: 600, marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
           <Paperclip size={13} /> {entrega.archivo_nombre}
@@ -87,7 +90,7 @@ export function GradeSubmissionModal({ entrega, onClose, onSuccess }) {
 
       <div className="form-group">
         <label className="form-label">
-          Calificación (Escala 0 a 100) <span className="required">*</span>
+          Calificacion (Escala 0 a 100) <span className="required">*</span>
         </label>
         <input
           className="form-control"
@@ -104,12 +107,12 @@ export function GradeSubmissionModal({ entrega, onClose, onSuccess }) {
 
       <div className="form-group">
         <label className="form-label">
-          Retroalimentación formativa y observaciones pedagógicas
+          Retroalimentacion formativa y observaciones pedagogicas
         </label>
         <textarea
           className="form-control"
           rows={4}
-          placeholder="Escribe comentarios específicos, fortalezas del trabajo y aspectos a mejorar para el estudiante..."
+          placeholder="Escribe comentarios especificos, fortalezas del trabajo y aspectos a mejorar para el estudiante..."
           value={retro}
           onChange={(e) => setRetro(e.target.value)}
         />
@@ -119,7 +122,7 @@ export function GradeSubmissionModal({ entrega, onClose, onSuccess }) {
         <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
         <button type="submit" className="btn btn-primary" disabled={loading}>
           <Award size={14} />
-          {loading ? 'Guardando...' : 'Asignar calificación'}
+          {loading ? 'Guardando...' : 'Asignar calificacion'}
         </button>
       </div>
     </form>
@@ -127,75 +130,367 @@ export function GradeSubmissionModal({ entrega, onClose, onSuccess }) {
 }
 
 // ============================================================
-// MODAL REPORTE DE ESTUDIANTES
+// MODAL: DEVOLVER ENTREGA PARA CORRECCION
 // ============================================================
-function ReporteEstudiantesModal({ tareaId, onClose }) {
-  const [entregas, setEntregas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('presentaron');
+export function DevolverEntregaModal({ entrega, onClose, onSuccess }) {
+  const [motivo, setMotivo] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    teacherAPI.allSubmissions()
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!motivo.trim()) {
+      setError('Por favor indica las observaciones o motivo de la devolucion.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await teacherAPI.devolverSubmission(entrega.entrega_id || entrega.id, motivo);
+      onSuccess?.();
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Error al devolver la entrega.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal open={true} onClose={onClose} title="Devolver Entrega para Correccion">
+      <form onSubmit={handleSubmit}>
+        {error && <Alert type="error" onClose={() => setError('')}>{error}</Alert>}
+        <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#92400E' }}>
+            {entrega.estudiante_nombre} &bull; {entrega.tarea_titulo}
+          </div>
+          <div style={{ fontSize: 12, color: '#B45309', marginTop: 4 }}>
+            Al devolver la entrega, el estudiante recibira una notificacion en su plataforma y podra enviar una nueva version corregida.
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">
+            Motivo o instrucciones de correccion <span className="required">*</span>
+          </label>
+          <textarea
+            className="form-control"
+            rows={4}
+            placeholder="Indica que aspectos debe corregir o completar el estudiante antes de volver a presentar..."
+            value={motivo}
+            onChange={e => setMotivo(e.target.value)}
+            required
+            autoFocus
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="btn btn-primary" disabled={loading} style={{ background: '#D97706', borderColor: '#D97706' }}>
+            <RotateCcw size={14} /> {loading ? 'Devolviendo...' : 'Confirmar y Devolver'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ============================================================
+// MODAL: SEGUIMIENTO DE LECTURA Y QUIEN VIO LA TAREA
+// ============================================================
+export function TareaVistasModal({ tareaId, tareaTitulo, onClose, onGrading }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('todos');
+  const [sendingReminder, setSendingReminder] = useState(false);
+  const [reminderMsg, setReminderMsg] = useState('');
+  const [search, setSearch] = useState('');
+
+  const loadData = useCallback(() => {
+    setLoading(true);
+    teacherAPI.taskViews(tareaId)
       .then(res => {
-        setEntregas(res.filter(e => e.tarea_id === tareaId));
+        setData(res);
       })
+      .catch(console.error)
       .finally(() => setLoading(false));
   }, [tareaId]);
 
-  // Clasificar entregas (simulado según estado)
-  const presentaron = entregas.filter(e => e.calificacion || e.archivo_nombre || (e.estado && e.estado !== 'ASIGNADA' && e.estado !== 'PENDIENTE'));
-  const noPresentaron = entregas.filter(e => !presentaron.includes(e));
-  
-  // Simulacion de vistas: Asumimos que si presentaron, vieron. Si tienen archivo, vieron. 
-  // En un entorno real tendrías un modelo VistasTarea en el backend.
-  const vieron = entregas.filter(e => presentaron.includes(e) || (e.estado && e.estado !== 'ASIGNADA'));
-  const noVieron = entregas.filter(e => !vieron.includes(e));
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  const listToShow = tab === 'presentaron' ? presentaron : 
-                     tab === 'no_presentaron' ? noPresentaron :
-                     tab === 'vieron' ? vieron : noVieron;
+  const handleSendReminder = async (tipo) => {
+    setSendingReminder(true);
+    setReminderMsg('');
+    try {
+      const res = await teacherAPI.sendViewsReminder(tareaId, { tipo });
+      setReminderMsg(res.mensaje || 'Recordatorio enviado exitosamente a los estudiantes.');
+      setTimeout(() => setReminderMsg(''), 4000);
+    } catch (err) {
+      setReminderMsg('Error al enviar recordatorio: ' + (err.message || 'Error'));
+    } finally {
+      setSendingReminder(false);
+    }
+  };
+
+  const estudiantes = data?.estudiantes || [];
+  const stats = data?.stats || {};
+  const tarea = data?.tarea || {};
+
+  const filteredEstudiantes = estudiantes.filter(est => {
+    if (search && !est.nombre_completo.toLowerCase().includes(search.toLowerCase()) &&
+        !est.matricula.toLowerCase().includes(search.toLowerCase())) {
+      return false;
+    }
+    if (tab === 'vieron') return est.ha_visto;
+    if (tab === 'sin_ver') return !est.ha_visto;
+    if (tab === 'entregaron') return est.ha_entregado;
+    if (tab === 'pendientes') return !est.ha_entregado;
+    return true;
+  });
 
   return (
-    <Modal open={true} onClose={onClose} title="Reporte de Estudiantes">
+    <Modal open={true} onClose={onClose} title={`Seguimiento de Lectura: ${tarea.titulo || tareaTitulo || 'Tarea'}`}>
       {loading ? (
-        <Loading text="Cargando reporte..." />
+        <Loading text="Consultando visualizaciones y entregas de los estudiantes..." />
       ) : (
-        <div style={{ padding: '0 10px' }}>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid #EDEBE9', paddingBottom: 10, flexWrap: 'wrap' }}>
-            <button className={`btn btn-sm ${tab === 'presentaron' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('presentaron')}>
-              Presentaron ({presentaron.length})
-            </button>
-            <button className={`btn btn-sm ${tab === 'no_presentaron' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('no_presentaron')}>
-              Faltan ({noPresentaron.length})
-            </button>
-            <button className={`btn btn-sm ${tab === 'vieron' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('vieron')}>
-              <Eye size={12}/> Vieron ({vieron.length})
-            </button>
-            <button className={`btn btn-sm ${tab === 'no_vieron' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('no_vieron')}>
-              <EyeOff size={12}/> No vieron ({noVieron.length})
-            </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Header Info */}
+          <div style={{
+            background: 'linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%)',
+            borderRadius: 10, padding: '14px 18px', color: '#FFFFFF'
+          }}>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#93C5FD', fontWeight: 700 }}>
+              {tarea.colegio_nombre} &bull; {tarea.curso_nombre} &bull; {tarea.materia_nombre}
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 800, marginTop: 4 }}>
+              {tarea.titulo}
+            </div>
+            <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#E2E8F0', marginTop: 8, flexWrap: 'wrap' }}>
+              <span>Fecha limite: <strong>{tarea.fecha_limite || 'Sin limite'}</strong></span>
+              <span>Puntaje maximo: <strong>{tarea.puntaje_maximo || 100} pts</strong></span>
+            </div>
           </div>
 
-          <div style={{ maxHeight: 350, overflowY: 'auto' }}>
-            {listToShow.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#616161', fontSize: 13, padding: '30px 0' }}>No hay estudiantes en esta lista.</p>
+          {/* KPI Stat Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#1E293B' }}>{stats.total_alumnos || 0}</div>
+              <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Total Alumnos</div>
+            </div>
+            <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#059669' }}>
+                {stats.vieron || 0} <span style={{ fontSize: 12, fontWeight: 600 }}>({stats.porcentaje_visto || 0}%)</span>
+              </div>
+              <div style={{ fontSize: 11, color: '#047857', fontWeight: 600 }}>Vieron la tarea</div>
+            </div>
+            <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#DC2626' }}>{stats.sin_ver || 0}</div>
+              <div style={{ fontSize: 11, color: '#B91C1C', fontWeight: 600 }}>No han visto</div>
+            </div>
+            <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#2563EB' }}>{stats.entregaron || 0}</div>
+              <div style={{ fontSize: 11, color: '#1D4ED8', fontWeight: 600 }}>Han entregado</div>
+            </div>
+          </div>
+
+          {/* Quick Reminder Action Bar */}
+          <div style={{
+            background: '#F1F5F9', borderRadius: 8, padding: '10px 14px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap'
+          }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Bell size={14} style={{ color: '#F59E0B' }} /> Recordatorios de tarea:
+            </span>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-sm"
+                style={{ background: '#DC2626', color: '#FFFFFF', fontSize: 11, padding: '4px 10px' }}
+                disabled={sendingReminder || stats.sin_ver === 0}
+                onClick={() => handleSendReminder('sin_ver')}
+                title="Enviar notificacion a quienes aun no han abierto la tarea"
+              >
+                <EyeOff size={12} /> Notificar a quienes no la han visto ({stats.sin_ver || 0})
+              </button>
+              <button
+                className="btn btn-sm"
+                style={{ background: '#2563EB', color: '#FFFFFF', fontSize: 11, padding: '4px 10px' }}
+                disabled={sendingReminder || stats.pendientes_entrega === 0}
+                onClick={() => handleSendReminder('sin_entregar')}
+                title="Enviar notificacion a quienes aun no han presentado su tarea"
+              >
+                <Clock size={12} /> Recordar pendientes de entrega ({stats.pendientes_entrega || 0})
+              </button>
+            </div>
+          </div>
+
+          {reminderMsg && (
+            <Alert type={reminderMsg.includes('Error') ? 'error' : 'success'} onClose={() => setReminderMsg('')}>
+              {reminderMsg}
+            </Alert>
+          )}
+
+          {/* Filter Tabs and Search */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {[
+                { id: 'todos', label: `Todos (${estudiantes.length})` },
+                { id: 'vieron', label: `Vieron (${stats.vieron || 0})` },
+                { id: 'sin_ver', label: `No vieron (${stats.sin_ver || 0})` },
+                { id: 'entregaron', label: `Entregaron (${stats.entregaron || 0})` },
+                { id: 'pendientes', label: `Sin entrega (${stats.pendientes_entrega || 0})` },
+              ].map(t => (
+                <button
+                  key={t.id}
+                  className={`btn btn-sm ${tab === t.id ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ fontSize: 11.5, padding: '4px 9px' }}
+                  onClick={() => setTab(t.id)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ position: 'relative', width: 200 }}>
+              <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+              <input
+                className="form-control"
+                style={{ paddingLeft: 28, height: 30, fontSize: 12 }}
+                placeholder="Filtrar alumno..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Students List */}
+          <div style={{ maxHeight: 380, overflowY: 'auto', border: '1px solid #E2E8F0', borderRadius: 8 }}>
+            {filteredEstudiantes.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px 10px', color: '#64748B', fontSize: 13 }}>
+                No se encontraron estudiantes con este filtro.
+              </div>
             ) : (
-              listToShow.map(e => (
-                <div key={e.id || Math.random()} style={{ padding: '10px 12px', borderBottom: '1px solid #F3F2F1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1E3A8A', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 'bold' }}>
-                      {e.estudiante_nombre?.slice(0, 2).toUpperCase() || 'ES'}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#242424' }}>{e.estudiante_nombre}</div>
-                      <div style={{ fontSize: 11, color: '#616161' }}>{e.estudiante_matricula}</div>
-                    </div>
-                  </div>
-                  {tab === 'presentaron' && e.calificacion && (
-                    <span style={{ fontSize: 12, fontWeight: 700, color: getNoteColor(e.calificacion.nota) }}>{e.calificacion.nota}/100</span>
-                  )}
-                </div>
-              ))
+              <table className="table" style={{ margin: 0, fontSize: 12.5 }}>
+                <thead style={{ background: '#F8FAFC', position: 'sticky', top: 0 }}>
+                  <tr>
+                    <th>Estudiante</th>
+                    <th>Estado de Lectura</th>
+                    <th>Estado de Entrega</th>
+                    <th>Nota</th>
+                    <th style={{ textAlign: 'center' }}>Accion</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEstudiantes.map(est => {
+                    const initials = (est.nombre_completo || 'ES').split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
+                    return (
+                      <tr key={est.estudiante_id}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{
+                              width: 28, height: 28, borderRadius: '50%',
+                              background: '#3B82F6', color: '#FFFFFF',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 11, fontWeight: 700
+                            }}>
+                              {initials}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, color: '#0F172A' }}>{est.nombre_completo}</div>
+                              <div style={{ fontSize: 10.5, color: '#64748B' }}>{est.matricula}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          {est.ha_visto ? (
+                            <div>
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                                padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                                background: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0'
+                              }}>
+                                <Eye size={12} /> Visto
+                              </span>
+                              <div style={{ fontSize: 10.5, color: '#64748B', marginTop: 2 }}>
+                                {est.fecha_primera_vista ? `1ra vista: ${est.fecha_primera_vista}` : ''}
+                                {est.total_vistas > 1 ? ` (${est.total_vistas} veces)` : ''}
+                              </div>
+                            </div>
+                          ) : (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                              background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA'
+                            }}>
+                              <EyeOff size={12} /> No ha visto la tarea
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {est.ha_entregado ? (
+                            <div>
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                                padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                                background: est.estado_entrega === 'CALIFICADO' ? '#ECFDF5' : est.estado_entrega === 'ATRASADO' ? '#FEF3C7' : '#EFF6FF',
+                                color: est.estado_entrega === 'CALIFICADO' ? '#059669' : est.estado_entrega === 'ATRASADO' ? '#D97706' : '#2563EB',
+                              }}>
+                                <CheckCircle size={12} /> {est.estado_entrega === 'CALIFICADO' ? 'Calificada' : est.estado_entrega === 'ATRASADO' ? 'Entregada con retraso' : 'Entregada'}
+                              </span>
+                              {est.archivo_nombre && (
+                                <div style={{ fontSize: 10.5, color: '#64748B', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <Paperclip size={10} /> {est.archivo_nombre}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                              background: '#F1F5F9', color: '#64748B'
+                            }}>
+                              <Clock size={11} /> Sin entrega
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {est.nota !== null && est.nota !== undefined ? (
+                            <span style={{ fontWeight: 800, fontSize: 13, color: getNoteColor(est.nota) }}>
+                              {est.nota}/100
+                            </span>
+                          ) : (
+                            <span style={{ color: '#94A3B8' }}>-</span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          {est.ha_entregado ? (
+                            <button
+                              className="btn btn-outline btn-sm"
+                              style={{ fontSize: 11, padding: '3px 8px' }}
+                              onClick={() => {
+                                onClose();
+                                onGrading?.(est);
+                              }}
+                            >
+                              <Award size={12} /> {est.nota !== null ? 'Editar nota' : 'Calificar'}
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-sm"
+                              style={{ fontSize: 11, padding: '3px 8px', background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A' }}
+                              onClick={() => handleSendReminder('sin_entregar')}
+                              title="Enviar recordatorio a este alumno"
+                            >
+                              <Send size={11} /> Recordar
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             )}
           </div>
         </div>
@@ -205,140 +500,613 @@ function ReporteEstudiantesModal({ tareaId, onClose }) {
 }
 
 // ============================================================
-// 1. TEACHER TASKS VIEW (MIS TAREAS - DOCENTE)
+// 1. GESTOR DE AVANCE DE TEMAS (TOPIC PROGRESS TRACKER)
 // ============================================================
-export function TeacherTasksView({ onNavigate, onOpenCreate }) {
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('todas');
 
-  const loadTasks = () => {
-    setLoading(true);
-    teacherAPI.tasks()
-      .then(setTasks)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+const ESTADO_CONFIG = {
+  PENDIENTE:   { label: 'Pendiente',    color: '#64748B', bg: '#F1F5F9', dot: 'O', btn: 'Iniciar' },
+  EN_PROGRESO: { label: 'En Progreso', color: '#D97706', bg: '#FEF3C7', dot: '~', btn: 'Completar' },
+  COMPLETADO:  { label: 'Completado',  color: '#059669', bg: '#D1FAE5', dot: 'V', btn: 'Reabrir' },
+};
+
+const NEXT_STATE = {
+
+  PENDIENTE: 'EN_PROGRESO',
+  EN_PROGRESO: 'COMPLETADO',
+  COMPLETADO: 'PENDIENTE',
+};
+
+function AddTemaModal({ materiaId, onClose, onCreated }) {
+  const [form, setForm] = useState({ titulo: '', descripcion: '', unidad: '', orden: 0 });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.titulo.trim()) { setError('El Título es obligatorio.'); return; }
+    setLoading(true); setError('');
+    try {
+      const created = await topicTrackerAPI.crearTema(materiaId, form);
+      onCreated(created);
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Error al crear el tema.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { loadTasks(); }, []);
+  return (
+    <Modal open={true} onClose={onClose} title="+ Agregar Tema al Programa">
+      <form onSubmit={handleSubmit}>
+        {error && <Alert type="error" onClose={() => setError('')}>{error}</Alert>}
+        <div className="form-group">
+          <label className="form-label">Título del Tema <span className="required">*</span></label>
+          <input
+            className="form-control" autoFocus
+            placeholder="Ej: Algebra Lineal - Matrices y Determinantes"
+            value={form.titulo}
+            onChange={e => setForm(p => ({ ...p, titulo: e.target.value }))}
+          />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="form-group">
+            <label className="form-label">Unidad / Bimestre</label>
+            <input
+              className="form-control"
+              placeholder="Ej: Unidad 1"
+              value={form.unidad}
+              onChange={e => setForm(p => ({ ...p, unidad: e.target.value }))}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Orden / N° de tema</label>
+            <input
+              className="form-control" type="number" min="0"
+              value={form.orden}
+              onChange={e => setForm(p => ({ ...p, orden: parseInt(e.target.value) || 0 }))}
+            />
+          </div>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Descripción / Objetivos (opcional)</label>
+          <textarea
+            className="form-control" rows={3}
+            placeholder="Describe qué abarca este tema, competencias esperadas..."
+            value={form.descripcion}
+            onChange={e => setForm(p => ({ ...p, descripcion: e.target.value }))}
+          />
+        </div>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="btn btn-primary" disabled={loading}>
+            <Plus size={14} /> {loading ? 'Guardando...' : 'Agregar Tema'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
 
-  const filtered = tasks.filter(t => {
-    const matchSearch = !search || t.titulo.toLowerCase().includes(search.toLowerCase()) || t.materia.toLowerCase().includes(search.toLowerCase());
-    if (!matchSearch) return false;
-    if (filter === 'activas') return !t.esta_vencida;
-    if (filter === 'pendientes_calificar') return t.pendientes_calificacion > 0;
-    if (filter === 'vencidas') return t.esta_vencida;
+export function TeacherTasksView({ onNavigate, onOpenCreate }) {
+  // 
+  // Data state
+  // 
+  const [estructura, setEstructura] = useState([]);  // [{colegio_id, colegio_nombre, cursos:[...]}]
+  const [temas, setTemas] = useState([]);
+  const [stats, setStats] = useState({ total: 0, completados: 0, en_progreso: 0, pendientes: 0, porcentaje_avance: 0 });
+  const [loading, setLoading] = useState(true);
+  const [loadingTemas, setLoadingTemas] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filterEstado, setFilterEstado] = useState('TODOS');
+  const [toggling, setToggling] = useState(null);  // tema id being toggled
+  const [deleting, setDeleting] = useState(null);
+
+  // 
+  // Cascade selectors
+  // 
+  const [selectedColegioId, setSelectedColegioId] = useState(null);
+  const [selectedCursoId, setSelectedCursoId]     = useState(null);
+  const [selectedMateriaId, setSelectedMateriaId] = useState(null);
+
+  // 
+  // Load the materia structure (colegios + cursos + materias)
+  // 
+  const loadEstructura = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await topicTrackerAPI.materiasConTemas();
+      setEstructura(data || []);
+      // Auto-select first items
+      if (data && data.length > 0) {
+        const firstColegio = data[0];
+        setSelectedColegioId(firstColegio.colegio_id);
+        if (firstColegio.cursos && firstColegio.cursos.length > 0) {
+          const firstCurso = firstColegio.cursos[0];
+          setSelectedCursoId(firstCurso.curso_id);
+          if (firstCurso.materias && firstCurso.materias.length > 0) {
+            setSelectedMateriaId(firstCurso.materias[0].materia_id);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error loading estructura:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadEstructura(); }, [loadEstructura]);
+
+  // 
+  // Derived selectors
+  // 
+  const colegios = estructura;
+  const cursos = useMemo(() => {
+    const c = colegios.find(x => x.colegio_id === selectedColegioId);
+    return c ? c.cursos : [];
+  }, [colegios, selectedColegioId]);
+
+  const materias = useMemo(() => {
+    const c = cursos.find(x => x.curso_id === selectedCursoId);
+    return c ? c.materias : [];
+  }, [cursos, selectedCursoId]);
+
+  const selectedColegio = colegios.find(x => x.colegio_id === selectedColegioId);
+  const selectedCurso   = cursos.find(x => x.curso_id === selectedCursoId);
+  const selectedMateria = materias.find(x => x.materia_id === selectedMateriaId);
+
+  // 
+  // Load topics when materia changes
+  // 
+  useEffect(() => {
+    if (!selectedMateriaId) { setTemas([]); return; }
+    setLoadingTemas(true);
+    topicTrackerAPI.temas(selectedMateriaId)
+      .then(res => {
+        setTemas(res.temas || []);
+        setStats(res.stats || {});
+      })
+      .catch(console.error)
+      .finally(() => setLoadingTemas(false));
+  }, [selectedMateriaId]);
+
+  // 
+  // Handlers
+  // 
+  const handleToggleEstado = async (tema) => {
+    const nextState = NEXT_STATE[tema.estado];
+    setToggling(tema.id);
+    try {
+      const updated = await topicTrackerAPI.actualizarTema(selectedMateriaId, tema.id, { estado: nextState });
+      setTemas(prev => prev.map(t => t.id === tema.id ? { ...t, ...updated } : t));
+      // Recalc stats
+      setTemas(prev => {
+        const all = prev;
+        const total = all.length;
+        const completados = all.filter(t => t.estado === 'COMPLETADO').length;
+        const en_progreso = all.filter(t => t.estado === 'EN_PROGRESO').length;
+        const pendientes  = all.filter(t => t.estado === 'PENDIENTE').length;
+        setStats({ total, completados, en_progreso, pendientes, porcentaje_avance: total > 0 ? Math.round(completados / total * 100) : 0 });
+        return all;
+      });
+    } catch (err) {
+      console.error('Error toggling tema:', err);
+    } finally {
+      setToggling(null);
+    }
+  };
+
+  const handleDelete = async (tema) => {
+    if (!window.confirm(`Eliminar el tema "${tema.titulo}"? Esta accion no se puede deshacer.`)) return;
+    setDeleting(tema.id);
+    try {
+      await topicTrackerAPI.eliminarTema(selectedMateriaId, tema.id);
+      setTemas(prev => {
+        const all = prev.filter(t => t.id !== tema.id);
+        const total = all.length;
+        const completados = all.filter(t => t.estado === 'COMPLETADO').length;
+        const en_progreso = all.filter(t => t.estado === 'EN_PROGRESO').length;
+        const pendientes  = all.filter(t => t.estado === 'PENDIENTE').length;
+        setStats({ total, completados, en_progreso, pendientes, porcentaje_avance: total > 0 ? Math.round(completados / total * 100) : 0 });
+        return all;
+      });
+    } catch (err) { console.error(err); }
+    finally { setDeleting(null); }
+  };
+
+  const handleTemaCreated = (newTema) => {
+    setTemas(prev => {
+      const all = [...prev, newTema];
+      const total = all.length;
+      const completados = all.filter(t => t.estado === 'COMPLETADO').length;
+      const en_progreso = all.filter(t => t.estado === 'EN_PROGRESO').length;
+      const pendientes  = all.filter(t => t.estado === 'PENDIENTE').length;
+      setStats({ total, completados, en_progreso, pendientes, porcentaje_avance: total > 0 ? Math.round(completados / total * 100) : 0 });
+      return all;
+    });
+  };
+
+  // 
+  // Filtered topics
+  // 
+  const filteredTemas = temas.filter(t => {
+    if (filterEstado !== 'TODOS' && t.estado !== filterEstado) return false;
+    if (search && !t.titulo.toLowerCase().includes(search.toLowerCase()) &&
+        !(t.descripcion || '').toLowerCase().includes(search.toLowerCase()) &&
+        !(t.unidad || '').toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
+  // 
+  // Cascade change handlers
+  // 
+  const onSelectColegio = (id) => {
+    setSelectedColegioId(id);
+    const c = colegios.find(x => x.colegio_id === id);
+    const firstCurso = c && c.cursos[0];
+    setSelectedCursoId(firstCurso ? firstCurso.curso_id : null);
+    const firstMateria = firstCurso && firstCurso.materias[0];
+    setSelectedMateriaId(firstMateria ? firstmateria.materia_id : null);
+  };
+  const onSelectCurso = (id) => {
+    setSelectedCursoId(id);
+    const c = cursos.find(x => x.curso_id === id);
+    const firstMateria = c && c.materias[0];
+    setSelectedMateriaId(firstMateria ? firstmateria.materia_id : null);
+  };
+
+  // 
+  // Render
+  // 
+  if (loading) return <Loading text="Cargando estructura académica..." />;
+
   return (
-    <div className="page-container">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+    <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/*  HEADER  */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#242424' }}>Gestión de Tareas Docentes</h2>
-          <p style={{ fontSize: '12.5px', color: '#616161' }}>
-            Tareas académicas asignadas a tus cursos con seguimiento en tiempo real.
+          <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Layers size={22} style={{ color: '#4338CA' }} /> Gestor de Avance de Temas
+          </h2>
+          <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
+            Registra y monitorea el progreso curricular por colegio, curso y materia. Sin perder ningún tema.
           </p>
         </div>
-
-        <div style={{ display: 'flex', gap: 12 }}>
-          <div style={{ position: 'relative', width: 240 }}>
-            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
-            <input
-              className="form-control"
-              style={{ paddingLeft: 30, height: 32, fontSize: '12.5px' }}
-              placeholder="Buscar tarea o asignatura..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <button className="btn btn-primary btn-sm" onClick={onOpenCreate}>
-            <Plus size={14} /> Nueva Tarea
-          </button>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="teams-tabs">
-        {[
-          { id: 'todas', label: 'Todas las tareas' },
-          { id: 'activas', label: 'Activas' },
-          { id: 'pendientes_calificar', label: 'Por calificar' },
-          { id: 'vencidas', label: 'Vencidas' },
-        ].map(tab => (
+        <div style={{ display: 'flex', gap: 8 }}>
           <button
-            key={tab.id}
-            className={`teams-tab ${filter === tab.id ? 'active' : ''}`}
-            onClick={() => setFilter(tab.id)}
+            className="btn btn-secondary btn-sm"
+            onClick={loadEstructura}
+            style={{ height: 36, display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
-            {tab.label}
+            <RefreshCw size={14} /> Actualizar
           </button>
-        ))}
+          {selectedMateriaId && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setShowAddModal(true)}
+              style={{ height: 36, display: 'inline-flex', alignItems: 'center', gap: 6, background: '#4338CA' }}
+            >
+              <Plus size={15} /> Agregar Tema
+            </button>
+          )}
+        </div>
       </div>
 
-      {loading ? (
-        <Loading text="Cargando tareas docentes..." />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={ClipboardList}
-          title="Sin tareas encontradas"
-          description="Crea una nueva tarea para tus estudiantes para iniciar el ciclo académico."
-          action={<button className="btn btn-primary" onClick={onOpenCreate}><Plus size={14} /> Crear tarea</button>}
-        />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filtered.map(t => {
-            const priBadge = getPriorityBadge(t.prioridad);
-            return (
-              <div key={t.id} className="task-card" onClick={() => onNavigate('entregas', { filterTaskId: t.id })}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontWeight: 600, fontSize: '14px', color: '#242424' }}>{t.titulo}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <span className={`badge ${priBadge.cls}`}>{priBadge.label}</span>
-                    <span className={`badge ${t.esta_vencida ? 'badge-vencida' : 'badge-calificada'}`}>
-                      {t.esta_vencida ? 'Vencida' : 'Activa'}
-                    </span>
-                  </div>
-                </div>
+      {/*  CASCADE FILTER  */}
+      <div style={{
+        background: '#FFFFFF', padding: '16px 20px', borderRadius: 12,
+        border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+      }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
 
-                <div style={{ display: 'flex', gap: 18, fontSize: '12px', color: '#616161', marginTop: 4, flexWrap: 'wrap' }}>
-                  <span>Curso: {t.curso_nombre}</span>
-                  <span>Asignatura: {t.materia}</span>
-                  <span>Fecha límite: {formatDate(t.fecha_limite)}</span>
-                  <span>Puntaje: {t.puntaje_maximo} pts</span>
-                </div>
+          {/* 1. Colegio */}
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#1E3A8A', marginBottom: 6 }}>&#127979; 1. Colegio</label>
+            <select
+              className="form-control"
+              value={selectedColegioId || ''}
+              onChange={e => onSelectColegio(parseInt(e.target.value))}
+              style={{ height: 42, fontSize: 13, fontWeight: 600, border: '1.5px solid #BFDBFE', borderRadius: 8, background: '#F8FAFC' }}
+            >
+              <option value="">-- Selecciona colegio --</option>
+              {colegios.map(c => <option key={c.colegio_id} value={c.colegio_id}>{c.colegio_nombre}</option>)}
+            </select>
+          </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 8, borderTop: '1px solid #EDEBE9' }}>
-                  <div style={{ display: 'flex', gap: 16, fontSize: '12px' }}>
-                    <span style={{ color: '#242424', fontWeight: 600 }}>
-                      Entregadas: {t.entregadas} de {t.total_alumnos} alumnos
-                    </span>
-                    <span style={{ color: t.pendientes_calificacion > 0 ? '#CA5010' : '#107C41', fontWeight: 600 }}>
-                      Por calificar: {t.pendientes_calificacion}
-                    </span>
-                    <span style={{ color: '#616161' }}>
-                      Calificadas: {t.calificadas}
-                    </span>
-                  </div>
-                  <span style={{ fontSize: 11, color: '#8A8886', fontStyle: 'italic' }}>
-                    Gestiona las entregas desde Mis Colegios → Materia
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+          {/* 2. Curso */}
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#0369A1', marginBottom: 6 }}>&#127891; 2. Curso</label>
+            <select
+              className="form-control"
+              value={selectedCursoId || ''}
+              onChange={e => onSelectCurso(parseInt(e.target.value))}
+              style={{ height: 42, fontSize: 13, fontWeight: 600, border: '1.5px solid #BAE6FD', borderRadius: 8, background: '#F8FAFC' }}
+              disabled={!selectedColegioId}
+            >
+              <option value="">-- Selecciona curso --</option>
+              {cursos.map(c => <option key={c.curso_id} value={c.curso_id}>{c.curso_nombre}</option>)}
+            </select>
+          </div>
+
+          {/* 3. Materia */}
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#4338CA', marginBottom: 6 }}>&#128214; 3. Materia</label>
+            <select
+              className="form-control"
+              value={selectedMateriaId || ''}
+              onChange={e => setSelectedMateriaId(parseInt(e.target.value))}
+              style={{ height: 42, fontSize: 13, fontWeight: 600, border: '1.5px solid #C7D2FE', borderRadius: 8, background: '#F8FAFC' }}
+              disabled={!selectedCursoId}
+            >
+              <option value="">-- Selecciona materia --</option>
+              {materias.map(m => <option key={m.materia_id} value={m.materia_id}>{m.materia_nombre}</option>)}
+            </select>
+          </div>
         </div>
+
+        {/* Breadcrumb */}
+        {selectedMateriaId && (
+          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#475569', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 600, color: '#64748B' }}>Visualizando temas de:</span>
+            <span style={{ fontWeight: 800, color: '#1E3A8A', background: '#EFF6FF', padding: '2px 8px', borderRadius: 6 }}> {selectedColegio?.colegio_nombre}</span>
+            <span>&gt;</span>
+            <span style={{ fontWeight: 800, color: '#0369A1', background: '#E0F2FE', padding: '2px 8px', borderRadius: 6 }}> {selectedCurso?.curso_nombre}</span>
+            <span>&gt;</span>
+            <span style={{ fontWeight: 800, color: '#3730A3', background: '#EEF2FF', padding: '2px 8px', borderRadius: 6 }}> {selectedMateria?.materia_nombre}</span>
+          </div>
+        )}
+      </div>
+
+      {/*  STATS CARDS + PROGRESS BAR  */}
+      {selectedMateriaId && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Progress bar */}
+          <div style={{
+            background: '#FFFFFF', borderRadius: 12, border: '1px solid #E2E8F0',
+            padding: '14px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <TrendingUp size={16} style={{ color: '#4338CA' }} /> Progreso curricular de la materia
+              </span>
+              <span style={{
+                fontSize: 18, fontWeight: 900,
+                color: stats.porcentaje_avance >= 80 ? '#059669' : stats.porcentaje_avance >= 40 ? '#D97706' : '#DC2626'
+              }}>
+                {stats.porcentaje_avance}%
+              </span>
+            </div>
+            <div style={{ background: '#F1F5F9', borderRadius: 999, height: 10, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', borderRadius: 999, transition: 'width 0.5s ease',
+                width: `${stats.porcentaje_avance}%`,
+                background: stats.porcentaje_avance >= 80 ? 'linear-gradient(90deg,#059669,#34D399)'
+                          : stats.porcentaje_avance >= 40 ? 'linear-gradient(90deg,#D97706,#FBBF24)'
+                          : 'linear-gradient(90deg,#DC2626,#F87171)'
+              }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: '#94A3B8' }}>
+              <span>{stats.completados} temas completados</span>
+              <span>{stats.total} temas en total</span>
+            </div>
+          </div>
+
+          {/* Stat mini-cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+            {[
+              { label: 'Total Temas', value: stats.total, color: '#4338CA', bg: '#EEF2FF', icon: '' },
+              { label: 'Completados', value: stats.completados, color: '#059669', bg: '#D1FAE5', icon: '\u2705' },
+              { label: 'En Progreso', value: stats.en_progreso, color: '#D97706', bg: '#FEF3C7', icon: '' },
+              { label: 'Pendientes',  value: stats.pendientes,  color: '#64748B', bg: '#F1F5F9', icon: '' },
+            ].map(s => (
+              <div key={s.label} style={{
+                background: s.bg, borderRadius: 10, padding: '12px 14px',
+                border: `1.5px solid ${s.color}22`, textAlign: 'center'
+              }}>
+                <div style={{ fontSize: 20 }}>{s.icon}</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: s.color, lineHeight: 1.1 }}>{s.value}</div>
+                <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600, marginTop: 2 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/*  TOPIC LIST  */}
+      {selectedMateriaId && (
+        <div style={{
+          background: '#FFFFFF', borderRadius: 12, border: '1px solid #E2E8F0',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)', overflow: 'hidden'
+        }}>
+          {/* Toolbar */}
+          <div style={{
+            padding: '12px 16px', borderBottom: '1px solid #F1F5F9',
+            display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap'
+          }}>
+            {/* Search */}
+            <div style={{ position: 'relative', flex: '1 1 200px' }}>
+              <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+              <input
+                className="form-control"
+                style={{ paddingLeft: 30, height: 34, fontSize: '12.5px' }}
+                placeholder="Buscar tema, unidad..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+            {/* Estado filter tabs */}
+            <div style={{ display: 'flex', gap: 6 }}>
+              {['TODOS', 'PENDIENTE', 'EN_PROGRESO', 'COMPLETADO'].map(est => {
+                const cfg = est === 'TODOS' ? { label: 'Todos', color: '#4338CA', bg: '#EEF2FF' } : ESTADO_CONFIG[est];
+                const isActive = filterEstado === est;
+                return (
+                  <button
+                    key={est}
+                    onClick={() => setFilterEstado(est)}
+                    style={{
+                      padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: isActive ? 700 : 500,
+                      border: isActive ? `1.5px solid ${cfg.color}` : '1px solid #E2E8F0',
+                      background: isActive ? cfg.bg : '#F8FAFC', color: isActive ? cfg.color : '#64748B',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {cfg.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Topic rows */}
+          {loadingTemas ? (
+            <div style={{ padding: 40, textAlign: 'center' }}>
+              <RefreshCw size={24} style={{ color: '#94A3B8', animation: 'spin 1s linear infinite' }} />
+              <p style={{ color: '#94A3B8', fontSize: 13, marginTop: 8 }}>Cargando temas...</p>
+            </div>
+          ) : filteredTemas.length === 0 ? (
+            <div style={{ padding: '48px 20px', textAlign: 'center' }}>
+              <BookOpen size={40} style={{ color: '#CBD5E1', marginBottom: 12 }} />
+              <p style={{ fontSize: 15, fontWeight: 700, color: '#475569', marginBottom: 6 }}>
+                {temas.length === 0 ? 'Aún no hay temas registrados' : 'Sin temas que coincidan con el filtro'}
+              </p>
+              <p style={{ fontSize: 12.5, color: '#94A3B8', marginBottom: 16 }}>
+                {temas.length === 0
+                  ? 'Agrega los temas del programa para hacer seguimiento de tu avance curricular.'
+                  : 'Prueba cambiando el filtro de estado o la Búsqueda.'}
+              </p>
+              {temas.length === 0 && (
+                <button className="btn btn-primary" onClick={() => setShowAddModal(true)} style={{ background: '#4338CA' }}>
+                  <Plus size={14} /> Agregar primer tema
+                </button>
+              )}
+            </div>
+          ) : (
+            <div>
+              {filteredTemas.map((tema, idx) => {
+                const cfg = ESTADO_CONFIG[tema.estado] || ESTADO_CONFIG.PENDIENTE;
+                const isToggling = toggling === tema.id;
+                const isDeleting = deleting === tema.id;
+                return (
+                  <div
+                    key={tema.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '14px 16px',
+                      borderBottom: idx < filteredTemas.length - 1 ? '1px solid #F1F5F9' : 'none',
+                      transition: 'background 0.15s',
+                      background: tema.estado === 'COMPLETADO' ? '#FAFFFE' : '#FFFFFF',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                    onMouseLeave={e => e.currentTarget.style.background = tema.estado === 'COMPLETADO' ? '#FAFFFE' : '#FFFFFF'}
+                  >
+                    {/* Toggle button */}
+                    <button
+                      onClick={() => handleToggleEstado(tema)}
+                      disabled={isToggling}
+                      title={`Avanzar a: ${ESTADO_CONFIG[NEXT_STATE[tema.estado]].label}`}
+                      style={{
+                        flexShrink: 0, width: 34, height: 34,
+                        border: `2px solid ${cfg.color}`,
+                        background: cfg.bg, color: cfg.color,
+                        borderRadius: 8, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 15, transition: 'all 0.15s', opacity: isToggling ? 0.5 : 1
+                      }}
+                    >
+                      {isToggling ? '...' : cfg.dot}
+
+                    </button>
+
+                    {/* Content */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{
+                          fontWeight: 700, fontSize: '14px', color: '#0F172A',
+                          textDecoration: tema.estado === 'COMPLETADO' ? 'line-through' : 'none',
+                          opacity: tema.estado === 'COMPLETADO' ? 0.65 : 1
+                        }}>
+                          {tema.orden > 0 && <span style={{ color: '#94A3B8', fontSize: 12, marginRight: 4 }}>#{tema.orden}</span>}
+                          {tema.titulo}
+                        </span>
+                        {tema.unidad && (
+                          <span style={{
+                            fontSize: 11, background: '#EEF2FF', color: '#4338CA',
+                            padding: '1px 7px', borderRadius: 6, fontWeight: 600
+                          }}>{tema.unidad}</span>
+                        )}
+                        <span style={{
+                          fontSize: 11, background: cfg.bg, color: cfg.color,
+                          padding: '1px 7px', borderRadius: 6, fontWeight: 700, border: `1px solid ${cfg.color}44`
+                        }}>{cfg.label}</span>
+                      </div>
+                      {tema.descripcion && (
+                        <p style={{ fontSize: '12px', color: '#64748B', margin: '3px 0 0', lineHeight: 1.4 }}>
+                          {tema.descripcion}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <button
+                        onClick={() => handleToggleEstado(tema)}
+                        disabled={isToggling}
+                        style={{
+                          padding: '5px 10px', borderRadius: 6, fontSize: 11.5, fontWeight: 700,
+                          border: `1.5px solid ${cfg.color}`, background: cfg.bg, color: cfg.color,
+                          cursor: 'pointer', whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {cfg.btn}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(tema)}
+                        disabled={isDeleting}
+                        style={{
+                          padding: '5px 8px', borderRadius: 6, fontSize: 11.5,
+                          border: '1px solid #FEE2E2', background: '#FFF5F5', color: '#DC2626',
+                          cursor: 'pointer'
+                        }}
+                        title="Eliminar tema"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/*  NO MATERIA SELECTED  */}
+      {!selectedMateriaId && !loading && (
+        <div style={{
+          background: '#FFFFFF', borderRadius: 12, border: '1px dashed #CBD5E1',
+          padding: '48px 20px', textAlign: 'center'
+        }}>
+          <BookOpen size={44} style={{ color: '#CBD5E1', marginBottom: 12 }} />
+          <p style={{ fontSize: 15, fontWeight: 700, color: '#475569', marginBottom: 4 }}>Selecciona un Colegio, Curso y Materia</p>
+          <p style={{ fontSize: 12.5, color: '#94A3B8' }}>Usa los selectores de arriba para ver y gestionar los temas curriculares.</p>
+        </div>
+      )}
+
+      {/*  ADD TEMA MODAL  */}
+      {showAddModal && selectedMateriaId && (
+        <AddTemaModal
+          materiaId={selectedMateriaId}
+          onClose={() => setShowAddModal(false)}
+          onCreated={handleTemaCreated}
+        />
       )}
     </div>
   );
 }
 
-// ============================================================
-// 2. CREATE TASK FORM (CREAR TAREA - DOCENTE)
-// ============================================================
 export function CreateTaskForm({ onSuccess, onCancel }) {
   const [courses, setCourses] = useState([]);
   const [form, setForm] = useState({
@@ -367,7 +1135,7 @@ export function CreateTaskForm({ onSuccess, onCancel }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.titulo || !form.fecha_limite || !form.curso_id) {
-      setError('Completa los campos obligatorios: Título, Curso y Fecha límite.');
+      setError('Completa los campos obligatorios: Título, Curso y Fecha limite.');
       return;
     }
     setLoading(true);
@@ -404,7 +1172,7 @@ export function CreateTaskForm({ onSuccess, onCancel }) {
           <label className="form-label">Título de la tarea <span className="required">*</span></label>
           <input
             className="form-control"
-            placeholder="Ej: Informe de Laboratorio N° 2 — Dinámica y Leyes de Newton"
+            placeholder="Ej: Informe de Laboratorio N° 2 - Dinamica y Leyes de Newton"
             value={form.titulo}
             onChange={e => setF('titulo', e.target.value)}
             required
@@ -433,7 +1201,7 @@ export function CreateTaskForm({ onSuccess, onCancel }) {
         </div>
 
         <div className="form-group">
-          <label className="form-label">Fecha y hora límite <span className="required">*</span></label>
+          <label className="form-label">Fecha y hora limite <span className="required">*</span></label>
           <input
             className="form-control"
             type="datetime-local"
@@ -444,7 +1212,7 @@ export function CreateTaskForm({ onSuccess, onCancel }) {
         </div>
 
         <div className="form-group">
-          <label className="form-label">Puntaje máximo (0 — 100)</label>
+          <label className="form-label">Puntaje maximo (0 - 100)</label>
           <input
             className="form-control"
             type="number"
@@ -476,11 +1244,11 @@ export function CreateTaskForm({ onSuccess, onCancel }) {
         </div>
 
         <div className="form-group" style={{ gridColumn: '1/-1' }}>
-          <label className="form-label">Indicaciones específicas para el estudiante</label>
+          <label className="form-label">Indicaciones especificas para el estudiante</label>
           <textarea
             className="form-control"
             rows={2}
-            placeholder="Formato requerido, normas de presentación, criterios de evaluación..."
+            placeholder="Formato requerido, normas de presentacion, criterios de evaluacion..."
             value={form.indicaciones}
             onChange={e => setF('indicaciones', e.target.value)}
           />
@@ -490,7 +1258,7 @@ export function CreateTaskForm({ onSuccess, onCancel }) {
           <label className="form-label">Nombre del material adjunto (opcional)</label>
           <input
             className="form-control"
-            placeholder="Guía_Practica_02.pdf"
+            placeholder="Guia_Practica_02.pdf"
             value={form.material_nombre}
             onChange={e => setF('material_nombre', e.target.value)}
           />
@@ -510,9 +1278,9 @@ export function CreateTaskForm({ onSuccess, onCancel }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
         <div>
           <button type="button" className="btn btn-secondary" onClick={() => setShowRubrica(true)}>
-            <Plus size={14} /> Añadir Rúbrica
+            <Plus size={14} /> Anadir Rubrica
           </button>
-          {rubricaData && <span style={{ marginLeft: 10, fontSize: '12px', color: '#107C41' }}><CheckCircle size={14} style={{ verticalAlign: 'middle' }} /> Rúbrica configurada</span>}
+          {rubricaData && <span style={{ marginLeft: 10, fontSize: '12px', color: '#107C41' }}><CheckCircle size={14} style={{ verticalAlign: 'middle' }} /> Rubrica configurada</span>}
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancelar</button>
@@ -526,203 +1294,609 @@ export function CreateTaskForm({ onSuccess, onCancel }) {
 }
 
 // ============================================================
-// 3. TEACHER SUBMISSIONS VIEW (REVISIÓN Y CALIFICACIÓN DE ENTREGAS)
+// 3. TEACHER SUBMISSIONS VIEW (REVISION Y CALIFICACION DE ENTREGAS)
 // ============================================================
 export function TeacherSubmissionsView({ initialTaskId }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('todas');
+  const [filter, setFilter] = useState('todas'); // 'todas' | 'pendientes' | 'calificadas' | 'atrasadas'
   const [search, setSearch] = useState('');
   const [gradingEntrega, setGradingEntrega] = useState(null);
+  const [viewsModalTask, setViewsModalTask] = useState(null);
+  const [devolverEntrega, setDevolverEntrega] = useState(null);
 
-  const loadSubmissions = () => {
+  // Jerarquia academica
+  const [estructura, setEstructura] = useState([]);
+  const [selectedColegioId, setSelectedColegioId] = useState('TODOS');
+  const [selectedCursoId, setSelectedCursoId] = useState('TODOS');
+  const [selectedMateriaId, setSelectedMateriaId] = useState('TODOS');
+  const [selectedTareaId, setSelectedTareaId] = useState(initialTaskId || 'TODAS');
+
+  const loadSubmissions = useCallback(() => {
     setLoading(true);
     teacherAPI.allSubmissions()
-      .then(setSubmissions)
+      .then(res => setSubmissions(res || []))
       .catch(console.error)
       .finally(() => setLoading(false));
+  }, []);
+
+  const loadEstructura = useCallback(async () => {
+    try {
+      const data = await topicTrackerAPI.materiasConTemas();
+      setEstructura(data || []);
+    } catch (err) {
+      console.error('Error cargando estructura:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSubmissions();
+    loadEstructura();
+  }, [loadSubmissions, loadEstructura]);
+
+  // Derivados de la estructura
+  const colegios = estructura;
+
+  const cursosDisponibles = useMemo(() => {
+    if (selectedColegioId === 'TODOS') {
+      return colegios.flatMap(c => c.cursos || []);
+    }
+    const c = colegios.find(x => x.colegio_id === selectedColegioId);
+    return c ? c.cursos : [];
+  }, [colegios, selectedColegioId]);
+
+  const materiasDisponibles = useMemo(() => {
+    if (selectedCursoId === 'TODOS') {
+      return cursosDisponibles.flatMap(cr => cr.materias || []);
+    }
+    const cr = cursosDisponibles.find(x => x.curso_id === selectedCursoId);
+    return cr ? cr.materias : [];
+  }, [cursosDisponibles, selectedCursoId]);
+
+  const selectedColegio = colegios.find(x => x.colegio_id === selectedColegioId);
+  const selectedCurso   = cursosDisponibles.find(x => x.curso_id === selectedCursoId);
+  const selectedMateria = materiasDisponibles.find(x => x.materia_id === selectedMateriaId);
+
+  // Tareas unicas disponibles segun el filtro
+  const tareasDisponibles = useMemo(() => {
+    const map = new Map();
+    submissions.forEach(s => {
+      if (selectedColegioId !== 'TODOS' && s.colegio_id !== selectedColegioId) return;
+      if (selectedCursoId !== 'TODOS' && s.curso_id !== selectedCursoId) return;
+      if (selectedMateriaId !== 'TODOS' && s.materia_id !== selectedMateriaId) return;
+      if (!map.has(s.tarea_id)) {
+        map.set(s.tarea_id, { id: s.tarea_id, titulo: s.tarea_titulo });
+      }
+    });
+    return Array.from(map.values());
+  }, [submissions, selectedColegioId, selectedCursoId, selectedMateriaId]);
+
+  // Manejadores de cascada
+  const onSelectColegio = (val) => {
+    const id = val === 'TODOS' ? 'TODOS' : parseInt(val);
+    setSelectedColegioId(id);
+    setSelectedCursoId('TODOS');
+    setSelectedMateriaId('TODOS');
+    setSelectedTareaId('TODAS');
   };
 
-  useEffect(() => { loadSubmissions(); }, []);
+  const onSelectCurso = (val) => {
+    const id = val === 'TODOS' ? 'TODOS' : parseInt(val);
+    setSelectedCursoId(id);
+    setSelectedMateriaId('TODOS');
+    setSelectedTareaId('TODAS');
+  };
 
-  const filtered = submissions.filter(s => {
-    if (initialTaskId && s.tarea_id !== initialTaskId) return false;
-    const matchSearch = !search ||
-      s.estudiante_nombre.toLowerCase().includes(search.toLowerCase()) ||
-      s.tarea_titulo.toLowerCase().includes(search.toLowerCase());
-    if (!matchSearch) return false;
-    if (filter === 'pendientes') return !s.calificacion;
-    if (filter === 'calificadas') return !!s.calificacion;
-    return true;
-  });
+  const onSelectMateria = (val) => {
+    const id = val === 'TODOS' ? 'TODOS' : parseInt(val);
+    setSelectedMateriaId(id);
+    setSelectedTareaId('TODAS');
+  };
+
+  const resetFilters = () => {
+    setSelectedColegioId('TODOS');
+    setSelectedCursoId('TODOS');
+    setSelectedMateriaId('TODOS');
+    setSelectedTareaId('TODAS');
+    setFilter('todas');
+    setSearch('');
+  };
+
+  // Filtrado final
+  const filtered = useMemo(() => {
+    return submissions.filter(s => {
+      if (selectedColegioId !== 'TODOS' && s.colegio_id !== selectedColegioId) return false;
+      if (selectedCursoId !== 'TODOS' && s.curso_id !== selectedCursoId) return false;
+      if (selectedMateriaId !== 'TODOS' && s.materia_id !== selectedMateriaId) return false;
+      if (selectedTareaId !== 'TODAS' && s.tarea_id !== parseInt(selectedTareaId)) return false;
+      if (initialTaskId && s.tarea_id !== initialTaskId) return false;
+
+      // Filtro de busqueda
+      if (search) {
+        const q = search.toLowerCase();
+        const matches = (s.estudiante_nombre || '').toLowerCase().includes(q) ||
+          (s.tarea_titulo || '').toLowerCase().includes(q) ||
+          (s.estudiante_matricula || '').toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+
+      // Filtro de estado
+      if (filter === 'pendientes') return !s.calificacion && s.estado !== 'DEVUELTA';
+      if (filter === 'calificadas') return !!s.calificacion;
+      if (filter === 'atrasadas') return s.es_tardia || s.estado === 'ATRASADO';
+
+      return true;
+    });
+  }, [submissions, selectedColegioId, selectedCursoId, selectedMateriaId, selectedTareaId, initialTaskId, search, filter]);
+
+  // Metricas para la seleccion actual
+  const stats = useMemo(() => {
+    const base = submissions.filter(s => {
+      if (selectedColegioId !== 'TODOS' && s.colegio_id !== selectedColegioId) return false;
+      if (selectedCursoId !== 'TODOS' && s.curso_id !== selectedCursoId) return false;
+      if (selectedMateriaId !== 'TODOS' && s.materia_id !== selectedMateriaId) return false;
+      if (selectedTareaId !== 'TODAS' && s.tarea_id !== parseInt(selectedTareaId)) return false;
+      return true;
+    });
+
+    return {
+      total: base.length,
+      pendientes: base.filter(s => !s.calificacion && s.estado !== 'DEVUELTA').length,
+      calificadas: base.filter(s => !!s.calificacion).length,
+      atrasadas: base.filter(s => s.es_tardia || s.estado === 'ATRASADO').length,
+    };
+  }, [submissions, selectedColegioId, selectedCursoId, selectedMateriaId, selectedTareaId]);
 
   return (
-    <div className="page-container">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+    <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* HEADER PRINCIPAL */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#242424' }}>Entregas de Estudiantes</h2>
-          <p style={{ fontSize: '12.5px', color: '#616161' }}>
-            Centro de revisión, evaluación y retroalimentación de tareas presentadas.
+          <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <InboxIcon size={22} style={{ color: '#2563EB' }} /> Gestion y Revision de Entregas
+          </h2>
+          <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
+            Centro de revision, calificacion, retroalimentacion y seguimiento de visualizacion academica por colegio, curso y materia.
           </p>
         </div>
 
-        <div style={{ position: 'relative', width: 260 }}>
-          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
-          <input
-            className="form-control"
-            style={{ paddingLeft: 30, height: 32, fontSize: '12.5px' }}
-            placeholder="Buscar por estudiante o tarea..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ position: 'relative', width: 280 }}>
+            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
+            <input
+              className="form-control"
+              style={{ paddingLeft: 32, height: 36, fontSize: '12.5px', borderRadius: 8 }}
+              placeholder="Buscar por estudiante, tarea o matricula..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={loadSubmissions}
+            disabled={loading}
+            title="Recargar entregas"
+            style={{ height: 36, padding: '0 12px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <RefreshCw size={13} className={loading ? 'spin' : ''} />
+            Actualizar
+          </button>
         </div>
       </div>
 
-      <div className="teams-tabs">
+      {/* SELECTOR JERARQUICO ACADEMICO (COLEGIO > CURSO > MATERIA) */}
+      <div style={{
+        background: '#FFFFFF', borderRadius: 12, border: '1.5px solid #E2E8F0',
+        padding: '16px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Filter size={16} style={{ color: '#1E3A8A' }} />
+            <span style={{ fontWeight: 800, fontSize: 13, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Filtro Academico por Colegio, Curso y Materia
+            </span>
+          </div>
+
+          {(selectedColegioId !== 'TODOS' || selectedCursoId !== 'TODOS' || selectedMateriaId !== 'TODOS' || selectedTareaId !== 'TODAS' || search) && (
+            <button
+              onClick={resetFilters}
+              style={{
+                fontSize: 12, color: '#2563EB', background: '#EFF6FF', border: '1px solid #BFDBFE',
+                padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600,
+                display: 'inline-flex', alignItems: 'center', gap: 4
+              }}
+            >
+              <RotateCcw size={12} /> Limpiar filtros / Ver todo
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+          {/* 1. Colegio */}
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#1E3A8A', marginBottom: 6 }}>
+              <School size={14} style={{ color: '#1E3A8A' }} /> 1. Colegio
+            </label>
+            <select
+              className="form-control"
+              value={selectedColegioId}
+              onChange={e => onSelectColegio(e.target.value)}
+              style={{ height: 38, fontSize: 13, fontWeight: 600, border: '1px solid #CBD5E1', borderRadius: 6, background: '#F8FAFC' }}
+            >
+              <option value="TODOS">-- Todos los Colegios --</option>
+              {colegios.map(c => (
+                <option key={c.colegio_id} value={c.colegio_id}>{c.colegio_nombre}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 2. Curso */}
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#0369A1', marginBottom: 6 }}>
+              <GraduationCap size={14} style={{ color: '#0369A1' }} /> 2. Curso
+            </label>
+            <select
+              className="form-control"
+              value={selectedCursoId}
+              onChange={e => onSelectCurso(e.target.value)}
+              style={{ height: 38, fontSize: 13, fontWeight: 600, border: '1px solid #CBD5E1', borderRadius: 6, background: '#F8FAFC' }}
+            >
+              <option value="TODOS">-- Todos los Cursos --</option>
+              {cursosDisponibles.map(cr => (
+                <option key={cr.curso_id} value={cr.curso_id}>{cr.curso_nombre}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 3. Materia */}
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#3730A3', marginBottom: 6 }}>
+              <BookOpen size={14} style={{ color: '#3730A3' }} /> 3. Materia
+            </label>
+            <select
+              className="form-control"
+              value={selectedMateriaId}
+              onChange={e => onSelectMateria(e.target.value)}
+              style={{ height: 38, fontSize: 13, fontWeight: 600, border: '1px solid #CBD5E1', borderRadius: 6, background: '#F8FAFC' }}
+            >
+              <option value="TODOS">-- Todas las Materias --</option>
+              {materiasDisponibles.map(m => (
+                <option key={m.materia_id} value={m.materia_id}>{m.materia_nombre}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 4. Tarea especifica */}
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#0F766E', marginBottom: 6 }}>
+              <ClipboardList size={14} style={{ color: '#0F766E' }} /> 4. Tarea
+            </label>
+            <select
+              className="form-control"
+              value={selectedTareaId}
+              onChange={e => setSelectedTareaId(e.target.value)}
+              style={{ height: 38, fontSize: 13, fontWeight: 600, border: '1px solid #CBD5E1', borderRadius: 6, background: '#F8FAFC' }}
+            >
+              <option value="TODAS">-- Todas las Tareas ({tareasDisponibles.length}) --</option>
+              {tareasDisponibles.map(t => (
+                <option key={t.id} value={t.id}>{t.titulo}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Breadcrumb de alcance activo */}
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#475569', flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 600, color: '#64748B' }}>Visualizando entregas de:</span>
+          <span style={{ fontWeight: 700, color: '#1E3A8A', background: '#EFF6FF', padding: '2px 8px', borderRadius: 4 }}>
+            {selectedColegio ? selectedColegio.colegio_nombre : 'Todos los Colegios'}
+          </span>
+          <span style={{ color: '#94A3B8' }}>&gt;</span>
+          <span style={{ fontWeight: 700, color: '#0369A1', background: '#E0F2FE', padding: '2px 8px', borderRadius: 4 }}>
+            {selectedCurso ? selectedCurso.curso_nombre : 'Todos los Cursos'}
+          </span>
+          <span style={{ color: '#94A3B8' }}>&gt;</span>
+          <span style={{ fontWeight: 700, color: '#3730A3', background: '#EEF2FF', padding: '2px 8px', borderRadius: 4 }}>
+            {selectedMateria ? selectedMateria.materia_nombre : 'Todas las Materias'}
+          </span>
+          <span style={{ marginLeft: 'auto', fontWeight: 600, color: '#0F172A', background: '#F1F5F9', padding: '2px 10px', borderRadius: 4 }}>
+            {filtered.length} entrega{filtered.length !== 1 ? 's' : ''} encontrada{filtered.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+      </div>
+
+      {/* KPI STATS CARDS */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+        <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 6, background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <InboxIcon size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A' }}>{stats.total}</div>
+            <div style={{ fontSize: 11.5, color: '#64748B', fontWeight: 600 }}>Total Entregas</div>
+          </div>
+        </div>
+
+        <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 6, background: '#FFFBEB', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Clock size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#D97706' }}>{stats.pendientes}</div>
+            <div style={{ fontSize: 11.5, color: '#92400E', fontWeight: 600 }}>Por Calificar</div>
+          </div>
+        </div>
+
+        <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 6, background: '#ECFDF5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CheckCircle size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#059669' }}>{stats.calificadas}</div>
+            <div style={{ fontSize: 11.5, color: '#065F46', fontWeight: 600 }}>Calificadas</div>
+          </div>
+        </div>
+
+        <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 6, background: '#FEF2F2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <AlertTriangle size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#DC2626' }}>{stats.atrasadas}</div>
+            <div style={{ fontSize: 11.5, color: '#991B1B', fontWeight: 600 }}>Con Retraso</div>
+          </div>
+        </div>
+      </div>
+
+      {/* TABS DE ESTADO */}
+      <div className="teams-tabs" style={{ marginBottom: 4 }}>
         {[
-          { id: 'todas', label: 'Todas las entregas' },
-          { id: 'pendientes', label: 'Por calificar' },
-          { id: 'calificadas', label: 'Calificadas' },
+          { id: 'todas', label: 'Todas las entregas', count: stats.total },
+          { id: 'pendientes', label: 'Por calificar', count: stats.pendientes },
+          { id: 'calificadas', label: 'Calificadas', count: stats.calificadas },
+          { id: 'atrasadas', label: 'Con retraso', count: stats.atrasadas },
         ].map(t => (
           <button
             key={t.id}
             className={`teams-tab ${filter === t.id ? 'active' : ''}`}
             onClick={() => setFilter(t.id)}
           >
-            {t.label}
+            <span>{t.label}</span>
+            <span className="teams-tab-badge">{t.count}</span>
           </button>
         ))}
       </div>
 
+      {/* LISTADO DE ENTREGAS */}
       {loading ? (
         <Loading text="Cargando entregas de los estudiantes..." />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={InboxIcon}
           title="Sin entregas para mostrar"
-          description={search ? `No se encontraron resultados para "${search}".` : 'No hay entregas registradas en esta vista.'}
+          description={search ? `No se encontraron resultados para "${search}".` : 'No hay entregas registradas en los filtros seleccionados.'}
         />
-      ) : (() => {
-        // Group by Colegio → Curso
-        const grouped = {};
-        filtered.forEach(ent => {
-          const colegio = ent.colegio_nombre || 'Sin colegio';
-          const curso = ent.curso_nombre || 'Sin curso';
-          if (!grouped[colegio]) grouped[colegio] = {};
-          if (!grouped[colegio][curso]) grouped[colegio][curso] = [];
-          grouped[colegio][curso].push(ent);
-        });
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {filtered.map(ent => {
+            const isLate = ent.es_tardia || ent.estado === 'ATRASADO';
+            const isGraded = !!ent.calificacion || (ent.nota !== null && ent.nota !== undefined);
+            const notaVal = ent.calificacion?.nota !== undefined ? ent.calificacion.nota : ent.nota;
+            const initials = (ent.estudiante_nombre || 'ES').split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {Object.entries(grouped).map(([colegio, cursos]) => (
-              <div key={colegio}>
-                {/* Colegio header */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '8px 14px', marginBottom: 10,
-                  background: 'linear-gradient(90deg, #0F1E3D 0%, #1E3A8A 100%)',
-                  borderRadius: 8, color: 'white',
-                }}>
-                  <Users size={15} />
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>{colegio}</span>
-                  <span style={{ marginLeft: 'auto', fontSize: 11, opacity: 0.7 }}>
-                    {Object.values(cursos).flat().length} entregas
-                  </span>
-                </div>
-
-                {/* Cursos dentro del colegio */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 12 }}>
-                  {Object.entries(cursos).map(([curso, entregas]) => (
-                    <div key={curso}>
-                      {/* Curso sub-header */}
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '5px 12px', marginBottom: 8,
-                        background: '#F3F2F1', borderRadius: 6,
-                        borderLeft: '3px solid #1E3A8A',
-                      }}>
-                        <ChevronRight size={13} style={{ color: '#1E3A8A' }} />
-                        <span style={{ fontWeight: 600, fontSize: 12.5, color: '#242424' }}>{curso}</span>
-                        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#616161' }}>
-                          {entregas.length} alumno{entregas.length !== 1 ? 's' : ''}
+            return (
+              <div
+                key={ent.id || ent.entrega_id || Math.random()}
+                className="card"
+                style={{
+                  padding: '16px 20px',
+                  borderRadius: 8,
+                  border: isLate ? '1px solid #FECACA' : '1px solid #E2E8F0',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                }}
+              >
+                {/* Cabecera de la tarjeta: Estudiante + Contexto + Estado */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                      width: 38, height: 38, borderRadius: '50%',
+                      background: '#1E3A8A',
+                      color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontWeight: 700, fontSize: '13px', flexShrink: 0
+                    }}>
+                      {initials}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '14px', color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {ent.estudiante_nombre}
+                        {ent.ha_visto && (
+                          <span style={{ fontSize: 11, color: '#059669', background: '#ECFDF5', border: '1px solid #A7F3D0', padding: '1px 6px', borderRadius: 4, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            <Eye size={11} /> Vio la tarea
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '11.5px', color: '#64748B', marginTop: 3, flexWrap: 'wrap' }}>
+                        <span>Matrícula: <strong>{ent.estudiante_matricula}</strong></span>
+                        <span>&bull;</span>
+                        <span style={{ background: '#EFF6FF', color: '#1E3A8A', padding: '1px 6px', borderRadius: 4, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                          <School size={11} /> {ent.colegio_nombre}
+                        </span>
+                        <span style={{ background: '#E0F2FE', color: '#0369A1', padding: '1px 6px', borderRadius: 4, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                          <GraduationCap size={11} /> {ent.curso_nombre}
+                        </span>
+                        <span style={{ background: '#EEF2FF', color: '#3730A3', padding: '1px 6px', borderRadius: 4, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                          <BookOpen size={11} /> {ent.materia_nombre}
                         </span>
                       </div>
-
-                      {/* Entregas del curso */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 8 }}>
-                        {entregas.map(ent => (
-                          <div key={ent.id || ent.entrega_id || Math.random()} className="card" style={{ padding: '14px 18px' }}>
-                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <div style={{
-                                  width: 34, height: 34, borderRadius: '50%',
-                                  backgroundColor: '#5B5FC7', color: '#FFFFFF',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  fontWeight: 600, fontSize: '12px', flexShrink: 0
-                                }}>
-                                  {ent.estudiante_nombre?.slice(0, 2).toUpperCase()}
-                                </div>
-                                <div>
-                                  <div style={{ fontWeight: 600, fontSize: '13px', color: '#242424' }}>
-                                    {ent.estudiante_nombre}
-                                  </div>
-                                  <div style={{ fontSize: '11px', color: '#616161' }}>
-                                    Matrícula: {ent.estudiante_matricula}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                <span className={`badge ${ent.calificacion ? 'badge-calificada' : 'badge-en_revision'}`}>
-                                  {ent.calificacion ? 'Calificada' : 'Pendiente revisión'}
-                                </span>
-                                {ent.calificacion && (
-                                  <span style={{ fontWeight: 700, fontSize: '14px', color: getNoteColor(ent.calificacion.nota) }}>
-                                    {ent.calificacion.nota}/100
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div style={{ margin: '8px 0', background: '#FAF9F8', padding: '8px 12px', borderRadius: '4px', border: '1px solid #EDEBE9' }}>
-                              <div style={{ fontWeight: 600, fontSize: '12px', color: '#242424' }}>{ent.tarea_titulo}</div>
-                              <div style={{ display: 'flex', gap: 16, fontSize: '11px', color: '#616161', marginTop: 4 }}>
-                                <span>Archivo: {ent.archivo_nombre}</span>
-                                <span>Fecha: {ent.fecha_entrega}</span>
-                              </div>
-                              {ent.calificacion?.retroalimentacion && (
-                                <div style={{ marginTop: 5, fontSize: '11px', color: '#107C41', fontWeight: 500 }}>
-                                  Retroalimentación: "{ent.calificacion.retroalimentacion}"
-                                </div>
-                              )}
-                            </div>
-
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                              <button
-                                className="btn btn-primary btn-sm"
-                                onClick={() => setGradingEntrega(ent)}
-                              >
-                                <Award size={13} /> {ent.calificacion ? 'Editar calificación' : 'Calificar entrega'}
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Estado / Nota */}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {isLate && (
+                      <span style={{
+                        background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA',
+                        padding: '3px 8px', borderRadius: 6, fontSize: 11.5, fontWeight: 700,
+                        display: 'inline-flex', alignItems: 'center', gap: 4
+                      }}>
+                        <Clock size={12} /> Fuera de plazo
+                      </span>
+                    )}
+
+                    <span className={`badge ${isGraded ? 'badge-calificada' : 'badge-en_revision'}`} style={{ fontSize: 12, padding: '4px 10px' }}>
+                      {isGraded ? 'Calificada' : 'Pendiente revision'}
+                    </span>
+
+                    {isGraded && (
+                      <span style={{ fontWeight: 800, fontSize: '16px', color: getNoteColor(notaVal), marginLeft: 4 }}>
+                        {notaVal}/100
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Info de la tarea y entrega */}
+                <div style={{
+                  background: '#F8FAFC', padding: '12px 14px', borderRadius: 8,
+                  border: '1px solid #E2E8F0', marginBottom: 12
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                    <div style={{ fontWeight: 700, fontSize: '13.5px', color: '#1E293B', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <ClipboardList size={15} style={{ color: '#2563EB' }} /> {ent.tarea_titulo}
+                    </div>
+                    {ent.fecha_limite && (
+                      <span style={{ fontSize: 11.5, color: '#64748B' }}>
+                        Fecha limite: <strong>{ent.fecha_limite}</strong>
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 16, fontSize: '12px', color: '#475569', marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Paperclip size={13} style={{ color: '#64748B' }} />
+                      Archivo: <strong>{ent.archivo_nombre || 'documento_entrega.pdf'}</strong>
+                    </span>
+                    <span>&bull;</span>
+                    <span>Fecha entrega: <strong>{ent.fecha_entrega}</strong></span>
+                    {ent.version > 1 && (
+                      <span style={{ background: '#EDE9FE', color: '#6D28D9', padding: '1px 6px', borderRadius: 4, fontWeight: 700, fontSize: 11 }}>
+                        Version {ent.version} (Reentregada)
+                      </span>
+                    )}
+                  </div>
+
+                  {ent.observaciones && (
+                    <div style={{ marginTop: 8, fontSize: '12px', color: '#475569', fontStyle: 'italic', borderLeft: '3px solid #94A3B8', paddingLeft: 8 }}>
+                      Nota del alumno: "{ent.observaciones}"
+                    </div>
+                  )}
+
+                  {/* Retroalimentacion docente previa */}
+                  {(ent.calificacion?.retroalimentacion || ent.retroalimentacion) && (
+                    <div style={{
+                      marginTop: 8, padding: '6px 10px', background: '#ECFDF5',
+                      border: '1px solid #A7F3D0', borderRadius: 6, fontSize: '12px', color: '#065F46'
+                    }}>
+                      <strong>Retroalimentacion:</strong> "{ent.calificacion?.retroalimentacion || ent.retroalimentacion}"
+                    </div>
+                  )}
+                </div>
+
+                {/* BARRA DE ACCIONES Y BOTONES */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingTop: 4 }}>
+                  {/* Botones secundarios (Quien vio la tarea + Ver archivo) */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      className="btn btn-outline btn-sm"
+                      style={{ fontSize: 12, padding: '5px 11px', display: 'inline-flex', alignItems: 'center', gap: 6, borderColor: '#3B82F6', color: '#1D4ED8', background: '#EFF6FF' }}
+                      onClick={() => setViewsModalTask({ id: ent.tarea_id, titulo: ent.tarea_titulo })}
+                      title="Ver que estudiantes del curso abrieron y leyeron esta tarea"
+                    >
+                      <Eye size={13} /> Quien vio la tarea
+                    </button>
+
+                    {ent.archivo_url ? (
+                      <a
+                        href={ent.archivo_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-outline btn-sm"
+                        style={{ fontSize: 12, padding: '5px 11px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                        title="Ver o descargar el archivo entregado"
+                      >
+                        <Download size={13} /> Ver archivo
+                      </a>
+                    ) : (
+                      <button
+                        className="btn btn-outline btn-sm"
+                        style={{ fontSize: 12, padding: '5px 11px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                        onClick={() => alert(`Archivo de la entrega: ${ent.archivo_nombre || 'documento.pdf'}`)}
+                        title="Ver detalles del archivo"
+                      >
+                        <Download size={13} /> Archivo adjunto
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Botones principales de revision y calificacion */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      className="btn btn-sm"
+                      style={{
+                        fontSize: 12, padding: '5px 11px',
+                        background: '#FFFBEB', color: '#B45309', border: '1px solid #FDE68A',
+                        display: 'inline-flex', alignItems: 'center', gap: 5
+                      }}
+                      onClick={() => setDevolverEntrega(ent)}
+                      title="Devolver la tarea para que el estudiante la corrija"
+                    >
+                      <RotateCcw size={13} /> Devolver para correccion
+                    </button>
+
+                    <button
+                      className="btn btn-primary btn-sm"
+                      style={{ fontSize: 12, padding: '5px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                      onClick={() => setGradingEntrega(ent)}
+                    >
+                      <Award size={14} />
+                      {isGraded ? 'Editar calificacion' : 'Revisar y calificar'}
+                    </button>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        );
-      })()}
+            );
+          })}
+        </div>
+      )}
 
-      {/* Modal for Grading */}
+      {/* MODAL: SEGUIMIENTO DE LECTURA (QUIEN VIO LA TAREA) */}
+      {viewsModalTask && (
+        <TareaVistasModal
+          tareaId={viewsModalTask.id}
+          tareaTitulo={viewsModalTask.titulo}
+          onClose={() => setViewsModalTask(null)}
+          onGrading={(est) => {
+            const ent = submissions.find(s => s.tarea_id === viewsModalTask.id && s.estudiante_id === est.estudiante_id);
+            if (ent) setGradingEntrega(ent);
+          }}
+        />
+      )}
+
+      {/* MODAL: CALIFICAR Y RETROALIMENTAR */}
       <Modal
         open={!!gradingEntrega}
         onClose={() => setGradingEntrega(null)}
-        title="Evaluación y Retroalimentación"
+        title="Evaluacion y Retroalimentacion Pedagogica"
       >
         {gradingEntrega && (
           <GradeSubmissionModal
@@ -732,6 +1906,15 @@ export function TeacherSubmissionsView({ initialTaskId }) {
           />
         )}
       </Modal>
+
+      {/* MODAL: DEVOLVER ENTREGA */}
+      {devolverEntrega && (
+        <DevolverEntregaModal
+          entrega={devolverEntrega}
+          onClose={() => setDevolverEntrega(null)}
+          onSuccess={() => loadSubmissions()}
+        />
+      )}
     </div>
   );
 }
@@ -739,7 +1922,7 @@ export function TeacherSubmissionsView({ initialTaskId }) {
 // ============================================================
 // 4. TEACHER GRADEBOOK VIEW (LIBRO DE CALIFICACIONES)
 // ============================================================
-export function TeacherGradebookView() {
+export function TeacherGradebookView({ onNavigate }) {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -752,29 +1935,77 @@ export function TeacherGradebookView() {
       .finally(() => setLoading(false));
   }, []);
 
+  const exportToCSV = () => {
+    if (!students || students.length === 0) return;
+    const headers = ['Estudiante', 'Matricula', 'Grado', 'Paralelo', 'Tareas Entregadas', 'Tareas Asignadas', 'Tareas Pendientes', 'Cumplimiento %', 'Promedio', 'Estado'];
+    const rows = students.map(s => [
+      `"${s.nombre_completo || ''}"`,
+      `"${s.matricula || ''}"`,
+      `"${s.grado || ''}"`,
+      `"${s.paralelo || ''}"`,
+      s.tareas_entregadas || 0,
+      s.tareas_asignadas || 0,
+      s.tareas_pendientes || 0,
+      s.porcentaje_cumplimiento || 0,
+      s.promedio || 0,
+      `"${s.estado_academico || ''}"`
+    ]);
+    const csvContent = '\ufeff' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Libro_Calificaciones_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const filtered = students.filter(s =>
     !search || s.nombre_completo.toLowerCase().includes(search.toLowerCase()) || s.matricula.includes(search)
   );
 
   return (
     <div className="page-container">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#242424' }}>Libro de Calificaciones</h2>
           <p style={{ fontSize: '12.5px', color: '#616161' }}>
-            Consolidado académico general por estudiante y rendimiento ponderado.
+            Consolidado academico general por estudiante y rendimiento ponderado.
           </p>
         </div>
 
-        <div style={{ position: 'relative', width: 260 }}>
-          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
-          <input
-            className="form-control"
-            style={{ paddingLeft: 30, height: 32, fontSize: '12.5px' }}
-            placeholder="Buscar por estudiante o matrícula..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', width: 220 }}>
+            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
+            <input
+              className="form-control"
+              style={{ paddingLeft: 30, height: 32, fontSize: '12.5px' }}
+              placeholder="Buscar estudiante..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={exportToCSV}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, height: 32 }}
+            title="Descargar tabla en formato CSV compatible con Excel"
+          >
+            <Download size={13} /> Exportar Excel (CSV)
+          </button>
+
+          {onNavigate && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => onNavigate('lista-excel')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, height: 32, background: '#1E3A8A' }}
+              title="Ver desglose completo de notas por colegio, curso y materia"
+            >
+              <FileSpreadsheet size={13} /> Vista Completa por Colegio
+            </button>
+          )}
         </div>
       </div>
 
@@ -784,7 +2015,7 @@ export function TeacherGradebookView() {
         <EmptyState
           icon={Award}
           title="Sin datos disponibles"
-          description="Los datos se reflejarán cuando se registren calificaciones."
+          description="Los datos se reflejaran cuando se registren calificaciones."
         />
       ) : (
         <div className="teams-table-container">
@@ -792,7 +2023,7 @@ export function TeacherGradebookView() {
             <thead>
               <tr>
                 <th>Estudiante</th>
-                <th>Matrícula</th>
+                <th>Matricula</th>
                 <th>Grado / Paralelo</th>
                 <th>Tareas Entregadas</th>
                 <th>Tareas Pendientes</th>
@@ -819,7 +2050,7 @@ export function TeacherGradebookView() {
                     </td>
                     <td>
                       <span style={{ fontWeight: 700, fontSize: '14px', color: noteColor }}>
-                        {s.promedio > 0 ? `${s.promedio}/100` : '—'}
+                        {s.promedio > 0 ? `${s.promedio}/100` : '-'}
                       </span>
                     </td>
                     <td>
@@ -832,7 +2063,7 @@ export function TeacherGradebookView() {
                         className="btn btn-outline btn-sm"
                         style={{ fontSize: 11, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                         onClick={() => setReportStudent(s)}
-                        title="Enviar reporte de desempeño académico"
+                        title="Enviar reporte de desempeno academico"
                       >
                         <Send size={11} /> Reporte
                       </button>
@@ -850,7 +2081,7 @@ export function TeacherGradebookView() {
         <Modal
           open={true}
           onClose={() => setReportStudent(null)}
-          title={`📊 Reporte Académico — ${reportStudent.nombre_completo}`}
+          title={`Reporte Académico — ${reportStudent.nombre_completo}`}
         >
           <SendReportModal
             student={reportStudent}
@@ -866,16 +2097,16 @@ export function TeacherGradebookView() {
 // MODAL: SEND ACADEMIC REPORT TO STUDENT
 // ============================================================
 function SendReportModal({ student, onClose }) {
-  const [asunto, setAsunto] = useState(`Reporte de Desempeño Académico - ${student.nombre_completo}`);
+  const [asunto, setAsunto] = useState(`Reporte de Desempeno Academico - ${student.nombre_completo}`);
   const [mensaje, setMensaje] = useState(
     `Estimado/a ${student.nombre_completo},\n\n` +
-    `Le informamos su situación académica actual:\n\n` +
-    `• Tareas entregadas: ${student.tareas_entregadas} de ${student.tareas_asignadas}\n` +
-    `• Tareas pendientes: ${student.tareas_pendientes}\n` +
-    `• Porcentaje de cumplimiento: ${student.porcentaje_cumplimiento}%\n` +
-    `• Promedio actual: ${student.promedio > 0 ? student.promedio + '/100' : 'Sin calificaciones aún'}\n` +
-    `• Estado académico: ${student.estado_academico}\n\n` +
-    `${student.riesgo_academico ? '⚠️ ATENCIÓN: El estudiante presenta indicadores de riesgo académico. Se recomienda atención adicional.\n\n' : ''}` +
+    `Le informamos su situacion académica actual:\n\n` +
+    `"¢ Tareas entregadas: ${student.tareas_entregadas} de ${student.tareas_asignadas}\n` +
+    `"¢ Tareas pendientes: ${student.tareas_pendientes}\n` +
+    `"¢ Porcentaje de cumplimiento: ${student.porcentaje_cumplimiento}%\n` +
+    `"¢ Promedio actual: ${student.promedio > 0 ? student.promedio + '/100' : 'Sin calificaciones Aún'}\n` +
+    `"¢ Estado academico: ${student.estado_academico}\n\n` +
+    `${student.riesgo_academico ? ' ATENCIN: El estudiante presenta indicadores de riesgo academico. Se recomienda atencion adicional.\n\n' : ''}` +
     `Saludos,\nEquipo Docente EduSmart`
   );
   const [incluirCalif, setIncluirCalif] = useState(true);
@@ -911,12 +2142,12 @@ function SendReportModal({ student, onClose }) {
           background: 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           margin: '0 auto 16px', fontSize: 28
-        }}>✅</div>
+        }}>[COMPLETADO]</div>
         <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#065F46', marginBottom: 6 }}>
-          ¡Reporte enviado exitosamente!
+          Reporte enviado exitosamente!
         </h3>
         <p style={{ color: '#616161', fontSize: '12.5px', marginBottom: 4 }}>
-          Se envió el informe de desempeño a:
+          Se envio el informe de desempeno a:
         </p>
         <p style={{ color: '#5B5FC7', fontWeight: 600, fontSize: '13px' }}>{student.email}</p>
         <button className="btn btn-secondary" style={{ marginTop: 18 }} onClick={onClose}>
@@ -947,7 +2178,7 @@ function SendReportModal({ student, onClose }) {
         <div>
           <div style={{ fontWeight: 700, fontSize: '13.5px', color: '#1E3A8A' }}>{student.nombre_completo}</div>
           <div style={{ fontSize: '11.5px', color: '#4B5563' }}>
-            📧 {student.email} · {student.matricula}
+             {student.email} - {student.matricula}
           </div>
         </div>
         {student.riesgo_academico && (
@@ -956,7 +2187,7 @@ function SendReportModal({ student, onClose }) {
             border: '1px solid #FECACA', borderRadius: 6,
             padding: '3px 8px', fontSize: '11px', fontWeight: 600
           }}>
-            ⚠️ Riesgo
+             Riesgo
           </span>
         )}
       </div>
@@ -964,7 +2195,7 @@ function SendReportModal({ student, onClose }) {
       {/* Metrics summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 18 }}>
         {[
-          { label: 'Promedio', value: student.promedio > 0 ? `${student.promedio}/100` : '—', color: getNoteColor(student.promedio) },
+          { label: 'Promedio', value: student.promedio > 0 ? `${student.promedio}/100` : '-', color: getNoteColor(student.promedio) },
           { label: 'Cumplimiento', value: `${student.porcentaje_cumplimiento}%`, color: student.porcentaje_cumplimiento >= 80 ? '#107C41' : '#CA5010' },
           { label: 'Pendientes', value: student.tareas_pendientes, color: student.tareas_pendientes > 0 ? '#CA5010' : '#616161' },
         ].map((m, i) => (
@@ -986,7 +2217,7 @@ function SendReportModal({ student, onClose }) {
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '12.5px', color: '#242424', cursor: 'pointer' }}>
           <input type="checkbox" checked={incluirProgreso} onChange={e => setIncluirProgreso(e.target.checked)} />
-          Incluir gráfico de progreso
+          Incluir grafico de progreso
         </label>
       </div>
 
@@ -1031,7 +2262,7 @@ function SendReportModal({ student, onClose }) {
 }
 
 // ============================================================
-// 5. TEACHER STUDENTS VIEW (SEGUIMIENTO ACADÉMICO)
+// 5. TEACHER STUDENTS VIEW (SEGUIMIENTO ACADMICO)
 // ============================================================
 export function TeacherStudentsView() {
   const [students, setStudents] = useState([]);
@@ -1057,10 +2288,10 @@ export function TeacherStudentsView() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#242424', marginBottom: 4 }}>
-            Seguimiento Académico de Estudiantes
+            Seguimiento Academico de Estudiantes
           </h2>
           <p style={{ color: '#616161', fontSize: '12.5px' }}>
-            Monitoreo del desempeño, ritmo de entrega y estado de riesgo académico. Envía reportes personalizados directamente al correo del estudiante.
+            Monitoreo del desempeno, ritmo de entrega y estado de riesgo academico. Envia reportes personalizados directamente al correo del estudiante.
           </p>
         </div>
         <div style={{ position: 'relative', width: 240 }}>
@@ -1078,7 +2309,7 @@ export function TeacherStudentsView() {
       {loading ? (
         <Loading text="Cargando expedientes de estudiantes..." />
       ) : filtered.length === 0 ? (
-        <EmptyState icon={Users} title="Sin resultados" description="No se encontró ningún estudiante con ese criterio." />
+        <EmptyState icon={Users} title="Sin resultados" description="No se encontro ningún estudiante con ese criterio." />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: 16 }}>
           {filtered.map(est => (
@@ -1102,7 +2333,7 @@ export function TeacherStudentsView() {
                     {est.nombre_completo}
                   </div>
                   <div style={{ fontSize: '11px', color: '#616161' }}>
-                    {est.matricula} · {est.grado} "{est.paralelo}"
+                    {est.matricula} - {est.grado} "{est.paralelo}"
                   </div>
                 </div>
                 <span className={`badge ${est.estado_academico === 'Excelente' ? 'badge-calificada' : est.estado_academico === 'Regular' ? 'badge-pendiente' : 'badge-vencida'}`}>
@@ -1124,13 +2355,13 @@ export function TeacherStudentsView() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: '11px', color: '#8A8886' }}>Promedio:</span>
                   <span style={{ fontWeight: 700, fontSize: '14px', color: getNoteColor(est.promedio) }}>
-                    {est.promedio > 0 ? `${est.promedio}/100` : '—'}
+                    {est.promedio > 0 ? `${est.promedio}/100` : '-'}
                   </span>
                 </div>
                 {est.riesgo_academico && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#B91C1C', fontSize: '11px', fontWeight: 600 }}>
                     <AlertTriangle size={12} />
-                    Riesgo académico
+                    Riesgo academico
                   </div>
                 )}
               </div>
@@ -1142,7 +2373,7 @@ export function TeacherStudentsView() {
                 onClick={() => setReportStudent(est)}
               >
                 <Send size={13} />
-                Enviar reporte de desempeño
+                Enviar reporte de desempeno
               </button>
             </div>
           ))}
@@ -1153,7 +2384,7 @@ export function TeacherStudentsView() {
       <Modal
         open={!!reportStudent}
         onClose={() => setReportStudent(null)}
-        title={`📊 Reporte Académico — ${reportStudent?.nombre_completo || ''}`}
+        title={`Reporte Académico — ${reportStudent?.nombre_completo || ''}`}
       >
         {reportStudent && (
           <SendReportModal
@@ -1167,7 +2398,7 @@ export function TeacherStudentsView() {
 }
 
 // ============================================================
-// 6. TEACHER REPORTS VIEW (REPORTES Y ANÁLISIS)
+// 6. TEACHER REPORTS VIEW (REPORTES Y ANLISIS)
 // ============================================================
 export function TeacherReportsView() {
   const [reports, setReports] = useState(null);
@@ -1180,17 +2411,17 @@ export function TeacherReportsView() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <Loading text="Generando reportes analíticos..." />;
+  if (loading) return <Loading text="Generando reportes analiticos..." />;
   if (!reports) return null;
 
   return (
     <div className="page-container">
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#242424', marginBottom: 4 }}>
-          Reportes y Estadísticas Académicas
+          Reportes y Estadisticas académicas
         </h2>
         <p style={{ color: '#616161', fontSize: '12.5px' }}>
-          Distribución de notas, cumplimiento institucional e indicadores globales de tus cursos.
+          Distribucion de notas, cumplimiento institucional e indicadores globales de tus cursos.
         </p>
       </div>
 
@@ -1220,7 +2451,7 @@ export function TeacherReportsView() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title"><BarChart2 size={16} /> Distribución de Calificaciones</span>
+          <span className="card-title"><BarChart2 size={16} /> Distribucion de Calificaciones</span>
         </div>
         <div className="card-body">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

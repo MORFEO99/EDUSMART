@@ -13,7 +13,7 @@ export default function CursoPage({ onNavigate, colegioId, cursoId }) {
       id: cursoId || 1,
       grado: '3ro',
       paralelo: 'A',
-      nivel: 'Bachillerato',
+      nivel: 'Secundaria',
       estudiantes: [
         { id: 1, nombre: 'Carlos Gómez', ru: 'EST-2023-001', progreso: 85, estado: 'Activo' },
         { id: 2, nombre: 'Ana Martínez', ru: 'EST-2023-002', progreso: 92, estado: 'Activo' },

@@ -4,7 +4,8 @@ import {
   User, LogOut, Plus, Bell, X, Check, ChevronRight, FileText,
   Clock, Award, MessageSquare, AlertCircle, AlertTriangle, UploadCloud,
   Download, Eye, Share2, Layers, BookOpen, Code, Database, Cpu, Menu,
-  CheckCircle2, ArrowRight, Building, Inbox, BarChart2, Search, Sparkles, Target
+  CheckCircle2, ArrowRight, Building, Inbox, BarChart2, Search, Sparkles, Target,
+  FileSpreadsheet
 } from 'lucide-react';
 
 // ============================================================
@@ -71,7 +72,7 @@ export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount 
     { id: 'espacios', label: 'Mis espacios', icon: BookOpen },
     { id: 'mis-tareas', label: 'Mis tareas', icon: CheckSquare },
     { id: 'resultados', label: 'Resultados', icon: TrendingUp },
-    { id: 'dashboard', label: 'Retos IA', icon: Target, highlight: true },
+    { id: 'retos', label: 'Retos IA', icon: Target, highlight: true },
   ];
 
   return (

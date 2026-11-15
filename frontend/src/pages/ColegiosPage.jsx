@@ -2,22 +2,23 @@ import React, { useState, useEffect } from 'react';
 import {
   Building, Plus, Users, BookOpen, Search, ArrowRight,
   ArrowLeft, ChevronRight, X, Layers, Calendar, User,
-  GraduationCap, FolderOpen, AlertCircle
+  GraduationCap, FolderOpen, AlertCircle, FileSpreadsheet
 } from 'lucide-react';
 import { Loading, EmptyState, Modal } from '../components';
 import { commonAPI, espaciosAPI } from '../api';
 import PanelInvitacion from '../components/PanelInvitacion';
+import ListaExcelDocente from './ListaExcelDocente';
 
 // ─────────────────────────────────────────────────────────────
 // Sub-panel: cursos de un colegio específico
 // ─────────────────────────────────────────────────────────────
-function CursosPanel({ colegio, onClose, onNavigate }) {
+function CursosPanel({ colegio, onClose, onNavigate, onOpenExcel }) {
   const [cursos, setCursos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const [showAddCurso, setShowAddCurso] = useState(false);
-  const [formCurso, setFormCurso] = useState({ grado: '', paralelo: '', nivel: 'Bachillerato', anio_lectivo: new Date().getFullYear().toString() });
+  const [formCurso, setFormCurso] = useState({ grado: '1ro de Secundaria', paralelo: '', nivel: 'Secundaria', anio_lectivo: new Date().getFullYear().toString() });
   
   const [showAddMateria, setShowAddMateria] = useState(null); // courseId
   const [formMateria, setFormMateria] = useState({ nombre: '', codigo: '', horas_semanales: 4 });
@@ -47,7 +48,7 @@ function CursosPanel({ colegio, onClose, onNavigate }) {
       };
       await commonAPI.crearCurso(colegio.id, dataToSend);
       setShowAddCurso(false);
-      setFormCurso({ grado: '', paralelo: '', nivel: 'Bachillerato', anio_lectivo: new Date().getFullYear().toString() });
+      setFormCurso({ grado: '1ro de Secundaria', paralelo: '', nivel: 'Secundaria', anio_lectivo: new Date().getFullYear().toString() });
       loadCursos();
     } catch (err) {
       alert(err.message);
@@ -193,7 +194,7 @@ function CursosPanel({ colegio, onClose, onNavigate }) {
                         {curso.grado} &ldquo;{curso.paralelo}&rdquo;
                       </div>
                       <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                        {curso.nivel || 'Bachillerato'} · {curso.anio_lectivo || '2026-2027'}
+                        {curso.nivel || 'Secundaria'} · {curso.anio_lectivo || '2026'}
                       </div>
                     </div>
                     <span style={{
@@ -273,6 +274,18 @@ function CursosPanel({ colegio, onClose, onNavigate }) {
                     background: '#F8FAFC'
                   }}>
                     <button
+                      className="btn btn-primary btn-sm"
+                      style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#1E3A8A' }}
+                      onClick={() => {
+                        onClose();
+                        if (onOpenExcel) onOpenExcel();
+                        else onNavigate('espacios', { tab: 'excel' });
+                      }}
+                      title="Ver lista de calificaciones y estados en formato Excel"
+                    >
+                      <FileSpreadsheet size={12} /> Lista de Estudiantes (Excel)
+                    </button>
+                    <button
                       className="btn btn-secondary btn-sm"
                       style={{ fontSize: 11 }}
                       onClick={() => {
@@ -280,7 +293,7 @@ function CursosPanel({ colegio, onClose, onNavigate }) {
                         onNavigate('teacher_courses', { colegioId: colegio.id, cursoId: curso.id });
                       }}
                     >
-                      <Users size={12} /> Ver estudiantes
+                      <Users size={12} /> Administrar curso
                     </button>
                   </div>
                 </div>
@@ -293,12 +306,58 @@ function CursosPanel({ colegio, onClose, onNavigate }) {
       <Modal open={showAddCurso} onClose={() => setShowAddCurso(false)} title="Añadir nuevo curso">
         <form onSubmit={handleCrearCurso}>
           <div className="form-group">
-            <label className="form-label">Grado / Nivel</label>
-            <input className="form-control" placeholder="Ej: 3ro Bachillerato" value={formCurso.grado} onChange={e => setFormCurso({...formCurso, grado: e.target.value})} required />
+            <label className="form-label">Nivel Educativo (Bolivia)</label>
+            <select
+              className="form-control"
+              value={formCurso.nivel}
+              onChange={e => {
+                const nivel = e.target.value;
+                const primerGrado = nivel === 'Primaria' ? '1ro de Primaria' : '1ro de Secundaria';
+                setFormCurso({ ...formCurso, nivel, grado: primerGrado });
+              }}
+            >
+              <option value="Secundaria">Educación Secundaria Comunitaria Productiva (1ro a 6to)</option>
+              <option value="Primaria">Educación Primaria Comunitaria Vocacional (1ro a 6to)</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Año de Escolaridad (Grado)</label>
+            <select
+              className="form-control"
+              value={formCurso.grado}
+              onChange={e => setFormCurso({ ...formCurso, grado: e.target.value })}
+              required
+            >
+              {formCurso.nivel === 'Primaria' ? (
+                <>
+                  <option value="1ro de Primaria">1ro de Primaria</option>
+                  <option value="2do de Primaria">2do de Primaria</option>
+                  <option value="3ro de Primaria">3ro de Primaria</option>
+                  <option value="4to de Primaria">4to de Primaria</option>
+                  <option value="5to de Primaria">5to de Primaria</option>
+                  <option value="6to de Primaria">6to de Primaria</option>
+                </>
+              ) : (
+                <>
+                  <option value="1ro de Secundaria">1ro de Secundaria</option>
+                  <option value="2do de Secundaria">2do de Secundaria</option>
+                  <option value="3ro de Secundaria">3ro de Secundaria</option>
+                  <option value="4to de Secundaria">4to de Secundaria</option>
+                  <option value="5to de Secundaria">5to de Secundaria</option>
+                  <option value="6to de Secundaria">6to de Secundaria</option>
+                </>
+              )}
+            </select>
           </div>
           <div className="form-group">
             <label className="form-label">Paralelo</label>
-            <input className="form-control" placeholder="Ej: A" value={formCurso.paralelo} onChange={e => setFormCurso({...formCurso, paralelo: e.target.value})} required />
+            <input
+              className="form-control"
+              placeholder="Ej: A, B, C"
+              value={formCurso.paralelo}
+              onChange={e => setFormCurso({ ...formCurso, paralelo: e.target.value.toUpperCase() })}
+              required
+            />
           </div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
             <button type="button" className="btn btn-secondary" onClick={() => setShowAddCurso(false)}>Cancelar</button>
@@ -335,7 +394,7 @@ function CursosPanel({ colegio, onClose, onNavigate }) {
 // Modal: Agregar nuevo colegio
 // ─────────────────────────────────────────────────────────────
 function AddColegioModal({ onClose, onSaved }) {
-  const [form, setForm] = useState({ nombre: '', ciudad: '', pais: 'Ecuador', direccion: '', telefono: '' });
+  const [form, setForm] = useState({ nombre: '', ciudad: '', pais: 'Bolivia', direccion: '', telefono: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -378,7 +437,7 @@ function AddColegioModal({ onClose, onSaved }) {
         </div>
         <div className="form-group">
           <label className="form-label">País</label>
-          <input className="form-control" placeholder="Ecuador" value={form.pais} onChange={e => setF('pais', e.target.value)} />
+          <input className="form-control" placeholder="Bolivia" value={form.pais} onChange={e => setF('pais', e.target.value)} />
         </div>
       </div>
       <div className="form-group">
@@ -400,9 +459,11 @@ function AddColegioModal({ onClose, onSaved }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Main: ColegiosPage
+// ─────────────────────────────────────────────────────────────
+// Main: ColegiosPage con Tabs integrados (Mis Colegios + Reportes)
 // ─────────────────────────────────────────────────────────────
 export default function ColegiosPage({ onNavigate }) {
+  const [activeTab, setActiveTab] = useState('colegios');
   const [colegios, setColegios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -423,117 +484,191 @@ export default function ColegiosPage({ onNavigate }) {
     c.nombre.toLowerCase().includes(search.toLowerCase())
   );
 
+  const TABS = [
+    { id: 'colegios', label: 'Mis Colegios y Cursos', emoji: '\u{1F3EB}' },
+    { id: 'reportes', label: 'Lista de Estudiantes y Reportes', emoji: '\u{1F4CA}' },
+  ];
+
   return (
     <div className="page-container">
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+      {/* ── Header ── */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>
-            Mis Colegios
+            Mis Espacios
           </h2>
           <p style={{ color: '#64748B', fontSize: 13 }}>
-            Instituciones educativas donde impartes clases. Selecciona un colegio para ver sus cursos.
+            Gestiona colegios, cursos y materias. Envía reportes de rendimiento académico a tus estudiantes.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowAddModal(true)} style={{ background: '#1E3A8A', flexShrink: 0 }}>
-          <Plus size={16} /> Añadir colegio
-        </button>
+        {activeTab === 'colegios' && (
+          <button className="btn btn-primary" onClick={() => setShowAddModal(true)} style={{ background: '#1E3A8A', flexShrink: 0 }}>
+            <Plus size={16} /> Añadir colegio
+          </button>
+        )}
       </div>
 
-      {/* Search */}
-      <div style={{ marginBottom: 20, position: 'relative', width: 320 }}>
-        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
-        <input
-          className="form-control"
-          placeholder="Buscar colegio..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ paddingLeft: 36 }}
-        />
+      {/* ── Tab Selector ── */}
+      <div style={{
+        display: 'flex', gap: 4, marginBottom: 24,
+        background: '#F1F5F9', borderRadius: 12, padding: 5,
+        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)'
+      }}>
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            id={`tab-${tab.id}`}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              flex: 1, padding: '11px 16px', borderRadius: 9, border: 'none',
+              fontSize: 13.5, fontWeight: activeTab === tab.id ? 700 : 500,
+              cursor: 'pointer', transition: 'all 0.18s',
+              background: activeTab === tab.id ? '#FFFFFF' : 'transparent',
+              color: activeTab === tab.id ? '#1E3A8A' : '#64748B',
+              boxShadow: activeTab === tab.id ? '0 2px 8px rgba(30,58,138,0.12)' : 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 16 }}>{tab.emoji}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* List */}
-      {loading ? (
-        <Loading text="Cargando tus colegios..." />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={Building}
-          title="No se encontraron colegios"
-          description={search ? `No hay resultados para "${search}".` : 'Aún no estás asignado a ningún colegio. Agrega uno para comenzar.'}
-          action={<button className="btn btn-primary" onClick={() => setShowAddModal(true)}><Plus size={14} /> Añadir colegio</button>}
-        />
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 18 }}>
-          {filtered.map(colegio => (
-            <div
-              key={colegio.id}
-              style={{
-                border: '1px solid #E2E8F0', borderRadius: 12,
-                background: '#FFFFFF', overflow: 'hidden',
-                display: 'flex', flexDirection: 'column',
-                transition: 'box-shadow 0.15s, border-color 0.15s'
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.boxShadow = '0 4px 20px rgba(30,58,138,0.12)';
-                e.currentTarget.style.borderColor = '#BFDBFE';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.boxShadow = 'none';
-                e.currentTarget.style.borderColor = '#E2E8F0';
-              }}
-            >
-              {/* Card Header */}
-              <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div style={{
-                  width: 52, height: 52, borderRadius: 10,
-                  background: 'linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)',
-                  color: 'white', display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', fontSize: 22, fontWeight: 700, flexShrink: 0
-                }}>
-                  {colegio.nombre.charAt(0)}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', margin: '0 0 4px 0', lineHeight: 1.3 }}>
-                    {colegio.nombre}
-                  </h3>
-                  <div style={{ fontSize: 12, color: '#64748B' }}>
-                    {[colegio.ciudad, colegio.pais].filter(Boolean).join(', ') || 'Ecuador'}
+      {/* ══ TAB 1: Mis Colegios y Cursos ══ */}
+      {activeTab === 'colegios' && (
+        <>
+          {/* Search */}
+          <div style={{ marginBottom: 20, position: 'relative', width: 320 }}>
+            <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
+            <input
+              className="form-control"
+              placeholder="Buscar colegio..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ paddingLeft: 36 }}
+            />
+          </div>
+
+          {/* Grid de colegios */}
+          {loading ? (
+            <Loading text="Cargando tus colegios..." />
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              icon={Building}
+              title="No se encontraron colegios"
+              description={search
+                ? `No hay resultados para "${search}".`
+                : 'Aún no estás asignado a ningún colegio. Agrega uno para comenzar.'}
+              action={
+                <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+                  <Plus size={14} /> Añadir colegio
+                </button>
+              }
+            />
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 18 }}>
+              {filtered.map(colegio => (
+                <div
+                  key={colegio.id}
+                  style={{
+                    border: '1px solid #E2E8F0', borderRadius: 12,
+                    background: '#FFFFFF', overflow: 'hidden',
+                    display: 'flex', flexDirection: 'column',
+                    transition: 'box-shadow 0.15s, border-color 0.15s'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(30,58,138,0.12)';
+                    e.currentTarget.style.borderColor = '#BFDBFE';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.borderColor = '#E2E8F0';
+                  }}
+                >
+                  {/* Card Header */}
+                  <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{
+                      width: 52, height: 52, borderRadius: 10,
+                      background: 'linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)',
+                      color: 'white', display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', fontSize: 22, fontWeight: 700, flexShrink: 0
+                    }}>
+                      {colegio.nombre.charAt(0)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', margin: '0 0 4px 0', lineHeight: 1.3 }}>
+                        {colegio.nombre}
+                      </h3>
+                      <div style={{ fontSize: 12, color: '#64748B' }}>
+                        {[colegio.ciudad, colegio.pais].filter(Boolean).join(', ') || 'Bolivia'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stats row */}
+                  <div style={{
+                    padding: '10px 20px', borderTop: '1px solid #F1F5F9',
+                    borderBottom: '1px solid #F1F5F9',
+                    display: 'flex', gap: 20, background: '#F8FAFC'
+                  }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748B' }}>
+                      <Layers size={14} color="#6366F1" />
+                      <strong style={{ color: '#1E293B' }}>{colegio.total_cursos ?? '\u2014'}</strong> cursos
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748B' }}>
+                      <Users size={14} color="#10B981" />
+                      <strong style={{ color: '#1E293B' }}>{colegio.total_estudiantes ?? '\u2014'}</strong> estudiantes
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748B' }}>
+                      <BookOpen size={14} color="#F59E0B" />
+                      <strong style={{ color: '#1E293B' }}>{colegio.total_materias ?? '\u2014'}</strong> materias
+                    </span>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div style={{ padding: '12px 16px', display: 'flex', gap: 8 }}>
+                    <button
+                      className="btn btn-primary"
+                      style={{ flex: 1, background: '#1E3A8A', fontSize: 13 }}
+                      onClick={() => onNavigate('colegio-detalle', { colegio })}
+                    >
+                      <GraduationCap size={15} /> Entrar al colegio
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ fontSize: 12, padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      onClick={() => setColegioSeleccionado(colegio)}
+                      title="Ver cursos y materias"
+                    >
+                      <FileSpreadsheet size={13} /> Cursos
+                    </button>
                   </div>
                 </div>
-              </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
-              {/* Stats */}
-              <div style={{
-                padding: '10px 20px', borderTop: '1px solid #F1F5F9',
-                borderBottom: '1px solid #F1F5F9',
-                display: 'flex', gap: 20, background: '#F8FAFC'
-              }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748B' }}>
-                  <Layers size={14} color="#6366F1" />
-                  <strong style={{ color: '#1E293B' }}>{colegio.total_cursos ?? '—'}</strong> cursos
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748B' }}>
-                  <Users size={14} color="#10B981" />
-                  <strong style={{ color: '#1E293B' }}>{colegio.total_estudiantes ?? '—'}</strong> estudiantes
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748B' }}>
-                  <BookOpen size={14} color="#F59E0B" />
-                  <strong style={{ color: '#1E293B' }}>{colegio.total_materias ?? '—'}</strong> materias
-                </span>
-              </div>
-
-              {/* Actions */}
-              <div style={{ padding: '12px 16px', display: 'flex', gap: 8 }}>
-                <button
-                  className="btn btn-primary"
-                  style={{ flex: 1, background: '#1E3A8A', fontSize: 13 }}
-                  onClick={() => onNavigate('colegio-detalle', { colegio })}
-                >
-                  <GraduationCap size={15} /> Entrar al colegio
-                </button>
+      {/* ══ TAB 2: Lista de Estudiantes y Reportes ══ */}
+      {activeTab === 'reportes' && (
+        <div>
+          <div style={{
+            padding: '12px 16px', marginBottom: 16,
+            background: 'linear-gradient(135deg, #EFF6FF 0%, #F0F4FF 100%)',
+            borderRadius: 10, border: '1px solid #BFDBFE',
+            display: 'flex', alignItems: 'center', gap: 10, fontSize: 13
+          }}>
+            <FileSpreadsheet size={20} color="#1E3A8A" />
+            <div>
+              <div style={{ fontWeight: 700, color: '#1E3A8A' }}>Lista de Estudiantes por Colegio, Curso y Materia</div>
+              <div style={{ color: '#475569', fontSize: 12 }}>
+                Selecciona el colegio, luego el curso y la materia para ver las calificaciones y enviar reportes individuales o grupales.
               </div>
             </div>
-          ))}
+          </div>
+          <ListaExcelDocente onNavigate={onNavigate} />
         </div>
       )}
 
@@ -549,12 +684,13 @@ export default function ColegiosPage({ onNavigate }) {
         />
       </Modal>
 
-      {/* Side panel: cursos del colegio */}
+      {/* Panel lateral: cursos del colegio seleccionado */}
       {colegioSeleccionado && (
         <CursosPanel
           colegio={colegioSeleccionado}
           onClose={() => setColegioSeleccionado(null)}
           onNavigate={onNavigate}
+          onOpenExcel={() => setActiveTab('reportes')}
         />
       )}
     </div>

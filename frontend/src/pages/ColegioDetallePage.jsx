@@ -12,8 +12,36 @@ import PanelInvitacion from '../components/PanelInvitacion';
 // Form: Crear Curso
 // ─────────────────────────────────────────────────────────────
 function FormCrearCurso({ colegioId, onClose, onSaved }) {
-  const [form, setForm] = useState({ grado: '', paralelo: '', nivel: 'Bachillerato', anio_lectivo: new Date().getFullYear().toString() });
+  const [form, setForm] = useState({
+    nivel: 'Secundaria',
+    grado: '1ro de Secundaria',
+    paralelo: 'A',
+    anio_lectivo: new Date().getFullYear().toString()
+  });
   const [loading, setLoading] = useState(false);
+
+  const GRADOS_SECUNDARIA = [
+    '1ro de Secundaria',
+    '2do de Secundaria',
+    '3ro de Secundaria',
+    '4to de Secundaria',
+    '5to de Secundaria',
+    '6to de Secundaria'
+  ];
+
+  const GRADOS_PRIMARIA = [
+    '1ro de Primaria',
+    '2do de Primaria',
+    '3ro de Primaria',
+    '4to de Primaria',
+    '5to de Primaria',
+    '6to de Primaria'
+  ];
+
+  const handleNivelChange = (nuevoNivel) => {
+    const primerGrado = nuevoNivel === 'Primaria' ? '1ro de Primaria' : '1ro de Secundaria';
+    setForm({ ...form, nivel: nuevoNivel, grado: primerGrado });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,32 +61,61 @@ function FormCrearCurso({ colegioId, onClose, onSaved }) {
     }
   };
 
+  const listaGrados = form.nivel === 'Primaria' ? GRADOS_PRIMARIA : GRADOS_SECUNDARIA;
+
   return (
     <form onSubmit={handleSubmit}>
       <div className="form-group">
-        <label className="form-label">Grado / Nivel *</label>
-        <input className="form-control" placeholder="Ej: 3ro Bachillerato" value={form.grado} onChange={e => setForm({ ...form, grado: e.target.value })} required />
-      </div>
-      <div className="form-group">
-        <label className="form-label">Paralelo *</label>
-        <input className="form-control" placeholder="Ej: A" value={form.paralelo} onChange={e => setForm({ ...form, paralelo: e.target.value })} required />
-      </div>
-      <div className="form-group">
-        <label className="form-label">Nivel</label>
-        <select className="form-control" value={form.nivel} onChange={e => setForm({ ...form, nivel: e.target.value })}>
-          <option>Básica Elemental</option>
-          <option>Básica Media</option>
-          <option>Básica Superior</option>
-          <option>Bachillerato</option>
+        <label className="form-label">Nivel Educativo (Bolivia) *</label>
+        <select
+          className="form-control"
+          value={form.nivel}
+          onChange={e => handleNivelChange(e.target.value)}
+        >
+          <option value="Secundaria">Educación Secundaria Comunitaria Productiva (1ro a 6to)</option>
+          <option value="Primaria">Educación Primaria Comunitaria Vocacional (1ro a 6to)</option>
         </select>
       </div>
+
       <div className="form-group">
-        <label className="form-label">Año lectivo</label>
-        <input className="form-control" value={form.anio_lectivo} onChange={e => setForm({ ...form, anio_lectivo: e.target.value })} />
+        <label className="form-label">Año de Escolaridad (Grado) *</label>
+        <select
+          className="form-control"
+          value={form.grado}
+          onChange={e => setForm({ ...form, grado: e.target.value })}
+          required
+        >
+          {listaGrados.map(g => (
+            <option key={g} value={g}>{g}</option>
+          ))}
+        </select>
       </div>
+
+      <div className="form-group">
+        <label className="form-label">Paralelo *</label>
+        <input
+          className="form-control"
+          placeholder="Ej: A, B, C"
+          value={form.paralelo}
+          onChange={e => setForm({ ...form, paralelo: e.target.value.toUpperCase() })}
+          required
+        />
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Gestión / Año Lectivo</label>
+        <input
+          className="form-control"
+          value={form.anio_lectivo}
+          onChange={e => setForm({ ...form, anio_lectivo: e.target.value })}
+        />
+      </div>
+
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
         <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-        <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Creando...' : 'Crear curso'}</button>
+        <button type="submit" className="btn btn-primary" disabled={loading}>
+          {loading ? 'Creando...' : 'Crear curso'}
+        </button>
       </div>
     </form>
   );
@@ -157,7 +214,7 @@ export default function ColegioDetallePage({ colegio, onBack, onNavigate }) {
         <div style={{ flex: 1 }}>
           <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 4px' }}>{colegio.nombre}</h2>
           <div style={{ fontSize: 13, opacity: 0.75 }}>
-            {[colegio.ciudad, colegio.pais].filter(Boolean).join(', ') || 'Ecuador'}
+            {[colegio.ciudad, colegio.pais].filter(Boolean).join(', ') || 'Bolivia'}
             {colegio.direccion && ` · ${colegio.direccion}`}
           </div>
         </div>
@@ -228,7 +285,7 @@ export default function ColegioDetallePage({ colegio, onBack, onNavigate }) {
                       {curso.grado} &ldquo;{curso.paralelo}&rdquo;
                     </div>
                     <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                      {curso.nivel || 'Bachillerato'} · {curso.anio_lectivo}
+                      {curso.nivel || 'Secundaria'} · {curso.anio_lectivo || '2026'}
                       &nbsp;·&nbsp;
                       <span style={{ color: '#1E3A8A', fontWeight: 600 }}>
                         {curso.materias?.length || 0} materia{curso.materias?.length !== 1 ? 's' : ''}
