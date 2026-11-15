@@ -181,12 +181,11 @@ export function Topbar({
     <header className="topbar">
       <div className="topbar-left">
         <button
-          className="btn-icon mobile-only"
+          className="btn-icon mobile-menu-btn"
           onClick={onToggleMobileMenu}
           aria-label="Abrir menú"
-          style={{ display: 'none' }}
         >
-          <Menu size={18} />
+          <Menu size={20} />
         </button>
 
         <div className="topbar-title">
@@ -196,7 +195,7 @@ export function Topbar({
       </div>
 
       {/* Global Search Bar */}
-      <div style={{ flex: 1, maxWidth: 360, margin: '0 20px', position: 'relative' }}>
+      <div className="topbar-search-container" style={{ flex: 1, maxWidth: 360, margin: '0 20px', position: 'relative' }}>
         <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
         <input
           type="text"

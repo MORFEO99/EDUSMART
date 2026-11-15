@@ -1219,35 +1219,210 @@ span.required {
 }
 
 /* ==========================================================================
-   RESPONSIVE LAYOUT
+   RESPONSIVE LAYOUT (DESKTOP, TABLET & MOBILE)
    ========================================================================== */
 
+/* Auth Layout Styles */
+.auth-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #F8FAFC;
+}
+
+.auth-banner {
+  background: #0B192C;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 40px;
+  color: #FFFFFF;
+  text-align: center;
+}
+
+.auth-form-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 32px;
+}
+
+.auth-form-container {
+  width: 100%;
+  max-width: 420px;
+}
+
+/* Landing Hero Grid */
+.landing-hero-container {
+  flex: 1;
+  max-width: 1240px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 48px 32px;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.landing-features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 18px;
+}
+
+/* Mobile Menu Button */
+.mobile-menu-btn {
+  display: none;
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 6px;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+/* Responsive Table Wrapper */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* --------------------------------------------------------------------------
+   MOBILE & TABLET BREAKPOINTS (<= 860px)
+   -------------------------------------------------------------------------- */
 @media (max-width: 860px) {
+  /* Auth Screen Mobile Adaptation */
+  .auth-layout {
+    grid-template-columns: 1fr;
+    min-height: 100vh;
+  }
+
+  .auth-banner {
+    padding: 24px 20px 20px;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .auth-banner h2 {
+    font-size: 20px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .auth-banner-desc,
+  .auth-banner-footer {
+    display: none !important;
+  }
+
+  .auth-illustration-wrap {
+    max-width: 260px !important;
+    max-height: 150px;
+    margin: 8px auto 0 !important;
+  }
+
+  .auth-form-wrapper {
+    padding: 24px 16px 40px !important;
+  }
+
+  .auth-form-container {
+    max-width: 100% !important;
+  }
+
+  /* Landing Screen Mobile */
+  .landing-hero-container {
+    grid-template-columns: 1fr;
+    padding: 24px 16px;
+    gap: 28px;
+  }
+
+  .landing-features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Navigation & Sidebar Mobile */
   .sidebar {
     position: fixed;
-    left: -260px;
+    left: -270px;
     top: 0;
     bottom: 0;
-    box-shadow: var(--shadow-lg);
+    width: 270px;
+    z-index: 100;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    transition: left 0.28s ease-in-out;
   }
 
   .sidebar.open {
     left: 0;
   }
 
+  .mobile-menu-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .topbar-search-container {
+    display: none !important;
+  }
+
   .topbar {
-    padding: 0 16px;
+    padding: 0 12px;
+    height: 56px;
+  }
+
+  .topbar-title h2 {
+    font-size: 14.5px;
+  }
+
+  .topbar-title p {
+    display: none;
   }
 
   .main-view-wrapper {
-    padding: 16px;
+    padding: 14px 12px;
   }
 
+  /* Dashboard Grids Mobile */
   .kpi-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .spaces-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* Modals on Mobile */
+  .modal-dialog,
+  .modal-content {
+    max-width: 95vw !important;
+    width: 95vw !important;
+    margin: 12px auto !important;
+    padding: 16px !important;
+  }
+
+  /* Button Touch Targets */
+  .btn {
+    min-height: 40px;
+  }
+}
+
+/* Small Smartphone Adaptation (<= 480px) */
+@media (max-width: 480px) {
+  .auth-banner h2 {
+    font-size: 18px !important;
+  }
+
+  .auth-illustration-wrap {
+    display: none; /* Hide heavy illustration on very small screens for speed and simplicity */
+  }
+
+  .topbar-right .topbar-action-btn span {
+    display: none;
   }
 }

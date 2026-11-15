@@ -34,11 +34,7 @@ export function LandingPage({ onGoToLogin, onGoToRegister }) {
       </nav>
 
       {/* Hero Container */}
-      <div style={{
-        flex: 1, maxWidth: 1240, margin: '0 auto', width: '100%',
-        padding: '48px 32px', display: 'grid', gridTemplateColumns: '1.05fr 0.95fr',
-        gap: 48, alignItems: 'center'
-      }}>
+      <div className="landing-hero-container">
         <div>
           {/* Badge */}
           <div style={{
@@ -107,7 +103,7 @@ export function LandingPage({ onGoToLogin, onGoToRegister }) {
           </div>
 
           {/* Micro Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginTop: 18 }}>
+          <div className="landing-features-grid">
             {[
               { label: 'Ciclo Completo', value: '6 Etapas', color: '#0284C7' },
               { label: 'Interacción', value: 'Directa', color: '#10B981' },
@@ -172,25 +168,21 @@ export function LoginPage({ onLoginSuccess, onGoToRegister, onGoToLanding }) {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#F8FAFC' }}>
+    <div className="auth-layout">
       {/* Left Banner */}
-      <div style={{
-        background: '#0B192C', borderRight: '1px solid rgba(255,255,255,0.08)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        padding: '48px 40px', color: '#FFFFFF', textAlign: 'center'
-      }}>
-        <div style={{ marginBottom: 24, cursor: 'pointer' }} onClick={onGoToLanding}>
-          <EdusmartLogo size={48} />
+      <div className="auth-banner">
+        <div style={{ marginBottom: 20, cursor: 'pointer' }} onClick={onGoToLanding}>
+          <EdusmartLogo size={44} />
         </div>
 
-        <h2 style={{ fontSize: 24, fontWeight: 800, color: '#FFFFFF', marginBottom: 8 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: '#FFFFFF', marginBottom: 8 }}>
           Espacio Personal Académico
         </h2>
-        <p style={{ fontSize: 13.5, color: '#94A3B8', maxWidth: 400, lineHeight: 1.5, marginBottom: 28 }}>
+        <p className="auth-banner-desc" style={{ fontSize: 13.5, color: '#94A3B8', maxWidth: 400, lineHeight: 1.5, marginBottom: 24 }}>
           Ingresa a tu cuenta para consultar tareas asignadas, presentar entregas y revisar calificaciones con retroalimentación.
         </p>
 
-        <div style={{
+        <div className="auth-illustration-wrap" style={{
           borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)',
           maxWidth: 440, width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.4)'
         }}>
@@ -201,14 +193,14 @@ export function LoginPage({ onLoginSuccess, onGoToRegister, onGoToLanding }) {
           />
         </div>
 
-        <div style={{ marginTop: 24, fontSize: 12, color: '#64748B' }}>
+        <div className="auth-banner-footer" style={{ marginTop: 20, fontSize: 12, color: '#64748B' }}>
           Interacción exclusiva Docente ↔ Estudiante
         </div>
       </div>
 
       {/* Right Login Form */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 32px' }}>
-        <div style={{ width: '100%', maxWidth: 420 }}>
+      <div className="auth-form-wrapper">
+        <div className="auth-form-container">
           <div style={{ marginBottom: 24 }}>
             <h2 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', marginBottom: 6 }}>
               Iniciar sesión

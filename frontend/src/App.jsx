@@ -66,6 +66,7 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showTeacherCreate, setShowTeacherCreate] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Check auth session on load
   useEffect(() => {
@@ -100,6 +101,7 @@ export default function App() {
   };
 
   const handleNavigate = (newSection, data = {}) => {
+    setSidebarOpen(false);
     if (newSection === 'crear-tarea' && authState.user?.rol === 'DOCENTE') {
       setShowTeacherCreate(true);
       return;
@@ -229,6 +231,8 @@ export default function App() {
         onNavigate={handleNavigate}
         onLogout={handleLogout}
         notifCount={unreadCount}
+        isOpen={sidebarOpen}
+        onCloseMobile={() => setSidebarOpen(false)}
       />
 
       <div className="app-content">
@@ -240,6 +244,7 @@ export default function App() {
           notifCount={unreadCount}
           onOpenNotifications={() => setShowNotifs(!showNotifs)}
           onNavigate={handleNavigate}
+          onToggleMobileMenu={() => setSidebarOpen(prev => !prev)}
         />
 
         {showNotifs && (
