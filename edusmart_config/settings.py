@@ -31,7 +31,11 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-iz*w2-5=)(akuo=ht+r%8
 # On Render it will be False, locally it will be True unless overridden
 DEBUG = os.environ.get('RENDER', '') == ''
 
-ALLOWED_HOSTS = ['*'] # En producción en Render puedes poner tu dominio .onrender.com
+allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '')
+if allowed_hosts_env:
+    ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_env.split(',') if h.strip()]
+else:
+    ALLOWED_HOSTS = ['*'] if DEBUG else ['edusmart-ku23.onrender.com', '.onrender.com', 'localhost', '127.0.0.1']
 
 # Integración con Modelos de Inteligencia Artificial (Google Gemini / OpenAI)
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
@@ -49,8 +53,16 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'drf_spectacular',
     'core',
 ]
+
+# Almacenamiento persistente en la nube (Cloudinary) si está configurado
+CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL', '')
+if CLOUDINARY_URL:
+    INSTALLED_APPS.insert(INSTALLED_APPS.index('django.contrib.staticfiles'), 'cloudinary_storage')
+    INSTALLED_APPS.append('cloudinary')
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 AUTH_USER_MODEL = 'core.Usuario'
 
@@ -77,7 +89,29 @@ REST_FRAMEWORK = {
         'core.authentication.CsrfExemptSessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'EduSmart Academic API',
+    'DESCRIPTION': 'Documentación interactiva OpenAPI 3.0 de la plataforma educativa EduSmart (Gestión de Tareas, Calificaciones, Espacios y Simuladores IA).',
+    'VERSION': '2.1.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
+
+# ==============================================================
+# EMAIL SETTINGS (SMTP)
+# ==============================================================
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
+)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'EduSmart <noreply@edusmart.edu>')
 
 ROOT_URLCONF = 'edusmart_config.urls'
 

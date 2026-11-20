@@ -24,3 +24,14 @@ dist/
 .vscode/
 .idea/
 *.swp
+
+# Scratch / Demo temporales
+scratch/frames/
+scratch/*.mp4
+scratch/*.avi
+*.mp4
+*.avi
+demo_edusmart.mp4
+EJECUTAR_COMO_ADMIN.bat
+GRABAR_VIDEO_DEMO.bat
+record_demo.ps1

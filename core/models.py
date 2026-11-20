@@ -2,6 +2,12 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 from django.db.models import Avg, Count, Q
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.exceptions import ValidationError
+from .validators import (
+    validate_grade, validate_file_size, validate_file_extension,
+    validate_image_size, validate_image_extension
+)
 
 
 class Usuario(AbstractUser):
@@ -245,7 +251,7 @@ class Rubrica(models.Model):
     nombre = models.CharField(max_length=200)
     descripcion = models.TextField(blank=True)
     docente = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='rubricas')
-    puntaje_total = models.IntegerField(default=100)
+    puntaje_total = models.IntegerField(default=100, validators=[MinValueValidator(1), MaxValueValidator(100)])
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -260,7 +266,7 @@ class CriterioRubrica(models.Model):
     rubrica = models.ForeignKey(Rubrica, on_delete=models.CASCADE, related_name='criterios')
     nombre = models.CharField(max_length=200)
     descripcion = models.TextField(blank=True)
-    puntaje_maximo = models.IntegerField(default=20)
+    puntaje_maximo = models.IntegerField(default=20, validators=[MinValueValidator(1)])
     orden = models.IntegerField(default=0)
 
     class Meta:
@@ -279,7 +285,7 @@ class Tarea(models.Model):
     titulo = models.CharField(max_length=200)
     descripcion = models.TextField()
     indicaciones = models.TextField(blank=True)
-    puntaje_maximo = models.IntegerField(default=100)
+    puntaje_maximo = models.IntegerField(default=100, validators=[MinValueValidator(1), MaxValueValidator(100)])
     fecha_publicacion = models.DateTimeField(default=timezone.now)
     fecha_limite = models.DateTimeField()
     estado = models.CharField(max_length=20, choices=ESTADOS, default='PUBLICADA')
@@ -290,6 +296,11 @@ class Tarea(models.Model):
 
     def __str__(self):
         return f"{self.titulo} ({self.espacio.nombre})"
+
+    def clean(self):
+        super().clean()
+        if self.fecha_limite and self.fecha_publicacion and self.fecha_limite < self.fecha_publicacion:
+            raise ValidationError({'fecha_limite': 'La fecha límite no puede ser anterior a la fecha de publicación.'})
 
     @property
     def esta_vencida(self):
@@ -302,7 +313,7 @@ class Material(models.Model):
     tarea = models.ForeignKey(Tarea, on_delete=models.CASCADE, related_name='materiales')
     nombre = models.CharField(max_length=150)
     tipo = models.CharField(max_length=30, choices=TIPOS, default='PDF')
-    archivo = models.FileField(upload_to='materiales/', null=True, blank=True)
+    archivo = models.FileField(upload_to='materiales/', null=True, blank=True, validators=[validate_file_size, validate_file_extension])
     archivo_url = models.CharField(max_length=500, blank=True)
     tamano = models.CharField(max_length=30, default='1.2 MB')
 
@@ -329,7 +340,7 @@ class Entrega(models.Model):
     tarea = models.ForeignKey(Tarea, on_delete=models.CASCADE, related_name='entregas')
     estudiante = models.ForeignKey(Estudiante, on_delete=models.CASCADE, related_name='entregas')
     fecha_entrega = models.DateTimeField(default=timezone.now)
-    archivo = models.FileField(upload_to='entregas/', null=True, blank=True)
+    archivo = models.FileField(upload_to='entregas/', null=True, blank=True, validators=[validate_file_size, validate_file_extension])
     archivo_url = models.CharField(max_length=500, blank=True)
     archivo_nombre = models.CharField(max_length=255, blank=True)
     archivo_tamano = models.CharField(max_length=30, blank=True, default='1.8 MB')
@@ -361,7 +372,7 @@ class VersionEntrega(models.Model):
     comentario = models.TextField(blank=True)
     fecha_envio = models.DateTimeField(default=timezone.now)
     estado = models.CharField(max_length=30, default='ENTREGADO')
-    nota = models.FloatField(null=True, blank=True)
+    nota = models.FloatField(null=True, blank=True, validators=[validate_grade])
     retroalimentacion = models.TextField(blank=True)
 
     class Meta:
@@ -374,7 +385,7 @@ class VersionEntrega(models.Model):
 
 class Calificacion(models.Model):
     entrega = models.OneToOneField(Entrega, on_delete=models.CASCADE, related_name='calificacion')
-    nota = models.FloatField()
+    nota = models.FloatField(validators=[validate_grade])
     fecha_calificacion = models.DateTimeField(default=timezone.now)
     docente = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='calificaciones')
 
@@ -541,7 +552,7 @@ class RecursoEspacio(models.Model):
     titulo = models.CharField(max_length=200)
     descripcion = models.TextField(blank=True)
     tipo = models.CharField(max_length=30, choices=TIPOS, default='PDF')
-    archivo = models.FileField(upload_to='recursos_espacio/', null=True, blank=True)
+    archivo = models.FileField(upload_to='recursos_espacio/', null=True, blank=True, validators=[validate_file_size, validate_file_extension])
     archivo_url = models.CharField(max_length=500, blank=True)
     enlace_url = models.CharField(max_length=500, blank=True)
     tamano = models.CharField(max_length=30, blank=True, default='1.5 MB')
@@ -576,7 +587,7 @@ class PlantillaTarea(models.Model):
     titulo = models.CharField(max_length=200)
     descripcion = models.TextField()
     indicaciones = models.TextField(blank=True)
-    puntaje_maximo = models.IntegerField(default=100)
+    puntaje_maximo = models.IntegerField(default=100, validators=[MinValueValidator(1), MaxValueValidator(100)])
     criterios_json = models.TextField(blank=True, default='[]')
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 

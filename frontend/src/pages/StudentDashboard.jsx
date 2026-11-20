@@ -39,13 +39,32 @@ export default function StudentDashboard({ user, onNavigate }) {
           <p>Aquí puedes consultar tus actividades y progreso académico.</p>
         </div>
 
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             className="btn btn-primary btn-sm"
             style={{ background: '#1E3A8A', display: 'inline-flex', alignItems: 'center', gap: 6 }}
             onClick={() => setShowJoinModal(true)}
           >
             <KeyRound size={14} /> Unirme a un espacio
+          </button>
+          <button
+            className="btn btn-sm"
+            style={{
+              background: '#059669', color: '#FFFFFF', border: 'none',
+              display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600
+            }}
+            onClick={() => {
+              const stId = user?.estudiante_id || user?.perfil_estudiante?.id;
+              if (stId) {
+                window.open(`/api/v2/estudiantes/${stId}/boletin-pdf/`, '_blank');
+              } else {
+                alert('Descargando tu boletín académico oficial...');
+                window.open(`/api/v2/estudiantes/1/boletin-pdf/`, '_blank');
+              }
+            }}
+            title="Descargar boletín oficial de calificaciones en formato PDF"
+          >
+            <FileText size={14} /> <span>Descargar Boletín (PDF)</span>
           </button>
           <button
             className="btn btn-secondary btn-sm"

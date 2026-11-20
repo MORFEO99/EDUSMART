@@ -13,6 +13,8 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from django.shortcuts import get_object_or_404
+from django.http import HttpResponse
+from .pdf_service import generate_course_gradebook_pdf
 
 from django.db import transaction
 
@@ -1899,3 +1901,24 @@ def api_materias_con_temas(request):
             'cursos': list(cd['cursos'].values()),
         })
     return Response(output)
+
+
+@api_view(['GET'])
+def api_descargar_boletin_curso(request, curso_id):
+    """
+    Genera y descarga el cuadro de calificaciones oficial de un curso en PDF.
+    Acceso restringido a docentes de la institución y administradores.
+    """
+    user = request.user
+    if not user.is_authenticated:
+        return Response({'error': 'Autenticación requerida.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if user.rol not in ['DOCENTE', 'ADMIN']:
+        return Response({'error': 'Solo docentes y directores tienen permiso para descargar el boletín general del curso.'}, status=status.HTTP_403_FORBIDDEN)
+
+    curso = get_object_or_404(Curso, id=curso_id)
+    pdf_buffer = generate_course_gradebook_pdf(curso)
+    safe_name = f"cuadro_calificaciones_{curso.grado}_{curso.seccion}_{timezone.now().strftime('%Y%m%d')}.pdf".replace(' ', '_')
+    response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{safe_name}"'
+    return response

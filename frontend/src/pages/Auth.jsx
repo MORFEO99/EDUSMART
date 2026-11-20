@@ -135,6 +135,88 @@ export function LoginPage({ onLoginSuccess, onGoToRegister, onGoToLanding }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState('');
+  const [forgotErr, setForgotErr] = useState('');
+
+  // Restablecimiento desde enlace recibido por correo
+  const [resetData, setResetData] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const uid = params.get('reset_uid');
+    const token = params.get('reset_token');
+    return uid && token ? { uid, token } : null;
+  });
+  const [newPass, setNewPass] = useState('');
+  const [newPassConfirm, setNewPassConfirm] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMsg, setResetMsg] = useState('');
+  const [resetErr, setResetErr] = useState('');
+
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    const mailToUse = forgotEmail.trim() || email.trim();
+    if (!mailToUse || !mailToUse.includes('@')) {
+      setForgotErr('Por favor ingresa un correo electrónico válido.');
+      return;
+    }
+    setForgotErr('');
+    setForgotMsg('');
+    setForgotLoading(true);
+    try {
+      const res = await fetch('/api/auth/password-reset-request/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: mailToUse })
+      });
+      const data = await res.json();
+      setForgotMsg(data.message || 'Instrucciones enviadas si el correo está registrado.');
+    } catch (err) {
+      setForgotErr('Error al contactar con el servidor. Inténtalo nuevamente.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleResetSubmit = async (e) => {
+    e.preventDefault();
+    if (!newPass || newPass.length < 6) {
+      setResetErr('La nueva contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (newPass !== newPassConfirm) {
+      setResetErr('Las contraseñas no coinciden.');
+      return;
+    }
+    setResetErr('');
+    setResetLoading(true);
+    try {
+      const res = await fetch('/api/auth/password-reset-confirm/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: resetData.uid,
+          token: resetData.token,
+          new_password: newPass
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResetErr(data.error || 'Error al actualizar contraseña.');
+      } else {
+        setResetMsg(data.message || 'Contraseña actualizada con éxito.');
+        // Limpiar URL query params
+        window.history.replaceState({}, document.title, window.location.pathname);
+        setTimeout(() => {
+          setResetData(null);
+        }, 2500);
+      }
+    } catch (err) {
+      setResetErr('Error de conexión.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -367,21 +449,94 @@ export function LoginPage({ onLoginSuccess, onGoToRegister, onGoToLanding }) {
         </div>
       </div>
 
+      {/* Modal para establecer nueva contraseña si se accedió por enlace seguro */}
+      {resetData && (
+        <Modal open={true} onClose={() => setResetData(null)} title="Restablecer Nueva Contraseña">
+          {resetMsg ? (
+            <div style={{ padding: '16px', background: '#ECFDF5', color: '#065F46', borderRadius: 8, fontSize: 14 }}>
+              ✅ {resetMsg}
+            </div>
+          ) : (
+            <form onSubmit={handleResetSubmit}>
+              <p style={{ fontSize: 13.5, color: '#475569', marginBottom: 16 }}>
+                Ingresa y confirma tu nueva contraseña para tu cuenta de EduSmart:
+              </p>
+              {resetErr && (
+                <div style={{ padding: '10px 12px', background: '#FEF2F2', color: '#991B1B', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+                  ⚠️ {resetErr}
+                </div>
+              )}
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label">Nueva Contraseña:</label>
+                <input
+                  className="form-control"
+                  type="password"
+                  placeholder="Mínimo 6 caracteres"
+                  value={newPass}
+                  onChange={(e) => setNewPass(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 16 }}>
+                <label className="form-label">Confirmar Nueva Contraseña:</label>
+                <input
+                  className="form-control"
+                  type="password"
+                  placeholder="Repite la contraseña"
+                  value={newPassConfirm}
+                  onChange={(e) => setNewPassConfirm(e.target.value)}
+                  required
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setResetData(null)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={resetLoading}>
+                  {resetLoading ? 'Guardando...' : 'Cambiar Contraseña'}
+                </button>
+              </div>
+            </form>
+          )}
+        </Modal>
+      )}
+
       {/* Forgot Password Modal */}
-      <Modal open={showForgotModal} onClose={() => setShowForgotModal(false)} title="Recuperación de Contraseña">
-        <p style={{ fontSize: 13.5, color: '#475569', marginBottom: 16 }}>
-          Para restablecer tu contraseña, ingresa tu correo electrónico registrado y te enviaremos las instrucciones de recuperación.
-        </p>
-        <div className="form-group">
-          <label className="form-label">Correo registrado:</label>
-          <input className="form-control" type="email" placeholder="usuario@edusmart.edu" defaultValue={email} />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-          <button className="btn btn-secondary" onClick={() => setShowForgotModal(false)}>Cerrar</button>
-          <button className="btn btn-primary" onClick={() => { alert('Se han enviado las instrucciones a tu correo.'); setShowForgotModal(false); }}>
-            Enviar enlace
-          </button>
-        </div>
+      <Modal open={showForgotModal} onClose={() => { setShowForgotModal(false); setForgotMsg(''); setForgotErr(''); }} title="Recuperación de Contraseña">
+        <form onSubmit={handleForgotSubmit}>
+          <p style={{ fontSize: 13.5, color: '#475569', marginBottom: 16 }}>
+            Para restablecer tu contraseña, ingresa tu correo electrónico registrado y te enviaremos un enlace seguro temporal.
+          </p>
+          {forgotMsg && (
+            <div style={{ padding: '12px 14px', background: '#ECFDF5', color: '#065F46', borderRadius: 8, fontSize: 13.5, marginBottom: 14 }}>
+              ✉️ {forgotMsg}
+            </div>
+          )}
+          {forgotErr && (
+            <div style={{ padding: '10px 12px', background: '#FEF2F2', color: '#991B1B', borderRadius: 8, fontSize: 13, marginBottom: 14 }}>
+              ⚠️ {forgotErr}
+            </div>
+          )}
+          <div className="form-group">
+            <label className="form-label">Correo registrado:</label>
+            <input
+              className="form-control"
+              type="email"
+              placeholder="usuario@edusmart.edu"
+              value={forgotEmail || email}
+              onChange={(e) => setForgotEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+            <button type="button" className="btn btn-secondary" onClick={() => { setShowForgotModal(false); setForgotMsg(''); setForgotErr(''); }}>
+              Cerrar
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={forgotLoading}>
+              {forgotLoading ? 'Enviando...' : 'Enviar enlace seguro'}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

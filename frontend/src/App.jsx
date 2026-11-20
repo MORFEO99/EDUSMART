@@ -67,6 +67,7 @@ export default function App() {
   const [showNotifs, setShowNotifs] = useState(false);
   const [showTeacherCreate, setShowTeacherCreate] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Check auth session on load
   useEffect(() => {
@@ -233,6 +234,8 @@ export default function App() {
         notifCount={unreadCount}
         isOpen={sidebarOpen}
         onCloseMobile={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(prev => !prev)}
       />
 
       <div className="app-content">
@@ -245,6 +248,15 @@ export default function App() {
           onOpenNotifications={() => setShowNotifs(!showNotifs)}
           onNavigate={handleNavigate}
           onToggleMobileMenu={() => setSidebarOpen(prev => !prev)}
+          onOpenQuickAction={() => {
+            if (authState.user?.rol === 'DOCENTE') {
+              setShowTeacherCreate(true);
+            } else {
+              handleNavigate('mis-espacios');
+            }
+          }}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(prev => !prev)}
         />
 
         {showNotifs && (

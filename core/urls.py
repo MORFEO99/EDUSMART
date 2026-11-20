@@ -16,6 +16,8 @@ urlpatterns = [
     path('api/auth/register/', api_views.api_register, name='api_register'),
     path('api/auth/logout/', api_views.api_logout, name='api_logout'),
     path('api/auth/me/', api_views.api_me, name='api_me'),
+    path('api/auth/password-reset-request/', api_views.api_password_reset_request, name='api_password_reset_request'),
+    path('api/auth/password-reset-confirm/', api_views.api_password_reset_confirm, name='api_password_reset_confirm'),
 
     # 2. Espacios Académicos ("Mis Espacios")
     path('api/espacios/', api_views.api_espacios, name='api_espacios'),
@@ -66,7 +68,9 @@ urlpatterns = [
     path('api/v2/cursos/<int:curso_id>/materias/', api_v2.api_materias_por_curso, name='api_v2_materias_curso'),
     path('api/v2/cursos/<int:curso_id>/importar/', api_v2.api_importar_estudiantes, name='api_v2_importar_estudiantes'),
     path('api/v2/cursos/<int:curso_id>/estudiantes/', api_v2.api_estudiantes_por_curso, name='api_v2_estudiantes_curso'),
+    path('api/v2/cursos/<int:curso_id>/boletin-pdf/', api_v2.api_descargar_boletin_curso, name='api_boletin_curso'),
     path('api/v2/cursos/<int:curso_id>/enviar-reportes/', api_v2.api_enviar_reportes_curso, name='api_v2_enviar_reportes_curso'),
+    path('api/v2/estudiantes/<int:estudiante_id>/boletin-pdf/', api_views.api_descargar_boletin_estudiante, name='api_boletin_estudiante'),
     path('api/v2/estudiantes/<int:estudiante_id>/enviar-reporte/', api_v2.api_enviar_reporte_estudiante, name='api_v2_enviar_reporte_estudiante'),
     path('api/v2/docente/lista-excel/', api_v2.api_lista_excel_docente, name='api_v2_lista_excel_docente'),
     path('api/v2/docente/materias-con-temas/', api_v2.api_materias_con_temas, name='api_v2_materias_con_temas'),

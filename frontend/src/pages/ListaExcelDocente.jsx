@@ -3,7 +3,7 @@ import {
   Users, ChevronRight, Download, Search, AlertTriangle,
   Building2, BookOpen, GraduationCap, FileSpreadsheet, X, Send,
   CheckCircle2, Filter, AlertCircle, ShieldAlert, Sparkles, TrendingUp,
-  Award, Check, Layers, SlidersHorizontal, ArrowRight
+  Award, Check, Layers, SlidersHorizontal, ArrowRight, FileText
 } from 'lucide-react';
 import { commonAPI } from '../api';
 import { Loading, EmptyState, Modal } from '../components';
@@ -501,7 +501,25 @@ export default function ListaExcelDocente({ onNavigate }) {
                 <span>Mandar Reporte a Todo el Curso</span>
               </button>
 
-              {/* 3. Exportar Excel */}
+              {/* 3. Descargar Boletín PDF del Curso */}
+              <button
+                className="btn btn-sm"
+                onClick={() => {
+                  if (!cursoActual?.curso_id) return;
+                  window.open(`/api/v2/cursos/${cursoActual.curso_id}/boletin-pdf/`, '_blank');
+                }}
+                style={{
+                  background: '#059669', color: '#FFFFFF', padding: '9px 14px', borderRadius: 8,
+                  fontSize: 12.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6,
+                  border: 'none', cursor: 'pointer', boxShadow: '0 2px 6px rgba(5,150,105,0.2)'
+                }}
+                title="Generar y descargar cuadro oficial de calificaciones de todo el curso en PDF"
+              >
+                <FileText size={15} />
+                <span>Boletín Oficial (PDF)</span>
+              </button>
+
+              {/* 4. Exportar Excel */}
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={handleExportCSV}
@@ -799,6 +817,24 @@ export default function ListaExcelDocente({ onNavigate }) {
                           >
                             {esRiesgo ? <AlertTriangle size={11} color="#DC2626" /> : <Send size={11} />}
                             <span>{esRiesgo ? 'Notificar Riesgo' : 'Mandar Reporte'}</span>
+                          </button>
+
+                          <button
+                            className="btn btn-sm"
+                            style={{
+                              fontSize: 11, padding: '4px 8px', color: '#0284C7',
+                              background: '#F0F9FF', border: '1px solid #BAE6FD',
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              marginLeft: 6
+                            }}
+                            onClick={() => {
+                              const stId = est.estudiante_id || est.id;
+                              if (stId) window.open(`/api/v2/estudiantes/${stId}/boletin-pdf/`, '_blank');
+                            }}
+                            title="Descargar boletín individual del estudiante en PDF"
+                          >
+                            <FileText size={11} />
+                            <span>PDF</span>
                           </button>
                         </td>
                       </tr>

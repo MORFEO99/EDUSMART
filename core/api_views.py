@@ -7,6 +7,14 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Avg, Count, Q
 from django.shortcuts import get_object_or_404
+from django.db import transaction
+from django.http import HttpResponse
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from .validators import validate_file_size, validate_file_extension, sanitize_filename, validate_grade
+from .email_service import send_grade_notification_email, send_password_reset_email
+from .pdf_service import generate_student_boletin_pdf
 
 from .models import (
     Usuario, Docente, Estudiante, Espacio, MiembroEspacio,
@@ -624,6 +632,7 @@ def api_tarea_detail(request, pk):
 # ==============================================================================
 
 @api_view(['POST'])
+@transaction.atomic
 def api_presentar_tarea(request, pk):
     user = request.user
     if user.rol != 'ESTUDIANTE' or not hasattr(user, 'perfil_estudiante'):
@@ -632,10 +641,28 @@ def api_presentar_tarea(request, pk):
     tarea = get_object_or_404(Tarea, id=pk)
     estudiante = user.perfil_estudiante
 
+    # Verificación de inscripción (Seguridad FASE 2)
+    if tarea.espacio_id not in estudiante.get_espacios_ids():
+        return Response({
+            'error': 'No estás inscrito en el espacio o curso correspondiente a esta tarea.'
+        }, status=status.HTTP_403_FORBIDDEN)
+
     data = request.data
-    archivo_url = data.get('archivo_url') or 'https://edusmart.cloud/storage/entregas/trabajo_practico.pdf'
-    archivo_nombre = data.get('archivo_nombre') or 'trabajo_academico_edusmart.pdf'
-    archivo_tamano = data.get('archivo_tamano') or '2.4 MB'
+    archivo_subido = request.FILES.get('archivo')
+    if archivo_subido:
+        try:
+            validate_file_size(archivo_subido)
+            validate_file_extension(archivo_subido)
+        except Exception as e:
+            msg = getattr(e, 'message', str(e))
+            return Response({'error': msg}, status=status.HTTP_400_BAD_REQUEST)
+        archivo_nombre = sanitize_filename(archivo_subido.name)
+        archivo_tamano = f"{round(archivo_subido.size / (1024 * 1024), 2)} MB"
+        archivo_url = data.get('archivo_url') or f"/media/entregas/{archivo_nombre}"
+    else:
+        archivo_url = data.get('archivo_url') or 'https://edusmart.cloud/storage/entregas/trabajo_practico.pdf'
+        archivo_nombre = sanitize_filename(data.get('archivo_nombre') or 'trabajo_academico_edusmart.pdf')
+        archivo_tamano = data.get('archivo_tamano') or '2.4 MB'
     observaciones = data.get('observaciones') or ''
 
     now = timezone.now()
@@ -805,6 +832,7 @@ def api_tarea_entregas(request, pk):
 
 
 @api_view(['POST'])
+@transaction.atomic
 def api_calificar_entrega(request, pk):
     user = request.user
     if user.rol != 'DOCENTE' or not hasattr(user, 'perfil_docente'):
@@ -851,6 +879,20 @@ def api_calificar_entrega(request, pk):
         latest_v.retroalimentacion = retro_comentario
         latest_v.estado = 'CALIFICADO'
         latest_v.save()
+
+    entrega.estado = 'CALIFICADO'
+    entrega.save(update_fields=['estado'])
+    entrega.estudiante.actualizar_progreso()
+
+    try:
+        send_grade_notification_email(
+            estudiante=entrega.estudiante,
+            tarea=entrega.tarea,
+            nota=nota,
+            retroalimentacion=retro_comentario
+        )
+    except Exception:
+        pass
 
     # MongoDB: registrar calificacion en log de actividad
     estudiante_id = entrega.estudiante.usuario.id
@@ -1641,6 +1683,7 @@ def api_progreso_academico(request):
             })
 
         return Response({
+            'estudiante_id': estudiante.id,
             'resumen': {
                 'promedio': progreso.promedio,
                 'tareas_entregadas': progreso.tareas_entregadas,
@@ -1776,3 +1819,100 @@ def api_marcar_notificaciones_leidas(request):
     if user.is_authenticated:
         Notificacion.objects.filter(usuario=user, leida=False).update(leida=True)
     return Response({'status': 'ok'})
+
+
+# ==============================================================================
+# 8. BOLETINES EN PDF Y RECUPERACIÓN DE CONTRASEÑA (FASE 4)
+# ==============================================================================
+
+@api_view(['GET'])
+def api_descargar_boletin_estudiante(request, estudiante_id):
+    """
+    Genera y descarga el boletín oficial de calificaciones en formato PDF.
+    Control de acceso:
+    - Estudiante: solo puede descargar su propio boletín.
+    - Docente / Admin: pueden descargar boletines de estudiantes.
+    """
+    user = request.user
+    if not user.is_authenticated:
+        return Response({'error': 'Debes iniciar sesión para descargar boletines.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    estudiante = get_object_or_404(Estudiante, id=estudiante_id)
+
+    # Control estricto de permisos
+    if user.rol == 'ESTUDIANTE':
+        if not hasattr(user, 'perfil_estudiante') or user.perfil_estudiante.id != estudiante.id:
+            return Response({'error': 'No tienes autorización para consultar el boletín de otro estudiante.'}, status=status.HTTP_403_FORBIDDEN)
+    elif user.rol == 'DOCENTE':
+        docente = getattr(user, 'perfil_docente', None)
+        if not docente:
+            return Response({'error': 'Perfil docente no configurado.'}, status=status.HTTP_403_FORBIDDEN)
+    elif user.rol not in ['ADMIN', 'PADRE']:
+        return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+
+    pdf_buffer = generate_student_boletin_pdf(estudiante)
+    filename = f"boletin_{sanitize_filename(estudiante.usuario.username)}_{timezone.now().strftime('%Y%m%d')}.pdf"
+    response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_password_reset_request(request):
+    """
+    Solicitud de restablecimiento de contraseña.
+    Seguridad: nunca revela si el correo existe o no en la base de datos (Timing/Enumeration attack prevention).
+    """
+    email = (request.data.get('email') or '').strip().lower()
+    if not email:
+        return Response({'error': 'Debes ingresar un correo electrónico válido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = Usuario.objects.filter(email__iexact=email).first()
+    if user:
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        origin = request.headers.get('Origin') or request.build_absolute_uri('/')[:-1]
+        reset_url = f"{origin}/?reset_uid={uid}&reset_token={token}"
+        try:
+            send_password_reset_email(user, reset_url)
+        except Exception:
+            pass
+
+    return Response({
+        'message': 'Si el correo electrónico está registrado en el sistema, recibirás un mensaje con las instrucciones para restablecer tu contraseña.'
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_password_reset_confirm(request):
+    """
+    Confirma el restablecimiento de contraseña utilizando token seguro de un solo uso.
+    """
+    uid_b64 = request.data.get('uid')
+    token = request.data.get('token')
+    new_password = (request.data.get('new_password') or '').strip()
+
+    if not uid_b64 or not token or not new_password:
+        return Response({'error': 'Parámetros incompletos (uid, token o nueva contraseña requeridos).'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if len(new_password) < 6:
+        return Response({'error': 'La contraseña debe contener al menos 6 caracteres.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        uid = force_str(urlsafe_base64_decode(uid_b64))
+        user = Usuario.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, Usuario.DoesNotExist):
+        user = None
+
+    if user is not None and default_token_generator.check_token(user, token):
+        user.set_password(new_password)
+        user.save()
+        return Response({
+            'message': 'Tu contraseña ha sido actualizada exitosamente. Ya puedes iniciar sesión con tu nueva contraseña.'
+        }, status=status.HTTP_200_OK)
+    else:
+        return Response({
+            'error': 'El enlace de recuperación es inválido o ha expirado. Por favor solicita uno nuevo.'
+        }, status=status.HTTP_400_BAD_REQUEST)

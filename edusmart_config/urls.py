@@ -4,11 +4,20 @@ from django.urls import path, re_path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularSwaggerView,
+    SpectacularRedocView,
+)
 
 dist_dir = settings.BASE_DIR / 'frontend' / 'dist'
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Documentación Swagger / OpenAPI
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     # Servir assets estáticos generados por Vite (React)
     re_path(r'^assets/(?P<path>.*)$', serve, {'document_root': dist_dir / 'assets'}),
     re_path(r'^images/(?P<path>.*)$', serve, {'document_root': dist_dir / 'images'}),
