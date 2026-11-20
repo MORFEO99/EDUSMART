@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, FolderGit2, CheckSquare, Activity, TrendingUp,
-  User, LogOut, Plus, Bell, X, Check, ChevronRight, ChevronLeft, FileText,
+  User, LogOut, Plus, Bell, X, Check, ChevronRight, FileText,
   Clock, Award, MessageSquare, AlertCircle, AlertTriangle, UploadCloud,
   Download, Eye, Share2, Layers, BookOpen, Code, Database, Cpu, Menu,
   CheckCircle2, ArrowRight, Building, Inbox, BarChart2, Search, Sparkles, Target,
-  FileSpreadsheet, Users
+  FileSpreadsheet
 } from 'lucide-react';
 
 // ============================================================
@@ -54,89 +54,27 @@ export function EdusmartLogo({ size = 34, showText = true, subtitle = true }) {
 }
 
 // ============================================================
-// 2. SIDEBAR EDUSMART (REORGANIZACIÓN TOTAL POR CATEGORÍAS)
+// 2. SIDEBAR EDUSMART (NAVEGACIÓN DIRECTA Y LIMPIA)
 // ============================================================
-export function Sidebar({
-  user,
-  activeSection,
-  onNavigate,
-  onLogout,
-  notifCount = 0,
-  isOpen = false,
-  onCloseMobile,
-  collapsed = false,
-  onToggleCollapse
-}) {
+export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount = 0, isOpen = false, onCloseMobile }) {
   const role = user?.rol || 'ESTUDIANTE';
 
-  // Navegación jerárquica y categorizada (FASE 2 & FASE 3)
-  const DOCENTE_NAV = [
-    {
-      category: 'Principal',
-      items: [
-        { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
-        { id: 'colegios', label: 'Mis Colegios y Cursos', icon: Building },
-        { id: 'espacios', label: 'Mis Espacios', icon: BookOpen },
-      ]
-    },
-    {
-      category: 'Gestión Académica',
-      items: [
-        { id: 'tareas', label: 'Tareas y Actividades', icon: CheckSquare },
-        { id: 'entregas', label: 'Entregas de Alumnos', icon: Inbox, badge: notifCount > 0 ? notifCount : null, badgeClass: 'danger' },
-        { id: 'seguimiento', label: 'Monitoreo de Estudiantes', icon: Users },
-        { id: 'import_students', label: 'Matrícula Masiva (Excel)', icon: UploadCloud, badge: 'Excel' },
-      ]
-    },
-    {
-      category: 'Evaluación y Registro',
-      items: [
-        { id: 'lista-excel', label: 'Planilla Oficial (Excel)', icon: FileSpreadsheet, badge: 'Bolivia', badgeClass: 'highlight' },
-        { id: 'calificaciones', label: 'Libro de Calificaciones', icon: BarChart2 },
-        { id: 'reportes', label: 'Reportes y Analítica', icon: FileText },
-        { id: 'importar_calificaciones', label: 'Cargar Notas Excel', icon: UploadCloud },
-      ]
-    },
-    {
-      category: 'Innovación Pedagógica',
-      items: [
-        { id: 'retos', label: 'Retos Gamificados', icon: Target, badge: 'IA' },
-      ]
-    }
+  // Navegación canónica según requerimiento oficial
+  const NAV_ITEMS = role === 'DOCENTE' ? [
+    { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
+    { id: 'espacios', label: 'Mis espacios', icon: BookOpen },
+    { id: 'tareas', label: 'Tareas', icon: CheckSquare },
+    { id: 'entregas', label: 'Entregas', icon: Inbox },
+    { id: 'resultados', label: 'Resultados', icon: BarChart2 },
+    { id: 'reportes', label: 'Reportes', icon: FileText },
+  ] : [
+    { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
+    { id: 'espacios', label: 'Mis espacios', icon: BookOpen },
+    { id: 'mis-tareas', label: 'Mis tareas', icon: CheckSquare },
+    { id: 'practicas', label: 'Simuladores IA', icon: Sparkles, highlight: true },
+    { id: 'resultados', label: 'Resultados', icon: TrendingUp },
+    { id: 'retos', label: 'Retos Gamificados', icon: Target },
   ];
-
-  const ESTUDIANTE_NAV = [
-    {
-      category: 'Mi Espacio Personal',
-      items: [
-        { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
-        { id: 'mis-espacios', label: 'Mis Materias', icon: BookOpen },
-        { id: 'mi-progreso', label: 'Mi Progreso Académico', icon: TrendingUp },
-      ]
-    },
-    {
-      category: 'Tareas y Actividades',
-      items: [
-        { id: 'mis-tareas', label: 'Mis Tareas', icon: CheckSquare, badge: notifCount > 0 ? notifCount : null, badgeClass: 'danger' },
-        { id: 'retroalimentacion', label: 'Retroalimentación Docente', icon: MessageSquare },
-      ]
-    },
-    {
-      category: 'Evaluación y Notas',
-      items: [
-        { id: 'resultados', label: 'Calificaciones y Boletín', icon: Award, badge: 'PDF', badgeClass: 'highlight' },
-      ]
-    },
-    {
-      category: 'Innovación y Práctica',
-      items: [
-        { id: 'practicas', label: 'Simuladores de Examen IA', icon: Sparkles, badge: 'IA', badgeClass: 'highlight' },
-        { id: 'retos', label: 'Misiones y Medallas', icon: Target },
-      ]
-    }
-  ];
-
-  const NAV_CATEGORIES = role === 'DOCENTE' ? DOCENTE_NAV : ESTUDIANTE_NAV;
 
   return (
     <>
@@ -149,24 +87,14 @@ export function Sidebar({
         />
       )}
 
-      <aside className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
+      <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         {/* Brand */}
-        <div
-          className="sidebar-header"
-          style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-          onClick={() => onNavigate('dashboard')}
-          title="Ir al inicio"
-        >
-          <EdusmartLogo size={34} showText={!collapsed} />
+        <div className="sidebar-header" style={{ cursor: 'pointer' }} onClick={() => onNavigate('dashboard')}>
+          <EdusmartLogo size={36} />
         </div>
 
         {/* User Card */}
-        <div
-          className="sidebar-user"
-          onClick={() => onNavigate('mi-perfil')}
-          style={{ cursor: 'pointer' }}
-          title={collapsed ? `${user?.nombre_completo} (${role})` : 'Ver mi perfil'}
-        >
+        <div className="sidebar-user" onClick={() => onNavigate('mi-perfil')} style={{ cursor: 'pointer' }}>
           <div className="sidebar-avatar">
             {user?.avatar_url ? (
               <img src={user.avatar_url} alt={user.nombre_completo} />
@@ -175,82 +103,50 @@ export function Sidebar({
             )}
             <div className="presence-status" title="En línea" />
           </div>
-          {!collapsed && (
-            <div className="sidebar-user-details">
-              <div className="sidebar-user-name" title={user?.nombre_completo}>
-                {user?.nombre_completo || 'Usuario'}
-              </div>
-              <span className={`sidebar-user-role ${role === 'DOCENTE' ? 'role-badge-docente' : 'role-badge-estudiante'}`}>
-                {role === 'DOCENTE' ? 'Docente' : 'Estudiante'}
-              </span>
+          <div className="sidebar-user-details">
+            <div className="sidebar-user-name" title={user?.nombre_completo}>
+              {user?.nombre_completo || 'Usuario'}
             </div>
-          )}
+            <span className={`sidebar-user-role ${role === 'DOCENTE' ? 'role-badge-docente' : 'role-badge-estudiante'}`}>
+              {role === 'DOCENTE' ? 'Docente' : 'Estudiante'}
+            </span>
+          </div>
         </div>
 
-        {/* Navigation Menu organized by categories */}
+        {/* Navigation Menu */}
         <nav className="sidebar-nav">
-          {NAV_CATEGORIES.map((cat, idx) => (
-            <div key={cat.category || idx} className="sidebar-category">
-              {!collapsed ? (
-                <div className="sidebar-category-title">{cat.category}</div>
-              ) : (
-                <div className="sidebar-category-divider" />
-              )}
-              {cat.items.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeSection === item.id ||
-                  (item.id === 'mis-espacios' && activeSection === 'espacios') ||
-                  (item.id === 'espacios' && activeSection === 'colegios') ||
-                  (item.id === 'tareas' && (activeSection === 'mis-tareas' || activeSection === 'crear-tarea')) ||
-                  (item.id === 'resultados' && activeSection === 'calificaciones');
-                return (
-                  <button
-                    key={item.id}
-                    className={`nav-item ${isActive ? 'active' : ''}`}
-                    onClick={() => {
-                      onNavigate(item.id);
-                      if (onCloseMobile) onCloseMobile();
-                    }}
-                    title={collapsed ? item.label : undefined}
-                  >
-                    <Icon size={18} />
-                    {!collapsed && <span>{item.label}</span>}
-                    {!collapsed && item.badge && (
-                      <span className={`sidebar-badge ${item.badgeClass || ''}`}>
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeSection === item.id;
+            return (
+              <button
+                key={item.id}
+                className={`nav-item ${isActive ? 'active' : ''}`}
+                onClick={() => {
+                  onNavigate(item.id);
+                  if (onCloseMobile) onCloseMobile();
+                }}
+              >
+                <Icon size={18} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
         </nav>
 
-        {/* Footer: Toggle Collapse, Perfil y Logout */}
+        {/* Footer Menu: Perfil y Logout */}
         <div className="sidebar-footer">
-          {/* Collapse/Expand Toggle on Desktop */}
-          <button
-            type="button"
-            className="sidebar-collapse-btn desktop-only"
-            onClick={onToggleCollapse}
-            title={collapsed ? 'Expandir menú lateral' : 'Contraer menú lateral'}
-          >
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-            {!collapsed && <span style={{ marginLeft: 8, fontSize: 12 }}>Contraer menú</span>}
-          </button>
-
           <button
             className={`btn-logout ${activeSection === 'mi-perfil' ? 'active' : ''}`}
             onClick={() => onNavigate('mi-perfil')}
-            title="Mi perfil y cuenta"
+            style={{ marginBottom: 6 }}
           >
             <User size={16} />
-            {!collapsed && <span>Mi perfil</span>}
+            <span>Mi perfil</span>
           </button>
-          <button className="btn-logout" onClick={onLogout} title="Cerrar sesión">
+          <button className="btn-logout" onClick={onLogout}>
             <LogOut size={16} />
-            {!collapsed && <span>Cerrar sesión</span>}
+            <span>Cerrar sesión</span>
           </button>
         </div>
       </aside>
@@ -259,7 +155,7 @@ export function Sidebar({
 }
 
 // ============================================================
-// 3. TOPBAR EDUSMART CON COMANDOS Y BÚSQUEDA GLOBAL
+// 3. TOPBAR EDUSMART CON BÚSQUEDA GLOBAL Y ACCIONES RÁPIDAS
 // ============================================================
 export function Topbar({
   title,
@@ -270,62 +166,15 @@ export function Topbar({
   onOpenQuickAction,
   onToggleMobileMenu,
   onNavigate,
-  collapsed = false,
-  onToggleCollapse
+  onSearch
 }) {
   const isDocente = user?.rol === 'DOCENTE';
   const [searchTerm, setSearchTerm] = useState('');
-  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
-  const searchRef = useRef(null);
 
-  // Command palette items based on role (FASE 3 & FASE 8)
-  const SEARCH_ITEMS = isDocente ? [
-    { id: 'dashboard', title: 'Inicio / Panel General', category: 'General', icon: LayoutDashboard },
-    { id: 'lista-excel', title: 'Planilla Oficial de Estudiantes (Excel)', category: 'Evaluación', icon: FileSpreadsheet, badge: 'Bolivia' },
-    { id: 'tareas', title: 'Tareas y Actividades', category: 'Académico', icon: CheckSquare },
-    { id: 'entregas', title: 'Entregas de Alumnos por Calificar', category: 'Evaluación', icon: Inbox },
-    { id: 'colegios', title: 'Mis Colegios y Cursos', category: 'Gestión', icon: Building },
-    { id: 'calificaciones', title: 'Libro de Calificaciones', category: 'Evaluación', icon: BarChart2 },
-    { id: 'seguimiento', title: 'Monitoreo de Estudiantes', category: 'Académico', icon: Users },
-    { id: 'reportes', title: 'Reportes y Analítica', category: 'Estadísticas', icon: FileText },
-    { id: 'import_students', title: 'Importar Estudiantes (Excel)', category: 'Herramientas', icon: UploadCloud },
-    { id: 'importar_calificaciones', title: 'Importar Calificaciones (Excel)', category: 'Herramientas', icon: UploadCloud },
-    { id: 'retos', title: 'Retos Gamificados', category: 'Innovación', icon: Target },
-    { id: 'mi-perfil', title: 'Mi Perfil y Seguridad', category: 'Cuenta', icon: User },
-  ] : [
-    { id: 'dashboard', title: 'Inicio / Mi Panel', category: 'General', icon: LayoutDashboard },
-    { id: 'mis-tareas', title: 'Mis Tareas y Entregas', category: 'Académico', icon: CheckSquare },
-    { id: 'resultados', title: 'Calificaciones y Boletín (PDF)', category: 'Evaluación', icon: Award, badge: 'PDF' },
-    { id: 'mis-espacios', title: 'Mis Materias y Espacios', category: 'Académico', icon: BookOpen },
-    { id: 'mi-progreso', title: 'Mi Progreso Académico', category: 'Rendimiento', icon: TrendingUp },
-    { id: 'practicas', title: 'Simuladores de Examen IA', category: 'Innovación', icon: Sparkles, badge: 'IA' },
-    { id: 'retroalimentacion', title: 'Retroalimentación de Profesores', category: 'Evaluación', icon: MessageSquare },
-    { id: 'retos', title: 'Misiones y Medallas', category: 'Gamificación', icon: Target },
-    { id: 'mi-perfil', title: 'Mi Perfil y Credenciales', category: 'Cuenta', icon: User },
-  ];
-
-  const filteredItems = searchTerm.trim()
-    ? SEARCH_ITEMS.filter(it =>
-        it.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        it.category.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : SEARCH_ITEMS.slice(0, 6);
-
-  // Close search dropdown on click outside
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (searchRef.current && !searchRef.current.contains(e.target)) {
-        setShowSearchDropdown(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleSelectSearchItem = (id) => {
-    setShowSearchDropdown(false);
-    setSearchTerm('');
-    onNavigate(id);
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchTerm(val);
+    onSearch?.(val);
   };
 
   return (
@@ -339,35 +188,21 @@ export function Topbar({
           <Menu size={20} />
         </button>
 
-        <button
-          type="button"
-          className="btn-icon desktop-collapse-btn"
-          onClick={onToggleCollapse}
-          title={collapsed ? "Expandir menú lateral" : "Contraer menú lateral"}
-          style={{ marginRight: 8, display: 'inline-flex' }}
-        >
-          <Menu size={18} />
-        </button>
-
         <div className="topbar-title">
           <h2>{title}</h2>
           {subtitle && <p>{subtitle}</p>}
         </div>
       </div>
 
-      {/* Global Quick Search / Command Palette */}
-      <div className="topbar-search-container" ref={searchRef} style={{ flex: 1, maxWidth: 440, margin: '0 20px', position: 'relative' }}>
+      {/* Global Search Bar */}
+      <div className="topbar-search-container" style={{ flex: 1, maxWidth: 360, margin: '0 20px', position: 'relative' }}>
         <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
         <input
           type="text"
           className="form-control"
-          placeholder="Buscar páginas, tareas, planilla, notas (ej: Excel, boletín)..."
+          placeholder="Buscar espacios, tareas, notas..."
           value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setShowSearchDropdown(true);
-          }}
-          onFocus={() => setShowSearchDropdown(true)}
+          onChange={handleSearchChange}
           style={{
             paddingLeft: 34,
             paddingRight: 12,
@@ -378,68 +213,26 @@ export function Topbar({
             background: '#F8FAFC'
           }}
         />
-
-        {showSearchDropdown && (
-          <div className="topbar-quicksearch-dropdown">
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', padding: '6px 12px', textTransform: 'uppercase' }}>
-              {searchTerm ? 'Resultados rápidos' : 'Accesos directos frecuentes'}
-            </div>
-            {filteredItems.length === 0 ? (
-              <div style={{ padding: '12px 14px', fontSize: 13, color: '#64748B', textAlign: 'center' }}>
-                No se encontraron páginas para "{searchTerm}"
-              </div>
-            ) : (
-              filteredItems.map(item => {
-                const ItemIcon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className="topbar-quicksearch-item"
-                    onClick={() => handleSelectSearchItem(item.id)}
-                  >
-                    <div style={{
-                      width: 28, height: 28, borderRadius: 6,
-                      background: '#EFF6FF', color: '#1E3A8A',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}>
-                      <ItemIcon size={15} />
-                    </div>
-                    <div>
-                      <div className="topbar-quicksearch-title">{item.title}</div>
-                      <div className="topbar-quicksearch-category">{item.category}</div>
-                    </div>
-                    {item.badge && (
-                      <span className="topbar-quicksearch-badge">{item.badge}</span>
-                    )}
-                  </button>
-                );
-              })
-            )}
-          </div>
-        )}
       </div>
 
       <div className="topbar-right">
-        {/* Contextual Action Button */}
+        {/* Quick action button depending on role */}
         {isDocente ? (
           <button
-            className="btn btn-primary btn-sm"
+            className="topbar-action-btn"
             onClick={onOpenQuickAction}
-            style={{ background: '#1E3A8A', color: 'white', display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 8 }}
-            title="Crear y publicar una nueva tarea académica"
+            style={{ background: '#1E3A8A', color: 'white', display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
-            <Plus size={15} />
+            <Plus size={16} />
             <span>Nueva tarea</span>
           </button>
         ) : (
           <button
-            className="btn btn-primary btn-sm"
+            className="topbar-action-btn"
             onClick={onOpenQuickAction}
-            style={{ background: '#0284C7', color: 'white', display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 8 }}
-            title="Unirme a una materia o curso con código de invitación"
+            style={{ background: '#0284C7', color: 'white', display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
-            <Plus size={15} />
+            <Plus size={16} />
             <span>Unirme a espacio</span>
           </button>
         )}
@@ -462,7 +255,7 @@ export function Topbar({
           title="Ver mi perfil"
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
-            cursor: 'pointer', padding: '4px 10px', borderRadius: 8,
+            cursor: 'pointer', padding: '4px 8px', borderRadius: 8,
             background: '#F1F5F9', border: '1px solid #E2E8F0'
           }}
         >
@@ -478,7 +271,7 @@ export function Topbar({
               user?.nombre_completo?.charAt(0) || 'U'
             )}
           </div>
-          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#334155' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
             {user?.first_name || user?.nombre_completo?.split(' ')[0]}
           </span>
         </div>
