@@ -77,14 +77,16 @@ def api_crear_reto(request):
         return Response({'error': 'Perfil de docente no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
 
     data = request.data
-    espacio_id = data.get('espacio_id')
+    espacio_id = data.get('espacio_id') or data.get('materia_id')
     espacio = None
 
     if espacio_id:
         try:
-            espacio = Espacio.objects.get(id=espacio_id, docente=docente)
-        except Espacio.DoesNotExist:
-            return Response({'error': 'Espacio no encontrado o no te pertenece.'}, status=status.HTTP_404_NOT_FOUND)
+            espacio = Espacio.objects.filter(id=espacio_id, docente=docente).first()
+            if not espacio:
+                espacio = Espacio.objects.filter(materia_id=espacio_id, docente=docente).first()
+        except Exception:
+            espacio = None
 
     reto = Challenge.objects.create(
         titulo=data.get('titulo', 'Nuevo Reto'),

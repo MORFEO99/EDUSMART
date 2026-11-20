@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Target, Star, Gift, CheckCircle, Plus, Trash2, BookOpen, X,
   Upload, Sparkles, FileText, AlertCircle, RefreshCw, Zap,
-  TrendingUp, Award, Layers, Clock, Check, ChevronRight
+  TrendingUp, Award, Layers, Clock, Check, ChevronRight,
+  School, GraduationCap, Filter, Search
 } from 'lucide-react';
 import { gamificationAPI, espaciosAPI } from '../api';
 
@@ -295,6 +296,8 @@ function FormCrearReto({
   tareas = []
 }) {
   const [tab, setTab] = useState(defaultEspacioId ? 'ia_avance' : 'manual'); // 'ia_avance' | 'ia_doc' | 'manual'
+  const [selectedColegio, setSelectedColegio] = useState('');
+  const [selectedCurso, setSelectedCurso] = useState('');
   const [form, setForm] = useState({
     titulo: '',
     descripcion: '',
@@ -308,6 +311,35 @@ function FormCrearReto({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+
+  // Auto-selección de colegio si solo hay uno
+  useEffect(() => {
+    const cols = Array.from(new Set(espacios.map(e => e.colegio_nombre).filter(Boolean)));
+    if (cols.length === 1 && !selectedColegio) {
+      setSelectedColegio(cols[0]);
+    }
+  }, [espacios, selectedColegio]);
+
+  const colegiosList = useMemo(() => {
+    return Array.from(new Set(espacios.map(e => e.colegio_nombre).filter(Boolean)));
+  }, [espacios]);
+
+  const cursosList = useMemo(() => {
+    const filtered = selectedColegio ? espacios.filter(e => e.colegio_nombre === selectedColegio) : espacios;
+    return Array.from(new Set(filtered.map(e => e.curso_nombre).filter(Boolean)));
+  }, [espacios, selectedColegio]);
+
+  const espaciosFiltrados = useMemo(() => {
+    return espacios.filter(e => {
+      if (selectedColegio && e.colegio_nombre && e.colegio_nombre !== selectedColegio) return false;
+      if (selectedCurso && e.curso_nombre && e.curso_nombre !== selectedCurso) return false;
+      return true;
+    });
+  }, [espacios, selectedColegio, selectedCurso]);
+
+  const selectedEspacioObj = useMemo(() => {
+    return espacios.find(e => String(e.id) === String(form.espacio_id));
+  }, [espacios, form.espacio_id]);
 
   // IA Avance states
   const [temaAvance, setTemaAvance] = useState(tareas.length > 0 ? tareas[0].titulo : '');
@@ -328,7 +360,8 @@ function FormCrearReto({
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
 
-  const materiaDisplay = defaultEspacioNombre || espacios.find(e => String(e.id) === String(form.espacio_id))?.nombre || '';
+  const materiaDisplay = defaultEspacioNombre || selectedEspacioObj?.nombre || '';
+  const cursoDisplay = defaultCursoNombre || selectedEspacioObj?.curso_nombre || selectedCurso || '';
 
   const handleChange = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -568,6 +601,64 @@ function FormCrearReto({
                 </div>
               </div>
 
+              {/* Selector de Colegio, Curso y Materia si no viene de un espacio específico */}
+              {!defaultEspacioId && (
+                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1E3A8A', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <BookOpen size={13} />
+                    <span>Vincular este avance a Colegio, Curso y Materia:</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    <select
+                      value={selectedColegio}
+                      onChange={e => {
+                        setSelectedColegio(e.target.value);
+                        setSelectedCurso('');
+                        setForm(f => ({ ...f, espacio_id: '' }));
+                      }}
+                      style={{ ...INPUT_STYLE, padding: '5px 8px', fontSize: '0.75rem' }}
+                    >
+                      <option value="">Colegio...</option>
+                      {colegiosList.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+
+                    <select
+                      value={selectedCurso}
+                      onChange={e => {
+                        setSelectedCurso(e.target.value);
+                        setForm(f => ({ ...f, espacio_id: '' }));
+                      }}
+                      style={{ ...INPUT_STYLE, padding: '5px 8px', fontSize: '0.75rem' }}
+                    >
+                      <option value="">Curso...</option>
+                      {cursosList.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+
+                    <select
+                      name="espacio_id"
+                      value={form.espacio_id}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const esp = espacios.find(x => String(x.id) === val);
+                        setForm(f => ({ ...f, espacio_id: val }));
+                        if (esp) {
+                          if (esp.colegio_nombre && !selectedColegio) setSelectedColegio(esp.colegio_nombre);
+                          if (esp.curso_nombre && !selectedCurso) setSelectedCurso(esp.curso_nombre);
+                        }
+                      }}
+                      style={{ ...INPUT_STYLE, padding: '5px 8px', fontSize: '0.75rem' }}
+                    >
+                      <option value="">Materia / Espacio...</option>
+                      {espaciosFiltrados.map(e => (
+                        <option key={e.id} value={e.id}>
+                          {e.nombre} {e.curso_nombre ? `(${e.curso_nombre})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
               {/* Tareas rápidas para seleccionar */}
               {tareas.length > 0 && (
                 <div>
@@ -679,6 +770,64 @@ function FormCrearReto({
                   </div>
                 </div>
               </div>
+
+              {/* Selector de Colegio, Curso y Materia si no viene de un espacio específico */}
+              {!defaultEspacioId && (
+                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#065F46', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <BookOpen size={13} />
+                    <span>Asignar este documento a Colegio, Curso y Materia:</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    <select
+                      value={selectedColegio}
+                      onChange={e => {
+                        setSelectedColegio(e.target.value);
+                        setSelectedCurso('');
+                        setForm(f => ({ ...f, espacio_id: '' }));
+                      }}
+                      style={{ ...INPUT_STYLE, padding: '5px 8px', fontSize: '0.75rem' }}
+                    >
+                      <option value="">Colegio...</option>
+                      {colegiosList.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+
+                    <select
+                      value={selectedCurso}
+                      onChange={e => {
+                        setSelectedCurso(e.target.value);
+                        setForm(f => ({ ...f, espacio_id: '' }));
+                      }}
+                      style={{ ...INPUT_STYLE, padding: '5px 8px', fontSize: '0.75rem' }}
+                    >
+                      <option value="">Curso...</option>
+                      {cursosList.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+
+                    <select
+                      name="espacio_id"
+                      value={form.espacio_id}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const esp = espacios.find(x => String(x.id) === val);
+                        setForm(f => ({ ...f, espacio_id: val }));
+                        if (esp) {
+                          if (esp.colegio_nombre && !selectedColegio) setSelectedColegio(esp.colegio_nombre);
+                          if (esp.curso_nombre && !selectedCurso) setSelectedCurso(esp.curso_nombre);
+                        }
+                      }}
+                      style={{ ...INPUT_STYLE, padding: '5px 8px', fontSize: '0.75rem' }}
+                    >
+                      <option value="">Materia / Espacio...</option>
+                      {espaciosFiltrados.map(e => (
+                        <option key={e.id} value={e.id}>
+                          {e.nombre} {e.curso_nombre ? `(${e.curso_nombre})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
 
               {/* Drop zone */}
               <div
@@ -818,34 +967,94 @@ function FormCrearReto({
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Tipo de Reto
-                  </label>
-                  <select name="tipo" value={form.tipo} onChange={handleChange} style={INPUT_STYLE}>
-                    <option value="TAREAS">📋 Entregar Tareas</option>
-                    <option value="PUNTAJE">⭐ Obtener Puntaje Alto</option>
-                    <option value="ASISTENCIA">✅ Participación / Asistencia</option>
-                    <option value="GENERAL">🎯 Reto General</option>
-                  </select>
+              {/* Asignación Académica: Colegio -> Curso -> Materia */}
+              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1E3A8A', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <School size={14} /> Asignación Académica (Colegio, Curso y Materia)
                 </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Materia Asignada
-                  </label>
-                  {defaultEspacioId ? (
-                    <div style={{ ...INPUT_STYLE, background: '#F8FAFC', fontWeight: 600, color: '#1E3A8A' }}>
-                      {defaultEspacioNombre || 'Materia actual'}
+                {!defaultEspacioId ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: 10 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: 3 }}>
+                        Colegio
+                      </label>
+                      <select
+                        value={selectedColegio}
+                        onChange={e => {
+                          setSelectedColegio(e.target.value);
+                          setSelectedCurso('');
+                          setForm(f => ({ ...f, espacio_id: '' }));
+                        }}
+                        style={{ ...INPUT_STYLE, padding: '0.5rem 0.6rem', fontSize: '0.82rem' }}
+                      >
+                        <option value="">Todos los colegios...</option>
+                        {colegiosList.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
                     </div>
-                  ) : (
-                    <select name="espacio_id" value={form.espacio_id} onChange={handleChange} style={INPUT_STYLE}>
-                      <option value="">🌐 Global (todas las materias)</option>
-                      {espacios.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-                    </select>
-                  )}
-                </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: 3 }}>
+                        Curso / Grado
+                      </label>
+                      <select
+                        value={selectedCurso}
+                        onChange={e => {
+                          setSelectedCurso(e.target.value);
+                          setForm(f => ({ ...f, espacio_id: '' }));
+                        }}
+                        style={{ ...INPUT_STYLE, padding: '0.5rem 0.6rem', fontSize: '0.82rem' }}
+                      >
+                        <option value="">Todos los cursos...</option>
+                        {cursosList.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: 3 }}>
+                        Materia Asignada
+                      </label>
+                      <select
+                        name="espacio_id"
+                        value={form.espacio_id}
+                        onChange={e => {
+                          const val = e.target.value;
+                          const esp = espacios.find(x => String(x.id) === val);
+                          setForm(f => ({ ...f, espacio_id: val }));
+                          if (esp) {
+                            if (esp.colegio_nombre && !selectedColegio) setSelectedColegio(esp.colegio_nombre);
+                            if (esp.curso_nombre && !selectedCurso) setSelectedCurso(esp.curso_nombre);
+                          }
+                        }}
+                        style={{ ...INPUT_STYLE, padding: '0.5rem 0.6rem', fontSize: '0.82rem' }}
+                      >
+                        <option value="">🌐 Global (todas las materias)</option>
+                        {espaciosFiltrados.map(e => (
+                          <option key={e.id} value={e.id}>
+                            {e.nombre} {e.curso_nombre ? `(${e.curso_nombre})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', color: '#1E3A8A', fontWeight: 600 }}>
+                    <BookOpen size={14} />
+                    <span>Materia: {defaultEspacioNombre}</span>
+                    {defaultCursoNombre && <span style={{ color: '#64748B' }}>· {defaultCursoNombre}</span>}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
+                  Tipo de Reto
+                </label>
+                <select name="tipo" value={form.tipo} onChange={handleChange} style={INPUT_STYLE}>
+                  <option value="TAREAS">📋 Entregar Tareas</option>
+                  <option value="PUNTAJE">⭐ Obtener Puntaje Alto</option>
+                  <option value="ASISTENCIA">✅ Participación / Asistencia</option>
+                  <option value="GENERAL">🎯 Reto General</option>
+                </select>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
@@ -926,6 +1135,10 @@ export default function ChallengeBoard({
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [espacios, setEspacios] = useState([]);
+  const [filterColegio, setFilterColegio] = useState('');
+  const [filterCurso, setFilterCurso] = useState('');
+  const [filterMateria, setFilterMateria] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const isDocente = userRole === 'DOCENTE';
 
   const loadChallenges = () => {
@@ -945,6 +1158,68 @@ export default function ChallengeBoard({
         .catch(() => {});
     }
   }, [espacioId, isDocente]);
+
+  // Filtros dinámicos basados en la lista de retos
+  const filterColegios = useMemo(() => {
+    const s = new Set();
+    challenges.forEach(uc => {
+      const c = uc.challenge || uc;
+      if (c.colegio_nombre) s.add(c.colegio_nombre);
+    });
+    return Array.from(s).sort();
+  }, [challenges]);
+
+  const filterCursos = useMemo(() => {
+    const s = new Set();
+    challenges.forEach(uc => {
+      const c = uc.challenge || uc;
+      if (!filterColegio || c.colegio_nombre === filterColegio) {
+        if (c.curso_nombre) s.add(c.curso_nombre);
+      }
+    });
+    return Array.from(s).sort();
+  }, [challenges, filterColegio]);
+
+  const filterMaterias = useMemo(() => {
+    const s = new Set();
+    challenges.forEach(uc => {
+      const c = uc.challenge || uc;
+      const matchCol = !filterColegio || c.colegio_nombre === filterColegio;
+      const matchCur = !filterCurso || c.curso_nombre === filterCurso;
+      if (matchCol && matchCur) {
+        const mat = c.materia_nombre || c.espacio_nombre;
+        if (mat) s.add(mat);
+      }
+    });
+    return Array.from(s).sort();
+  }, [challenges, filterColegio, filterCurso]);
+
+  const filteredChallenges = useMemo(() => {
+    return challenges.filter(uc => {
+      const c = uc.challenge || uc;
+      if (filterColegio && c.colegio_nombre !== filterColegio) return false;
+      if (filterCurso && c.curso_nombre !== filterCurso) return false;
+      const mat = c.materia_nombre || c.espacio_nombre;
+      if (filterMateria && mat !== filterMateria) return false;
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        const t = (c.titulo || '').toLowerCase();
+        const d = (c.descripcion || '').toLowerCase();
+        const m = (mat || '').toLowerCase();
+        if (!t.includes(q) && !d.includes(q) && !m.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [challenges, filterColegio, filterCurso, filterMateria, searchTerm]);
+
+  const hasActiveFilters = Boolean(filterColegio || filterCurso || filterMateria || searchTerm);
+
+  const clearFilters = () => {
+    setFilterColegio('');
+    setFilterCurso('');
+    setFilterMateria('');
+    setSearchTerm('');
+  };
 
   const handleParticipate = (challengeId) => {
     gamificationAPI.participateChallenge(challengeId)
@@ -1027,6 +1302,113 @@ export default function ChallengeBoard({
           </div>
         </div>
 
+        {/* Filtros por Colegio, Curso y Materia */}
+        {!espacioId && challenges.length > 0 && (
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
+            background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '0.75rem',
+            padding: '0.75rem 1rem', marginBottom: '1.2rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 200px' }}>
+              <Search size={16} color="#64748B" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                placeholder="Buscar reto por título o contenido..."
+                style={{
+                  width: '100%', border: 'none', background: 'transparent',
+                  fontSize: '0.84rem', outline: 'none', color: '#0F172A'
+                }}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: 2 }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              {/* Filtro Colegio */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <School size={14} color="#64748B" />
+                <select
+                  value={filterColegio}
+                  onChange={e => {
+                    setFilterColegio(e.target.value);
+                    setFilterCurso('');
+                    setFilterMateria('');
+                  }}
+                  style={{
+                    padding: '0.35rem 0.6rem', borderRadius: 6, border: '1px solid #CBD5E1',
+                    fontSize: '0.78rem', background: '#FFFFFF', color: '#334155', fontWeight: 600
+                  }}
+                >
+                  <option value="">Todos los Colegios</option>
+                  {filterColegios.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              {/* Filtro Curso */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <GraduationCap size={14} color="#64748B" />
+                <select
+                  value={filterCurso}
+                  onChange={e => {
+                    setFilterCurso(e.target.value);
+                    setFilterMateria('');
+                  }}
+                  style={{
+                    padding: '0.35rem 0.6rem', borderRadius: 6, border: '1px solid #CBD5E1',
+                    fontSize: '0.78rem', background: '#FFFFFF', color: '#334155', fontWeight: 600
+                  }}
+                >
+                  <option value="">Todos los Cursos</option>
+                  {filterCursos.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              {/* Filtro Materia */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <BookOpen size={14} color="#64748B" />
+                <select
+                  value={filterMateria}
+                  onChange={e => setFilterMateria(e.target.value)}
+                  style={{
+                    padding: '0.35rem 0.6rem', borderRadius: 6, border: '1px solid #CBD5E1',
+                    fontSize: '0.78rem', background: '#FFFFFF', color: '#334155', fontWeight: 600
+                  }}
+                >
+                  <option value="">Todas las Materias</option>
+                  {filterMaterias.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  style={{
+                    padding: '0.3rem 0.65rem', borderRadius: 6, border: '1px solid #FECACA',
+                    background: '#FEF2F2', color: '#DC2626', fontSize: '0.75rem', fontWeight: 700,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
+                  }}
+                >
+                  <X size={12} /> Limpiar filtros
+                </button>
+              )}
+            </div>
+
+            <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, marginLeft: 'auto' }}>
+              Mostrando {filteredChallenges.length} de {challenges.length} retos
+            </span>
+          </div>
+        )}
+
         {/* Retos Grid */}
         {challenges.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '2.5rem 1.5rem', color: '#64748B', background: '#F8FAFC', borderRadius: '0.75rem', border: '2px dashed #CBD5E1' }}>
@@ -1047,9 +1429,24 @@ export default function ChallengeBoard({
               ✨ Crear Reto con IA para este Avance
             </button>
           </div>
+        ) : filteredChallenges.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2rem 1.5rem', color: '#64748B', background: '#F8FAFC', borderRadius: '0.75rem', border: '1px dashed #CBD5E1' }}>
+            <p style={{ margin: 0, fontWeight: 700, color: '#1E293B' }}>
+              No se encontraron retos con los filtros seleccionados.
+            </p>
+            <button
+              onClick={clearFilters}
+              style={{
+                marginTop: 8, padding: '0.4rem 0.9rem', background: '#EEF2FF', color: '#4F46E5',
+                border: '1px solid #C7D2FE', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem'
+              }}
+            >
+              Restablecer filtros
+            </button>
+          </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '1rem' }}>
-            {challenges.map(uc => {
+            {filteredChallenges.map(uc => {
               const c = uc.challenge || uc;
               const activo = c.activo !== undefined ? c.activo : true;
               return (
@@ -1088,14 +1485,28 @@ export default function ChallengeBoard({
                     </div>
                   </div>
 
-                  {c.espacio_nombre && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
-                      <BookOpen size={11} color="#4F46E5" />
-                      <span style={{ fontSize: '0.72rem', color: '#4F46E5', fontWeight: 700 }}>
-                        {c.espacio_nombre}
+                  {/* Badges de Colegio, Curso y Materia */}
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                    {c.colegio_nombre && (
+                      <span style={{ fontSize: '0.7rem', background: '#F1F5F9', color: '#334155', padding: '2px 6px', borderRadius: 4, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <School size={10} color="#64748B" /> {c.colegio_nombre}
                       </span>
-                    </div>
-                  )}
+                    )}
+                    {c.curso_nombre && (
+                      <span style={{ fontSize: '0.7rem', background: '#EFF6FF', color: '#1E40AF', padding: '2px 6px', borderRadius: 4, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <GraduationCap size={10} color="#3B82F6" /> {c.curso_nombre}
+                      </span>
+                    )}
+                    {(c.materia_nombre || c.espacio_nombre) ? (
+                      <span style={{ fontSize: '0.7rem', background: '#EEF2FF', color: '#4338CA', padding: '2px 6px', borderRadius: 4, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <BookOpen size={10} color="#6366F1" /> {c.materia_nombre || c.espacio_nombre}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.7rem', background: '#F8FAFC', color: '#64748B', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
+                        🌐 Global
+                      </span>
+                    )}
+                  </div>
 
                   <p style={{ margin: '0 0 12px', fontSize: '0.8rem', color: '#475569', lineHeight: 1.4, flex: 1 }}>
                     {c.descripcion}
@@ -1163,6 +1574,96 @@ export default function ChallengeBoard({
         </div>
       </div>
 
+      {/* Filtros por Colegio, Curso y Materia para Estudiantes */}
+      {!espacioId && challenges.length > 0 && (
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
+          background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '0.75rem',
+          padding: '0.75rem 1rem', marginBottom: '1.2rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 200px' }}>
+            <Search size={16} color="#64748B" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Buscar reto por título o contenido..."
+              style={{
+                width: '100%', border: 'none', background: 'transparent',
+                fontSize: '0.84rem', outline: 'none', color: '#0F172A'
+              }}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: 2 }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Filtro Colegio */}
+            {filterColegios.length > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <School size={14} color="#64748B" />
+                <select
+                  value={filterColegio}
+                  onChange={e => {
+                    setFilterColegio(e.target.value);
+                    setFilterCurso('');
+                    setFilterMateria('');
+                  }}
+                  style={{
+                    padding: '0.35rem 0.6rem', borderRadius: 6, border: '1px solid #CBD5E1',
+                    fontSize: '0.78rem', background: '#FFFFFF', color: '#334155', fontWeight: 600
+                  }}
+                >
+                  <option value="">Todos los Colegios</option>
+                  {filterColegios.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
+
+            {/* Filtro Materia */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <BookOpen size={14} color="#64748B" />
+              <select
+                value={filterMateria}
+                onChange={e => setFilterMateria(e.target.value)}
+                style={{
+                  padding: '0.35rem 0.6rem', borderRadius: 6, border: '1px solid #CBD5E1',
+                  fontSize: '0.78rem', background: '#FFFFFF', color: '#334155', fontWeight: 600
+                }}
+              >
+                <option value="">Todas las Materias</option>
+                {filterMaterias.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                style={{
+                  padding: '0.3rem 0.65rem', borderRadius: 6, border: '1px solid #FECACA',
+                  background: '#FEF2F2', color: '#DC2626', fontSize: '0.75rem', fontWeight: 700,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
+                }}
+              >
+                <X size={12} /> Limpiar filtros
+              </button>
+            )}
+          </div>
+
+          <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, marginLeft: 'auto' }}>
+            {filteredChallenges.length} de {challenges.length} retos
+          </span>
+        </div>
+      )}
+
       {challenges.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748B', background: '#F8FAFC', borderRadius: '0.75rem' }}>
           <Target size={34} style={{ margin: '0 auto 8px', opacity: 0.35, color: '#4F46E5' }} />
@@ -1173,9 +1674,24 @@ export default function ChallengeBoard({
             Tu docente publicará retos gamificados según el avance de cada tema.
           </p>
         </div>
+      ) : filteredChallenges.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '2rem 1.5rem', color: '#64748B', background: '#F8FAFC', borderRadius: '0.75rem', border: '1px dashed #CBD5E1' }}>
+          <p style={{ margin: 0, fontWeight: 700, color: '#1E293B' }}>
+            No se encontraron retos con los filtros seleccionados.
+          </p>
+          <button
+            onClick={clearFilters}
+            style={{
+              marginTop: 8, padding: '0.4rem 0.9rem', background: '#EEF2FF', color: '#4F46E5',
+              border: '1px solid #C7D2FE', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem'
+            }}
+          >
+            Restablecer filtros
+          </button>
+        </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
-          {challenges.map(uc => {
+          {filteredChallenges.map(uc => {
             const c = uc.challenge || uc;
             const isCompleted = uc.estado === 'COMPLETADO';
             const progressPercent = Math.min(100, Math.round(((uc.progreso || 0) / (uc.meta || c.meta || 1)) * 100));
@@ -1208,14 +1724,28 @@ export default function ChallengeBoard({
                   )}
                 </div>
 
-                {c.espacio_nombre && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
-                    <BookOpen size={11} color="#4F46E5" />
-                    <span style={{ fontSize: '0.72rem', color: '#4F46E5', fontWeight: 700 }}>
-                      {c.espacio_nombre}
+                {/* Badges Colegio, Curso y Materia */}
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {c.colegio_nombre && (
+                    <span style={{ fontSize: '0.7rem', background: '#F1F5F9', color: '#334155', padding: '2px 6px', borderRadius: 4, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      <School size={10} color="#64748B" /> {c.colegio_nombre}
                     </span>
-                  </div>
-                )}
+                  )}
+                  {c.curso_nombre && (
+                    <span style={{ fontSize: '0.7rem', background: '#EFF6FF', color: '#1E40AF', padding: '2px 6px', borderRadius: 4, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      <GraduationCap size={10} color="#3B82F6" /> {c.curso_nombre}
+                    </span>
+                  )}
+                  {(c.materia_nombre || c.espacio_nombre) ? (
+                    <span style={{ fontSize: '0.7rem', background: '#EEF2FF', color: '#4338CA', padding: '2px 6px', borderRadius: 4, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      <BookOpen size={10} color="#6366F1" /> {c.materia_nombre || c.espacio_nombre}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.7rem', background: '#F8FAFC', color: '#64748B', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
+                      🌐 Global
+                    </span>
+                  )}
+                </div>
 
                 <p style={{ margin: '0 0 12px', fontSize: '0.8rem', color: '#475569', lineHeight: 1.4, flex: 1 }}>
                   {c.descripcion}
