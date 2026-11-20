@@ -17,38 +17,50 @@ export default function SendReportModal({ student, course, isRiskOnly = false, a
   let initialMessage = '';
 
   if (isRiskOnly) {
-    initialSubject = `⚠️ ALERTA ACADÉMICA Y PLAN DE REFUERZO - ${course?.grado} "${course?.paralelo}"`;
+    initialSubject = `📋 CITACIÓN ACADÉMICA URGENTE: Riesgo de Deserción y Reprobación - ${course?.grado} "${course?.paralelo}"`;
     initialMessage = 
-      `Estimados estudiantes y padres de familia:\n\n` +
-      `Nos comunicamos formalmente para notificarles que se ha registrado una alerta de riesgo académico en la materia, ` +
-      `debido a calificaciones por debajo de la nota mínima de aprobación (51/100) o tareas y actividades pendientes de entrega.\n\n` +
-      `Es indispensable coordinar con el docente a la brevedad posible para acceder al plan de reforzamiento pedagógico y regularizar sus evaluaciones antes del cierre del trimestre.\n\n` +
-      `Saludos cordiales,\nPlantel Docente y Dirección Académica\nEduSmart Bolivia`;
+      `Estimados Padres de Familia y Tutores Legales:\n\n` +
+      `Por medio del presente comunicado, como profesor(a) del curso ${course?.grado} "${course?.paralelo}", les hago llegar formalmente esta CITACIÓN URGENTE por motivos de rendimiento escolar.\n\n` +
+      `Se ha detectado que sus hijos/as presentan calificaciones reprobatorias (inferiores a 51/100 pts) y/o acumulación reiterada de tareas sin presentar en la materia.\n\n` +
+      `Les solicito encarecidamente ponerse en contacto conmigo o presentarse en la institución a la brevedad posible para coordinar un plan de nivelación y entrega extraordinaria de actividades antes del cierre del periodo evaluativo.\n\n` +
+      `Atentamente,\nProfesor(a) de la Asignatura\nPlataforma Educativa EduSmart`;
   } else if (isBulk) {
-    initialSubject = `📊 Reporte Trimestral de Desempeño - Curso ${course?.grado} "${course?.paralelo}"`;
+    initialSubject = `📊 Informe Académico Periódico - Curso ${course?.grado} "${course?.paralelo}"`;
     initialMessage = 
-      `Estimados estudiantes y padres de familia del curso ${course?.grado} "${course?.paralelo}":\n\n` +
-      `Se ha actualizado el informe periódico de calificaciones, cumplimiento de tareas y desempeño académico en la plataforma EduSmart.\n\n` +
-      `Les invitamos a revisar sus calificaciones individuales y retroalimentación para mantener el compromiso y la excelencia académica.\n\n` +
-      `Atentamente,\nProfesor(a) de la Asignatura\nEduSmart Bolivia`;
+      `Estimados Padres de Familia, Tutores y Estudiantes del curso ${course?.grado} "${course?.paralelo}":\n\n` +
+      `Les saluda cordialmente el/la profesor(a) de la materia. Les comparto la actualización oficial del registro de tareas, calificaciones y cumplimiento académico registrado en la plataforma EduSmart.\n\n` +
+      `Agradezco el continuo acompañamiento desde el hogar y les invito a revisar el detalle individual de sus evaluaciones.\n\n` +
+      `Atentamente,\nProfesor(a) de la Asignatura\nPlataforma Educativa EduSmart`;
   } else {
-    const enRiesgo = student?.riesgo_academico || (student?.promedio != null && student.promedio < 51);
+    const studentName = student?.nombre || student?.nombre_completo || '';
+    const tutorLabel = student?.nombre_tutor ? `${student.nombre_tutor} (${student.relacion_tutor || 'Tutor'})` : 'Padre / Madre de Familia / Tutor';
+    const enRiesgo = student?.riesgo_academico || (student?.promedio != null && student.promedio < 51) || (student?.tareas_pendientes > 0);
+
     initialSubject = enRiesgo
-      ? `⚠️ Alerta de Rendimiento Académico - ${student?.nombre_completo || ''}`
-      : `📊 Reporte Periódico de Calificaciones - ${student?.nombre_completo || ''}`;
-    initialMessage = 
-      `Estimado/a ${student?.nombre_completo || ''} y familia:\n\n` +
-      `Le informamos su estado académico actual registrado en la plataforma EduSmart:\n\n` +
-      `• Código RUDE: ${student?.matricula || '—'}\n` +
-      `• Tareas entregadas: ${student?.tareas_entregadas || 0} de ${student?.tareas_asignadas || 0}\n` +
-      `• Tareas pendientes: ${student?.tareas_pendientes || 0}\n` +
-      `• Porcentaje de cumplimiento: ${student?.porcentaje_cumplimiento || 0}%\n` +
-      `• Promedio acumulado: ${student?.promedio > 0 ? student.promedio + '/100 pts' : 'Sin notas registradas'}\n` +
-      `• Estado académico: ${student?.estado_academico || 'En curso'}\n\n` +
-      (enRiesgo
-        ? `⚠️ AVISO DE REFUERZO: Te encuentras en situación de riesgo académico. Te recomendamos presentarte a las horas de apoyo pedagógico para regularizar tus entregas y asegurar tu aprobación.\n\n`
-        : `¡Felicitaciones por tu esfuerzo y constancia en el desarrollo de las actividades académicas!\n\n`) +
-      `Atentamente,\nEquipo Docente EduSmart`;
+      ? `📋 CITACIÓN ACADÉMICA URGENTE: Incumplimiento y Bajo Rendimiento - ${studentName}`
+      : `📊 Reporte Periódico de Desempeño - ${studentName}`;
+
+    initialMessage = enRiesgo
+      ? `Estimado/a ${tutorLabel} del estudiante ${studentName}:\n\n` +
+        `Por medio de la presente, como docente de la asignatura, me dirijo a usted con carácter de URGENCIA para hacerle llegar formalmente esta CITACIÓN ACADÉMICA por bajo rendimiento y tareas sin presentar:\n\n` +
+        `• Estudiante: ${studentName}\n` +
+        `• Tareas entregadas: ${student?.tareas_entregadas || 0} de ${student?.tareas_asignadas || student?.total_tareas || 0}\n` +
+        `• Tareas pendientes sin entregar: ${student?.tareas_pendientes || 0}\n` +
+        `• Promedio acumulado: ${student?.promedio > 0 ? student.promedio + '/100 pts' : 'Sin notas suficientes'}\n` +
+        `• Cumplimiento: ${student?.porcentaje_cumplimiento || 0}%\n` +
+        `• Situación actual: EN RIESGO ACADÉMICO\n\n` +
+        `Le solicito muy amablemente comunicarse conmigo o presentarse a la brevedad posible para tratar esta situación, regularizar los trabajos pendientes y evitar la reprobación del periodo.\n\n` +
+        `Atentamente,\nProfesor(a) de la Asignatura\nPlataforma Educativa EduSmart`
+      : `Estimado/a ${tutorLabel} del estudiante ${studentName}:\n\n` +
+        `Le saluda cordialmente su profesor(a). Le comparto el estado académico actualizado de su hijo/a en la plataforma EduSmart:\n\n` +
+        `• Estudiante: ${studentName}\n` +
+        `• Tareas completadas: ${student?.tareas_entregadas || 0} de ${student?.tareas_asignadas || student?.total_tareas || 0}\n` +
+        `• Tareas pendientes: ${student?.tareas_pendientes || 0}\n` +
+        `• Promedio acumulado: ${student?.promedio > 0 ? student.promedio + '/100 pts' : 'Sin notas registradas'}\n` +
+        `• Porcentaje de cumplimiento: ${student?.porcentaje_cumplimiento || 0}%\n` +
+        `• Estado: ${student?.estado_academico || 'Regular'}\n\n` +
+        `¡Agradezco su compromiso y constante respaldo en su formación!\n\n` +
+        `Atentamente,\nProfesor(a) de la Asignatura\nPlataforma Educativa EduSmart`;
   }
 
   const [asunto, setAsunto] = useState(initialSubject);
@@ -309,7 +321,8 @@ export default function SendReportModal({ student, course, isRiskOnly = false, a
             type="button"
             onClick={() => {
               const fullMsg = `*${asunto}*\n\n${mensaje}`;
-              const phone = (student?.telefono || '').replace(/\D/g, '');
+              const targetPhone = student?.telefono_tutor || student?.telefono || '';
+              const phone = targetPhone.replace(/\D/g, '');
               const cleanPhone = phone.length === 8 ? '591' + phone : phone;
               const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(fullMsg)}` : `https://wa.me/?text=${encodeURIComponent(fullMsg)}`;
               window.open(url, '_blank');
@@ -320,7 +333,7 @@ export default function SendReportModal({ student, course, isRiskOnly = false, a
               borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700,
               cursor: 'pointer', boxShadow: '0 2px 4px rgba(22,163,74,0.25)'
             }}
-            title="Abrir WhatsApp con el reporte prearmado para el padre o tutor"
+            title="Abrir WhatsApp con la citación oficial para el padre o tutor"
           >
             <span>💬 Notificar por WhatsApp</span>
           </button>

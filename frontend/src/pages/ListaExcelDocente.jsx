@@ -987,8 +987,13 @@ export default function ListaExcelDocente({ onNavigate }) {
                             onClick={() => setReportStudentTarget({
                               id: est.estudiante_id,
                               nombre_completo: est.nombre,
+                              nombre: est.nombre,
                               email: est.email,
                               matricula: est.ru,
+                              telefono: est.telefono,
+                              telefono_tutor: est.telefono_tutor,
+                              nombre_tutor: est.nombre_tutor,
+                              relacion_tutor: est.relacion_tutor,
                               tareas_entregadas: est.tareas_entregadas,
                               tareas_asignadas: est.total_tareas,
                               tareas_pendientes: est.tareas_pendientes,

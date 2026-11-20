@@ -1711,24 +1711,58 @@ def _build_student_list_excel(espacio, tareas):
 
         en_riesgo = len(factores_riesgo) > 0
 
-        # Plantilla prearmada para WhatsApp a Padre de Familia / Tutor
+        # Plantilla prearmada para WhatsApp a Padre de Familia / Tutor (con tono de Citación Formal del Docente)
         materia_label = espacio.nombre or (espacio.materia.nombre if espacio.materia else 'Materia')
-        telefono = (est.usuario.telefono or '').strip()
-        motivos_str = "\n".join([f"• {f}" for f in factores_riesgo]) if factores_riesgo else "• Ninguna observación de riesgo"
-
-        whatsapp_msg = (
-            f"Estimado tutor/padre de familia de {est.usuario.nombre_completo}:\n\n"
-            f"Le contactamos de {materia_label} (EduSmart Bolivia).\n"
-            f"Estado Académico: {'🚨 ALERTA ALTA DE RIESGO' if nivel_riesgo == 'ALTO' else ('⚠️ ALERTA ACADÉMICA' if nivel_riesgo == 'MEDIO' else '✅ DESEMPEÑO ESTABLE')}\n\n"
-            f"Motivos observados:\n{motivos_str}\n\n"
-            f"Resumen de Desempeño:\n"
-            f"• Tareas entregadas: {entregas_count} de {total_t}\n"
-            f"• Tareas pendientes: {total_t - entregas_count}\n"
-            f"• Promedio acumulado: {promedio if promedio is not None else 'Sin notas'} / 100 pts\n\n"
-            f"Le solicitamos coordinar con el docente para el plan de regularización y apoyo pedagógico."
+        docente_nombre = (
+            espacio.docente.usuario.nombre_completo
+            if (espacio.docente and hasattr(espacio.docente, 'usuario') and espacio.docente.usuario.nombre_completo)
+            else (request.user.nombre_completo if hasattr(request.user, 'nombre_completo') and request.user.nombre_completo else 'Profesor(a)')
         )
+        tutor_nombre = getattr(est, 'nombre_tutor', '') or 'Padre / Madre de Familia / Tutor'
+        relacion_tutor = getattr(est, 'relacion_tutor', 'TUTOR')
+        tratamiento = 'Sra.' if relacion_tutor == 'MADRE' else ('Sr.' if relacion_tutor == 'PADRE' else 'Estimado/a')
 
-        clean_phone = ''.join(filter(str.isdigit, telefono))
+        telefono_destino = (getattr(est, 'telefono_tutor', None) or est.usuario.telefono or '').strip()
+        motivos_str = "\n".join([f"   • {f}" for f in factores_riesgo]) if factores_riesgo else "   • Ninguna observación de riesgo"
+
+        if en_riesgo:
+            whatsapp_msg = (
+                f"📋 *CITACIÓN ACADÉMICA — EduSmart*\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"{tratamiento} *{tutor_nombre}*:\n\n"
+                f"Le saluda cordialmente el/la profesor(a) *{docente_nombre}*, docente de la materia *{materia_label}*.\n\n"
+                f"Me dirijo a usted como responsable del/la estudiante *{est.usuario.nombre_completo}* para hacerle llegar formalmente una *CITACIÓN URGENTE* por motivos académicos:\n\n"
+                f"*📌 Observaciones detectadas:*\n"
+                f"{motivos_str}\n\n"
+                f"*📊 Resumen del Estudiante:*\n"
+                f"• Tareas entregadas: {entregas_count} de {total_t}\n"
+                f"• Tareas pendientes / sin entregar: {total_t - entregas_count}\n"
+                f"• Promedio acumulado: {promedio if promedio is not None else 'Sin notas'} / 100 pts\n"
+                f"• Nivel de alerta: {'🔴 RIESGO ALTO (Reprobación inminente)' if nivel_riesgo == 'ALTO' else '🟠 RIESGO MEDIO'}\n\n"
+                f"⚠️ *Solicitud del Docente:*\n"
+                f"Le solicito amablemente comunicarse conmigo o acercarse a la institución a la brevedad posible para coordinar un plan de regularización, entrega de tareas y nivelación antes del cierre de calificaciones.\n\n"
+                f"Atentamente,\n"
+                f"*{docente_nombre}*\n"
+                f"_Docente de {materia_label} — Plataforma EduSmart_"
+            )
+        else:
+            whatsapp_msg = (
+                f"📊 *REPORTE ACADÉMICO — EduSmart*\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"{tratamiento} *{tutor_nombre}*:\n\n"
+                f"Le saluda el/la profesor(a) *{docente_nombre}*, docente de la materia *{materia_label}*.\n\n"
+                f"Le comparto el informe de seguimiento de su hijo/a *{est.usuario.nombre_completo}*:\n"
+                f"• Tareas entregadas: {entregas_count} de {total_t}\n"
+                f"• Promedio actual: {promedio if promedio is not None else 'Sin notas'} / 100 pts\n"
+                f"• Cumplimiento: {cumplimiento}%\n"
+                f"• Desempeño: {estado_ac}\n\n"
+                f"Agradezco su constante apoyo y acompañamiento en su proceso formativo.\n\n"
+                f"Atentamente,\n"
+                f"*{docente_nombre}*\n"
+                f"_Docente de {materia_label} — Plataforma EduSmart_"
+            )
+
+        clean_phone = ''.join(filter(str.isdigit, telefono_destino))
         if clean_phone.startswith('0'):
             clean_phone = clean_phone[1:]
         if len(clean_phone) == 8 and not clean_phone.startswith('591'):
@@ -1740,7 +1774,10 @@ def _build_student_list_excel(espacio, tareas):
             'nombre': est.usuario.nombre_completo,
             'email': est.usuario.email,
             'ru': ru,
-            'telefono': telefono,
+            'telefono': est.usuario.telefono or '',
+            'telefono_tutor': getattr(est, 'telefono_tutor', '') or '',
+            'nombre_tutor': getattr(est, 'nombre_tutor', '') or '',
+            'relacion_tutor': getattr(est, 'relacion_tutor', '') or 'PADRE',
             'tareas_entregadas': entregas_count,
             'tareas_pendientes': total_t - entregas_count,
             'total_tareas': total_t,
@@ -2324,21 +2361,29 @@ def api_enviar_alertas_rendimiento(request):
     curso_id = request.data.get('curso_id')
     now = timezone.now()
 
+    # Obtener docente que ejecuta la acción (para firmar los mensajes)
+    docente_obj = None
+    materia_nombre = 'EduSmart'
+    try:
+        docente_obj = request.user.perfil_docente
+    except Exception:
+        pass
+
     # Construir queryset base de estudiantes
     if espacio_id:
         espacio = get_object_or_404(Espacio, id=espacio_id)
+        materia_nombre = espacio.nombre
         estudiantes_ids = espacio.miembros.values_list('estudiante_id', flat=True)
         estudiantes_qs = Estudiante.objects.filter(id__in=estudiantes_ids)
     elif curso_id:
         curso = get_object_or_404(Curso, id=curso_id)
+        materia_nombre = curso.nombre_completo if hasattr(curso, 'nombre_completo') else str(curso)
         estudiantes_ids = curso.estudiantes.filter(estado='ACTIVO').values_list('estudiante_id', flat=True)
         estudiantes_qs = Estudiante.objects.filter(id__in=estudiantes_ids)
     else:
-        try:
-            docente = request.user.perfil_docente
-        except Exception:
+        if not docente_obj:
             return Response({'error': 'Solo docentes pueden enviar alertas masivas'}, status=403)
-        colegios_ids = DocenteColegio.objects.filter(docente=docente).values_list('colegio_id', flat=True)
+        colegios_ids = DocenteColegio.objects.filter(docente=docente_obj).values_list('colegio_id', flat=True)
         cursos_ids = Curso.objects.filter(colegio_id__in=colegios_ids).values_list('id', flat=True)
         estudiantes_ids = EstudianteCurso.objects.filter(
             curso_id__in=cursos_ids, estado='ACTIVO'
@@ -2378,8 +2423,10 @@ def api_enviar_alertas_rendimiento(request):
         if not motivos:
             continue
 
-        # Enviar alertas
-        resultado_ws = whatsapp_service.enviar_alerta_rendimiento(est, motivos)
+        # Enviar alertas con firma del docente
+        resultado_ws = whatsapp_service.enviar_alerta_rendimiento(
+            est, motivos, docente=docente_obj, materia=materia_nombre
+        )
 
         # Notificacion interna
         Notificacion.objects.create(
@@ -2414,6 +2461,14 @@ def api_alertar_tarea_vencida(request, tarea_id):
     """
     tarea = get_object_or_404(Tarea, id=tarea_id)
     espacio = tarea.espacio
+
+    # Obtener docente que ejecuta la acción
+    docente_obj = None
+    try:
+        docente_obj = request.user.perfil_docente
+    except Exception:
+        pass
+
     estudiantes_ids = espacio.miembros.values_list('estudiante_id', flat=True)
     estudiantes_sin_entrega = Estudiante.objects.filter(
         id__in=estudiantes_ids
@@ -2423,7 +2478,9 @@ def api_alertar_tarea_vencida(request, tarea_id):
 
     resultados = []
     for est in estudiantes_sin_entrega:
-        resultado_ws = whatsapp_service.enviar_alerta_tarea_vencida(est, tarea)
+        resultado_ws = whatsapp_service.enviar_alerta_tarea_vencida(
+            est, tarea, docente=docente_obj
+        )
 
         Notificacion.objects.create(
             usuario=est.usuario,
