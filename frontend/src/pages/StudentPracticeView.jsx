@@ -10,6 +10,7 @@ export default function StudentPracticeView({ onNavigate }) {
   const [practicas, setPracticas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterMateria, setFilterMateria] = useState('todas');
+  const [filterTab, setFilterTab] = useState('pendientes'); // 'pendientes' | 'aprobadas' | 'todas'
   const [selectedPracticaId, setSelectedPracticaId] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -36,12 +37,22 @@ export default function StudentPracticeView({ onNavigate }) {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  // Evaluaciones divididas por estado
+  const pendientesPorHacer = practicas.filter(p => !p.aprobado);
+  const aprobadas = practicas.filter(p => p.aprobado);
+
+  const basePracticas = filterTab === 'pendientes'
+    ? pendientesPorHacer
+    : filterTab === 'aprobadas'
+    ? aprobadas
+    : practicas;
+
   // Extraer lista única de materias para el filtro
   const materias = Array.from(new Set(practicas.map(p => p.materia_nombre)));
 
   const filteredPracticas = filterMateria === 'todas'
-    ? practicas
-    : practicas.filter(p => p.materia_nombre === filterMateria);
+    ? basePracticas
+    : basePracticas.filter(p => p.materia_nombre === filterMateria);
 
   const completadas = practicas.filter(p => p.aprobado).length;
   const total = practicas.length;
@@ -73,10 +84,10 @@ export default function StudentPracticeView({ onNavigate }) {
             <Sparkles size={13} color="#FDE047" /> Inteligencia Artificial Educativa
           </div>
           <h1 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 900, letterSpacing: '-0.02em' }}>
-            Simuladores de Examen por Avance Docente
+            Evaluaciones y Simuladores con IA
           </h1>
           <p style={{ margin: '8px 0 0', fontSize: '0.9rem', color: '#C7D2FE', lineHeight: 1.5 }}>
-            Cada vez que tu profesor completa un tema en el aula, la IA genera un simulador con ejercicios didácticos paso a paso para que practiques y asegures la máxima nota en tus exámenes formales.
+            Consulta y rinde tus evaluaciones pendientes generadas por la IA según el avance de tus materias.
           </p>
         </div>
 
@@ -87,21 +98,60 @@ export default function StudentPracticeView({ onNavigate }) {
           padding: '1.2rem 1.6rem', minWidth: 200, textAlign: 'center'
         }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#E0E7FF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Simuladores Superados
+            Evaluaciones Pendientes
           </div>
           <div style={{ fontSize: '2rem', fontWeight: 900, color: '#FFFFFF', margin: '4px 0' }}>
-            {completadas} <span style={{ fontSize: '1rem', fontWeight: 600, color: '#A5B4FC' }}>/ {total}</span>
+            {pendientesPorHacer.length} <span style={{ fontSize: '1rem', fontWeight: 600, color: '#A5B4FC' }}>/ {total}</span>
           </div>
           <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 9999, height: 6, overflow: 'hidden', marginTop: 8 }}>
             <div style={{ height: '100%', background: '#34D399', width: `${progresoPct}%`, transition: 'width 0.4s' }} />
           </div>
           <div style={{ fontSize: 11, color: '#A5B4FC', marginTop: 4, fontWeight: 600 }}>
-            {progresoPct}% de preparación completada
+            {completadas} superadas ({progresoPct}% completado)
           </div>
         </div>
       </div>
 
-      {/* Toolbar y Filtros */}
+      {/* Tabs Principales: Pendientes y Por Hacer vs Aprobadas vs Todas */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <button
+          onClick={() => setFilterTab('pendientes')}
+          style={{
+            padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            fontWeight: 700, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6,
+            background: filterTab === 'pendientes' ? '#1E3A8A' : '#F1F5F9',
+            color: filterTab === 'pendientes' ? '#FFFFFF' : '#475569',
+            boxShadow: filterTab === 'pendientes' ? '0 2px 4px rgba(30,58,138,0.2)' : 'none'
+          }}
+        >
+          <Clock size={14} /> Evaluaciones Pendientes y Por Hacer ({pendientesPorHacer.length})
+        </button>
+        <button
+          onClick={() => setFilterTab('aprobadas')}
+          style={{
+            padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            fontWeight: 700, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6,
+            background: filterTab === 'aprobadas' ? '#059669' : '#F1F5F9',
+            color: filterTab === 'aprobadas' ? '#FFFFFF' : '#475569',
+            boxShadow: filterTab === 'aprobadas' ? '0 2px 4px rgba(5,150,105,0.2)' : 'none'
+          }}
+        >
+          <CheckCircle size={14} /> Evaluaciones Aprobadas ({aprobadas.length})
+        </button>
+        <button
+          onClick={() => setFilterTab('todas')}
+          style={{
+            padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            fontWeight: 700, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6,
+            background: filterTab === 'todas' ? '#475569' : '#F1F5F9',
+            color: filterTab === 'todas' ? '#FFFFFF' : '#475569'
+          }}
+        >
+          Todas ({practicas.length})
+        </button>
+      </div>
+
+      {/* Toolbar y Filtros por Asignatura */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.4rem', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: '#64748B', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -116,22 +166,25 @@ export default function StudentPracticeView({ onNavigate }) {
               color: filterMateria === 'todas' ? '#FFFFFF' : '#475569'
             }}
           >
-            Todas ({practicas.length})
+            Todas ({basePracticas.length})
           </button>
-          {materias.map(m => (
-            <button
-              key={m}
-              onClick={() => setFilterMateria(m)}
-              style={{
-                padding: '5px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                fontWeight: 700, fontSize: 12, transition: 'all 0.15s',
-                background: filterMateria === m ? '#4F46E5' : '#F1F5F9',
-                color: filterMateria === m ? '#FFFFFF' : '#475569'
-              }}
-            >
-              {m}
-            </button>
-          ))}
+          {materias.map(m => {
+            const countInMateria = basePracticas.filter(p => p.materia_nombre === m).length;
+            return (
+              <button
+                key={m}
+                onClick={() => setFilterMateria(m)}
+                style={{
+                  padding: '5px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                  fontWeight: 700, fontSize: 12, transition: 'all 0.15s',
+                  background: filterMateria === m ? '#4F46E5' : '#F1F5F9',
+                  color: filterMateria === m ? '#FFFFFF' : '#475569'
+                }}
+              >
+                {m} ({countInMateria})
+              </button>
+            );
+          })}
         </div>
 
         <button
@@ -157,11 +210,34 @@ export default function StudentPracticeView({ onNavigate }) {
           background: '#FFFFFF', border: '2px dashed #E2E8F0', borderRadius: '1rem',
           padding: '3rem 2rem', textAlign: 'center', color: '#64748B'
         }}>
-          <BookOpen size={42} style={{ color: '#94A3B8', margin: '0 auto 10px', opacity: 0.6 }} />
-          <h3 style={{ margin: 0, color: '#1E293B', fontWeight: 800 }}>No hay simuladores disponibles todavía</h3>
-          <p style={{ margin: '6px auto 0', maxWidth: 480, fontSize: '0.86rem', color: '#64748B' }}>
-            A medida que tus docentes marquen como <strong>"Completado"</strong> los temas en el aula, aparecerán aquí automáticamente los simuladores de examen con IA para que practiques.
-          </p>
+          {filterTab === 'pendientes' ? (
+            <>
+              <CheckCircle size={46} style={{ color: '#10B981', margin: '0 auto 10px' }} />
+              <h3 style={{ margin: 0, color: '#065F46', fontWeight: 800 }}>¡Estás al día con tus evaluaciones!</h3>
+              <p style={{ margin: '6px auto 0', maxWidth: 480, fontSize: '0.86rem', color: '#64748B' }}>
+                No tienes evaluaciones diagnósticas ni simuladores IA pendientes por hacer en este momento.
+              </p>
+              {aprobadas.length > 0 && (
+                <button
+                  onClick={() => setFilterTab('aprobadas')}
+                  style={{
+                    marginTop: 14, padding: '7px 16px', background: '#F0FDF4', color: '#166534',
+                    border: '1px solid #BBF7D0', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer'
+                  }}
+                >
+                  Ver mis {aprobadas.length} evaluaciones aprobadas →
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <BookOpen size={42} style={{ color: '#94A3B8', margin: '0 auto 10px', opacity: 0.6 }} />
+              <h3 style={{ margin: 0, color: '#1E293B', fontWeight: 800 }}>No hay evaluaciones en esta sección</h3>
+              <p style={{ margin: '6px auto 0', maxWidth: 480, fontSize: '0.86rem', color: '#64748B' }}>
+                A medida que tus docentes avancen temas en el aula, aparecerán aquí las evaluaciones correspondientes.
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: '1.2rem' }}>

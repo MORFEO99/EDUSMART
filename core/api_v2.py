@@ -1918,7 +1918,8 @@ def api_descargar_boletin_curso(request, curso_id):
 
     curso = get_object_or_404(Curso, id=curso_id)
     pdf_buffer = generate_course_gradebook_pdf(curso)
-    safe_name = f"cuadro_calificaciones_{curso.grado}_{curso.seccion}_{timezone.now().strftime('%Y%m%d')}.pdf".replace(' ', '_')
+    paralelo = getattr(curso, 'paralelo', '') or getattr(curso, 'seccion', '')
+    safe_name = f"cuadro_calificaciones_{curso.grado}_{paralelo}_{timezone.now().strftime('%Y%m%d')}.pdf".replace(' ', '_')
     response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{safe_name}"'
     return response

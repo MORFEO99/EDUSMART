@@ -39,8 +39,11 @@ class EspacioSerializer(serializers.ModelSerializer):
     total_estudiantes = serializers.ReadOnlyField()
     total_tareas = serializers.ReadOnlyField()
     tareas_pendientes_estudiante = serializers.SerializerMethodField()
+    colegio_id = serializers.SerializerMethodField()
     colegio_nombre = serializers.SerializerMethodField()
+    curso_id = serializers.SerializerMethodField()
     curso_nombre = serializers.SerializerMethodField()
+    materia_id = serializers.SerializerMethodField()
     materia_nombre = serializers.SerializerMethodField()
 
     class Meta:
@@ -49,17 +52,48 @@ class EspacioSerializer(serializers.ModelSerializer):
             'id', 'nombre', 'descripcion', 'codigo', 'color', 'icono',
             'imagen_url', 'docente', 'docente_nombre', 'total_estudiantes',
             'total_tareas', 'tareas_pendientes_estudiante', 'fecha_creacion',
-            'colegio_nombre', 'curso_nombre', 'materia_nombre'
+            'colegio_id', 'colegio_nombre', 'curso_id', 'curso_nombre', 'materia_id', 'materia_nombre'
         ]
 
     def get_docente_nombre(self, obj):
         return obj.docente.usuario.nombre_completo if obj.docente else 'Docente'
 
+    def get_colegio_id(self, obj):
+        if obj.colegio_id:
+            return obj.colegio_id
+        if obj.curso and obj.curso.colegio_id:
+            return obj.curso.colegio_id
+        if obj.materia and obj.materia.curso and obj.materia.curso.colegio_id:
+            return obj.materia.curso.colegio_id
+        return None
+
     def get_colegio_nombre(self, obj):
-        return obj.colegio.nombre if obj.colegio else ''
+        if obj.colegio:
+            return obj.colegio.nombre
+        if obj.curso and obj.curso.colegio:
+            return obj.curso.colegio.nombre
+        if obj.materia and obj.materia.curso and obj.materia.curso.colegio:
+            return obj.materia.curso.colegio.nombre
+        return ''
+
+    def get_curso_id(self, obj):
+        if obj.curso_id:
+            return obj.curso_id
+        if obj.materia and obj.materia.curso_id:
+            return obj.materia.curso_id
+        return None
 
     def get_curso_nombre(self, obj):
-        return obj.curso.nombre_completo if obj.curso else ''
+        if obj.curso:
+            return obj.curso.nombre_completo
+        if obj.materia and obj.materia.curso:
+            return obj.materia.curso.nombre_completo
+        return ''
+
+    def get_materia_id(self, obj):
+        if obj.materia_id:
+            return obj.materia_id
+        return None
 
     def get_materia_nombre(self, obj):
         return obj.materia.nombre if obj.materia else ''
@@ -188,23 +222,49 @@ class TareaSerializer(serializers.ModelSerializer):
         return obj.docente.usuario.nombre_completo if obj.docente else 'Docente'
 
     def get_colegio_id(self, obj):
-        return obj.espacio.colegio_id if obj.espacio else None
+        if not obj.espacio:
+            return None
+        if obj.espacio.colegio_id:
+            return obj.espacio.colegio_id
+        if obj.espacio.curso and obj.espacio.curso.colegio_id:
+            return obj.espacio.curso.colegio_id
+        if obj.espacio.materia and obj.espacio.materia.curso and obj.espacio.materia.curso.colegio_id:
+            return obj.espacio.materia.curso.colegio_id
+        return None
 
     def get_colegio_nombre(self, obj):
-        if obj.espacio and obj.espacio.colegio:
+        if not obj.espacio:
+            return ''
+        if obj.espacio.colegio:
             return obj.espacio.colegio.nombre
+        if obj.espacio.curso and obj.espacio.curso.colegio:
+            return obj.espacio.curso.colegio.nombre
+        if obj.espacio.materia and obj.espacio.materia.curso and obj.espacio.materia.curso.colegio:
+            return obj.espacio.materia.curso.colegio.nombre
         return ''
 
     def get_curso_id(self, obj):
-        return obj.espacio.curso_id if obj.espacio else None
+        if not obj.espacio:
+            return None
+        if obj.espacio.curso_id:
+            return obj.espacio.curso_id
+        if obj.espacio.materia and obj.espacio.materia.curso_id:
+            return obj.espacio.materia.curso_id
+        return None
 
     def get_curso_nombre(self, obj):
-        if obj.espacio and obj.espacio.curso:
+        if not obj.espacio:
+            return ''
+        if obj.espacio.curso:
             return obj.espacio.curso.nombre_completo
+        if obj.espacio.materia and obj.espacio.materia.curso:
+            return obj.espacio.materia.curso.nombre_completo
         return ''
 
     def get_materia_id(self, obj):
-        return obj.espacio.materia_id if obj.espacio else None
+        if not obj.espacio:
+            return None
+        return obj.espacio.materia_id
 
     def get_materia_nombre(self, obj):
         if obj.espacio and obj.espacio.materia:

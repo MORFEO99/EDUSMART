@@ -589,6 +589,32 @@ function AddTemaModal({ materiaId, onClose, onCreated }) {
 }
 
 export function TeacherTasksView({ onNavigate, onOpenCreate }) {
+  // Main Tab State: 'tareas' (por defecto) vs 'avance' (IA & Temas)
+  const [activeTab, setActiveTab] = useState('tareas');
+
+  // Tasks Data state (Gestión de Tareas Docentes)
+  const [tasks, setTasks] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
+  const [taskSearch, setTaskSearch] = useState('');
+  const [taskFilter, setTaskFilter] = useState('todas'); // Por defecto 'todas'
+
+  // Filtros de jerarquía académica para Tareas
+  const [filterColegioId, setFilterColegioId] = useState('TODOS');
+  const [filterCursoId, setFilterCursoId]     = useState('TODOS');
+  const [filterMateriaId, setFilterMateriaId] = useState('TODOS');
+
+  const loadTasks = () => {
+    setLoadingTasks(true);
+    teacherAPI.tasks()
+      .then(res => setTasks(Array.isArray(res) ? res : []))
+      .catch(console.error)
+      .finally(() => setLoadingTasks(false));
+  };
+
+  useEffect(() => {
+    loadTasks();
+  }, []);
+
   // 
   // Data state
   // 
@@ -771,17 +797,51 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
   const onSelectColegio = (id) => {
     setSelectedColegioId(id);
     const c = colegios.find(x => x.colegio_id === id);
-    const firstCurso = c && c.cursos[0];
+    const firstCurso = c && c.cursos && c.cursos[0];
     setSelectedCursoId(firstCurso ? firstCurso.curso_id : null);
-    const firstMateria = firstCurso && firstCurso.materias[0];
-    setSelectedMateriaId(firstMateria ? firstmateria.materia_id : null);
+    const firstMateria = firstCurso && firstCurso.materias && firstCurso.materias[0];
+    setSelectedMateriaId(firstMateria ? firstMateria.materia_id : null);
   };
   const onSelectCurso = (id) => {
     setSelectedCursoId(id);
     const c = cursos.find(x => x.curso_id === id);
-    const firstMateria = c && c.materias[0];
-    setSelectedMateriaId(firstMateria ? firstmateria.materia_id : null);
+    const firstMateria = c && c.materias && c.materias[0];
+    setSelectedMateriaId(firstMateria ? firstMateria.materia_id : null);
   };
+
+  // Filtered tasks — including hierarchy filters
+  const filteredTasks = tasks.filter(t => {
+    // Status filter
+    if (taskFilter === 'activas' && t.esta_vencida) return false;
+    if (taskFilter === 'pendientes_calificar' && (t.pendientes_calificacion || 0) === 0) return false;
+    if (taskFilter === 'vencidas' && !t.esta_vencida) return false;
+
+    // Hierarchy filters
+    if (filterColegioId !== 'TODOS' && t.colegio_id && String(t.colegio_id) !== String(filterColegioId)) return false;
+    if (filterCursoId !== 'TODOS' && t.curso_id && String(t.curso_id) !== String(filterCursoId)) return false;
+    if (filterMateriaId !== 'TODOS' && t.materia_id && String(t.materia_id) !== String(filterMateriaId)) return false;
+
+    // Text search
+    const matchSearch = !taskSearch ||
+      t.titulo?.toLowerCase().includes(taskSearch.toLowerCase()) ||
+      t.materia?.toLowerCase().includes(taskSearch.toLowerCase()) ||
+      t.curso_nombre?.toLowerCase().includes(taskSearch.toLowerCase()) ||
+      t.colegio_nombre?.toLowerCase().includes(taskSearch.toLowerCase());
+    return matchSearch;
+  });
+
+  // Derived selectors for filter bar (from estructura)
+  const filterColegios = estructura;
+  const filterCursos = useMemo(() => {
+    if (filterColegioId === 'TODOS') return [];
+    const c = filterColegios.find(x => String(x.colegio_id) === String(filterColegioId));
+    return c ? c.cursos : [];
+  }, [filterColegios, filterColegioId]);
+  const filterMaterias = useMemo(() => {
+    if (filterCursoId === 'TODOS') return [];
+    const c = filterCursos.find(x => String(x.curso_id) === String(filterCursoId));
+    return c ? c.materias : [];
+  }, [filterCursos, filterCursoId]);
 
   // 
   // Render
@@ -791,35 +851,273 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
   return (
     <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/*  HEADER  */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+      {/* Pestañas Principales: Gestión de Tareas vs Avance Curricular / IA */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderBottom: '1px solid #E2E8F0', paddingBottom: 12 }}>
+        <button
+          onClick={() => setActiveTab('tareas')}
+          style={{
+            padding: '9px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            fontWeight: 700, fontSize: 13.5, display: 'inline-flex', alignItems: 'center', gap: 7,
+            background: activeTab === 'tareas' ? '#1E3A8A' : '#F1F5F9',
+            color: activeTab === 'tareas' ? '#FFFFFF' : '#475569',
+            boxShadow: activeTab === 'tareas' ? '0 2px 6px rgba(30,58,138,0.2)' : 'none',
+            transition: 'all 0.15s'
+          }}
+        >
+          <CheckSquare size={16} /> Tareas Asignadas ({tasks.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('avance')}
+          style={{
+            padding: '9px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            fontWeight: 700, fontSize: 13.5, display: 'inline-flex', alignItems: 'center', gap: 7,
+            background: activeTab === 'avance' ? '#4338CA' : '#F1F5F9',
+            color: activeTab === 'avance' ? '#FFFFFF' : '#475569',
+            boxShadow: activeTab === 'avance' ? '0 2px 6px rgba(67,56,202,0.2)' : 'none',
+            transition: 'all 0.15s'
+          }}
+        >
+          <Sparkles size={16} /> Avance Curricular y Simuladores IA
+        </button>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          PESTAÑA 1: GESTIÓN DE TAREAS DOCENTES
+          ══════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'tareas' && (
         <div>
-          <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Layers size={22} style={{ color: '#4338CA' }} /> Gestor de Avance de Temas
-          </h2>
-          <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
-            Registra y monitorea el progreso curricular por colegio, curso y materia. Sin perder ningún tema.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={loadEstructura}
-            style={{ height: 36, display: 'inline-flex', alignItems: 'center', gap: 6 }}
-          >
-            <RefreshCw size={14} /> Actualizar
-          </button>
-          {selectedMateriaId && (
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={() => setShowAddModal(true)}
-              style={{ height: 36, display: 'inline-flex', alignItems: 'center', gap: 6, background: '#4338CA' }}
-            >
-              <Plus size={15} /> Agregar Tema
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: '0 0 4px 0' }}>
+                Gestión de Tareas Docentes
+              </h2>
+              <p style={{ fontSize: '12.5px', color: '#64748B', margin: 0 }}>
+                Supervisa las actividades publicadas, revisa entregas de estudiantes y califica trabajos.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', width: 220 }}>
+                <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
+                <input
+                  className="form-control"
+                  style={{ paddingLeft: 30, height: 34, fontSize: '12.5px' }}
+                  placeholder="Buscar tarea..."
+                  value={taskSearch}
+                  onChange={(e) => setTaskSearch(e.target.value)}
+                />
+              </div>
+              <button className="btn btn-secondary btn-sm" onClick={loadTasks} style={{ height: 34, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <RefreshCw size={13} /> Actualizar
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={onOpenCreate} style={{ height: 34, background: '#1E3A8A', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Plus size={15} /> Nueva Tarea
+              </button>
+            </div>
+          </div>
+
+          {/* ── Filtros jerárquicos: Colegio → Curso → Materia ── */}
+          {filterColegios.length > 0 && (
+            <div style={{
+              background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 10,
+              padding: '12px 16px', marginBottom: 14,
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10
+            }}>
+              {/* Colegio */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#1E3A8A', marginBottom: 5 }}>
+                  <School size={13} /> Colegio
+                </label>
+                <select
+                  className="form-control"
+                  style={{ height: 36, fontSize: 12.5, fontWeight: 600 }}
+                  value={filterColegioId}
+                  onChange={e => {
+                    setFilterColegioId(e.target.value);
+                    setFilterCursoId('TODOS');
+                    setFilterMateriaId('TODOS');
+                  }}
+                >
+                  <option value="TODOS">— Todos los colegios —</option>
+                  {filterColegios.map(c => (
+                    <option key={c.colegio_id} value={c.colegio_id}>{c.colegio_nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Curso */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#0284C7', marginBottom: 5 }}>
+                  <GraduationCap size={13} /> Curso
+                </label>
+                <select
+                  className="form-control"
+                  style={{ height: 36, fontSize: 12.5, fontWeight: 600 }}
+                  value={filterCursoId}
+                  disabled={filterColegioId === 'TODOS'}
+                  onChange={e => {
+                    setFilterCursoId(e.target.value);
+                    setFilterMateriaId('TODOS');
+                  }}
+                >
+                  <option value="TODOS">— Todos los cursos —</option>
+                  {filterCursos.map(c => (
+                    <option key={c.curso_id} value={c.curso_id}>{c.curso_nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Materia */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#059669', marginBottom: 5 }}>
+                  <BookOpen size={13} /> Materia
+                </label>
+                <select
+                  className="form-control"
+                  style={{ height: 36, fontSize: 12.5, fontWeight: 600 }}
+                  value={filterMateriaId}
+                  disabled={filterCursoId === 'TODOS'}
+                  onChange={e => setFilterMateriaId(e.target.value)}
+                >
+                  <option value="TODOS">— Todas las materias —</option>
+                  {filterMaterias.map(m => (
+                    <option key={m.materia_id} value={m.materia_id}>{m.materia_nombre}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Filtros de estado de tarea */}
+          <div className="teams-tabs" style={{ marginBottom: 14 }}>
+            {[
+              { id: 'todas', label: `Todas (${tasks.length})` },
+              { id: 'activas', label: `Activas (${tasks.filter(t => !t.esta_vencida).length})` },
+              { id: 'pendientes_calificar', label: `Por calificar (${tasks.filter(t => (t.pendientes_calificacion || 0) > 0).length})` },
+              { id: 'vencidas', label: `Vencidas (${tasks.filter(t => t.esta_vencida).length})` },
+            ].map(tab => (
+              <button key={tab.id} className={`teams-tab ${taskFilter === tab.id ? 'active' : ''}`} onClick={() => setTaskFilter(tab.id)}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {loadingTasks ? (
+            <div style={{ padding: 40, textAlign: 'center' }}>
+              <RefreshCw size={24} style={{ color: '#94A3B8', animation: 'spin 1s linear infinite' }} />
+              <p style={{ color: '#94A3B8', fontSize: 13, marginTop: 8 }}>Cargando tareas...</p>
+            </div>
+          ) : filteredTasks.length === 0 ? (
+            <EmptyState
+              icon={ClipboardList}
+              title={taskSearch ? 'Sin coincidencias' : 'Sin tareas en esta vista'}
+              description={taskSearch ? `No se encontraron tareas para "${taskSearch}".` : 'Publica una tarea para comenzar el ciclo académico con tus estudiantes.'}
+              action={<button className="btn btn-primary" onClick={onOpenCreate} style={{ background: '#1E3A8A' }}><Plus size={14} /> Publicar primera tarea</button>}
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {filteredTasks.map(t => {
+                const priBadge = getPriorityBadge(t.prioridad);
+                return (
+                  <div key={t.id} className="task-card" style={{ background: '#FFFFFF', borderRadius: 10, border: '1px solid #E2E8F0', padding: 16 }}>
+                    {/* Header: título + badges */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+                      <span style={{ fontWeight: 700, fontSize: '14.5px', color: '#0F172A' }}>{t.titulo}</span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <span className={`badge ${priBadge.cls}`}>{priBadge.label}</span>
+                        <span className={`badge ${t.esta_vencida ? 'badge-vencida' : 'badge-calificada'}`}>
+                          {t.esta_vencida ? 'Vencida' : 'Activa'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Jerarquía académica: Colegio | Curso | Materia */}
+                    <div style={{ display: 'flex', gap: 14, fontSize: '12px', flexWrap: 'wrap', marginBottom: 8 }}>
+                      {t.colegio_nombre && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#1E3A8A', fontWeight: 600 }}>
+                          <School size={12} /> {t.colegio_nombre}
+                        </span>
+                      )}
+                      {t.curso_nombre && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#0284C7', fontWeight: 600 }}>
+                          <GraduationCap size={12} /> {t.curso_nombre}
+                        </span>
+                      )}
+                      {t.materia && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#059669', fontWeight: 600 }}>
+                          <BookOpen size={12} /> {t.materia}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Detalles: fecha + puntaje */}
+                    <div style={{ display: 'flex', gap: 16, fontSize: '12px', color: '#64748B', flexWrap: 'wrap' }}>
+                      <span><strong>Fecha límite:</strong> {formatDate(t.fecha_limite)}</span>
+                      <span><strong>Puntaje:</strong> {t.puntaje_maximo} pts</span>
+                    </div>
+
+                    {/* Footer: stats + acción */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTop: '1px solid #F1F5F9', flexWrap: 'wrap', gap: 10 }}>
+                      <div style={{ display: 'flex', gap: 16, fontSize: '12.5px', flexWrap: 'wrap' }}>
+                        <span style={{ color: '#0F172A', fontWeight: 600 }}>
+                          Entregadas: <strong>{t.entregadas || t.total_entregas || 0}</strong>
+                        </span>
+                        <span style={{ color: (t.pendientes_calificacion || 0) > 0 ? '#D97706' : '#059669', fontWeight: 700 }}>
+                          Por calificar: {t.pendientes_calificacion || 0}
+                        </span>
+                        <span style={{ color: '#64748B' }}>
+                          Calificadas: {t.calificadas || 0}
+                        </span>
+                      </div>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => onNavigate('entregas', { filterTaskId: t.id })}
+                        style={{ height: 32, fontSize: 12, background: '#1E3A8A' }}
+                      >
+                        Ver entregas
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
-      </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          PESTAÑA 2: AVANCE CURRICULAR Y SIMULADORES IA
+          ══════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'avance' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/*  HEADER  */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Layers size={20} style={{ color: '#4338CA' }} /> Gestor de Avance de Temas y Simuladores IA
+              </h2>
+              <p style={{ fontSize: '12.5px', color: '#64748B', margin: 0 }}>
+                Registra el progreso curricular y genera simuladores de examen con IA al completar cada tema.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={loadEstructura}
+                style={{ height: 34, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <RefreshCw size={13} /> Actualizar
+              </button>
+              {selectedMateriaId && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setShowAddModal(true)}
+                  style={{ height: 34, display: 'inline-flex', alignItems: 'center', gap: 6, background: '#4338CA' }}
+                >
+                  <Plus size={15} /> Agregar Tema
+                </button>
+              )}
+            </div>
+          </div>
 
       {/*  CASCADE FILTER  */}
       <div style={{
@@ -1172,14 +1470,19 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
           onCreated={handleTemaCreated}
         />
       )}
+        </div>
+      )}
     </div>
   );
 }
 
 export function CreateTaskForm({ onSuccess, onCancel }) {
   const [courses, setCourses] = useState([]);
+  const [selectedColegio, setSelectedColegio] = useState('');
+  const [selectedCurso, setSelectedCurso] = useState('');
   const [form, setForm] = useState({
     curso_id: '',
+    espacio_id: '',
     titulo: '',
     descripcion: '',
     materia: '',
@@ -1196,21 +1499,49 @@ export function CreateTaskForm({ onSuccess, onCancel }) {
   const [rubricaData, setRubricaData] = useState(null);
 
   useEffect(() => {
-    commonAPI.courses().then(setCourses).catch(console.error);
+    commonAPI.courses().then(data => {
+      const list = data || [];
+      setCourses(list);
+      const cols = Array.from(new Set(list.map(c => c.colegio_nombre).filter(Boolean)));
+      if (cols.length === 1) {
+        setSelectedColegio(cols[0]);
+      }
+    }).catch(console.error);
   }, []);
+
+  const colegiosList = useMemo(() => {
+    return Array.from(new Set(courses.map(c => c.colegio_nombre).filter(Boolean)));
+  }, [courses]);
+
+  const cursosList = useMemo(() => {
+    const filtered = selectedColegio ? courses.filter(c => c.colegio_nombre === selectedColegio) : courses;
+    return Array.from(new Set(filtered.map(c => c.curso_nombre).filter(Boolean)));
+  }, [courses, selectedColegio]);
+
+  const espaciosDisponibles = useMemo(() => {
+    return courses.filter(c => {
+      if (selectedColegio && c.colegio_nombre && c.colegio_nombre !== selectedColegio) return false;
+      if (selectedCurso && c.curso_nombre && c.curso_nombre !== selectedCurso) return false;
+      return true;
+    });
+  }, [courses, selectedColegio, selectedCurso]);
 
   const setF = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.titulo || !form.fecha_limite || !form.curso_id) {
-      setError('Completa los campos obligatorios: Título, Curso y Fecha limite.');
+      setError('Completa los campos obligatorios: Colegio/Curso/Materia, Título y Fecha límite.');
       return;
     }
     setLoading(true);
     setError('');
     try {
-      await teacherAPI.createTask({ ...form, rubrica: rubricaData });
+      await teacherAPI.createTask({
+        ...form,
+        espacio_id: form.curso_id,
+        rubrica: rubricaData
+      });
       onSuccess?.();
     } catch (err) {
       setError(err.message || 'Error al crear la tarea.');
@@ -1248,22 +1579,66 @@ export function CreateTaskForm({ onSuccess, onCancel }) {
           />
         </div>
 
+        {/* Jerarquía: Colegio -> Curso -> Materia / Espacio */}
         <div className="form-group">
-          <label className="form-label">Curso y Asignatura <span className="required">*</span></label>
+          <label className="form-label">Colegio</label>
+          <select
+            className="form-control"
+            value={selectedColegio}
+            onChange={e => {
+              setSelectedColegio(e.target.value);
+              setSelectedCurso('');
+              setF('curso_id', '');
+              setF('espacio_id', '');
+            }}
+          >
+            <option value="">Todos los colegios...</option>
+            {colegiosList.map(col => (
+              <option key={col} value={col}>{col}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Curso / Grado</label>
+          <select
+            className="form-control"
+            value={selectedCurso}
+            onChange={e => {
+              setSelectedCurso(e.target.value);
+              setF('curso_id', '');
+              setF('espacio_id', '');
+            }}
+          >
+            <option value="">Todos los cursos...</option>
+            {cursosList.map(cur => (
+              <option key={cur} value={cur}>{cur}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group" style={{ gridColumn: '1/-1' }}>
+          <label className="form-label">Materia / Espacio Académico <span className="required">*</span></label>
           <select
             className="form-control"
             value={form.curso_id}
             onChange={e => {
-              const c = courses.find(x => x.id === parseInt(e.target.value));
-              setF('curso_id', e.target.value);
-              if (c) setF('materia', c.materia_nombre || c.nombre);
+              const val = e.target.value;
+              const c = courses.find(x => x.id === parseInt(val));
+              setF('curso_id', val);
+              setF('espacio_id', val);
+              if (c) {
+                setF('materia', c.materia_nombre || c.nombre);
+                if (c.colegio_nombre && !selectedColegio) setSelectedColegio(c.colegio_nombre);
+                if (c.curso_nombre && !selectedCurso) setSelectedCurso(c.curso_nombre);
+              }
             }}
             required
           >
-            <option value="">Selecciona un curso...</option>
-            {courses.map(c => (
+            <option value="">Selecciona la materia o espacio donde publicar la tarea...</option>
+            {espaciosDisponibles.map(c => (
               <option key={c.id} value={c.id}>
-                {c.nombre} ({c.materia_nombre})
+                {c.nombre} {c.curso_nombre ? `— ${c.curso_nombre}` : ''} {c.colegio_nombre ? `(${c.colegio_nombre})` : ''}
               </option>
             ))}
           </select>

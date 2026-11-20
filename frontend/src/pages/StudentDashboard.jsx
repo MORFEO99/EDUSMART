@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
   CheckSquare, Inbox, Award, TrendingUp, Clock, AlertCircle,
-  FolderGit2, ArrowRight, FileText, CheckCircle2, ChevronRight, KeyRound
+  FolderGit2, ArrowRight, FileText, CheckCircle2, ChevronRight, KeyRound,
+  BookOpen, Star, User
 } from 'lucide-react';
 import { dashboardAPI } from '../api';
 import { Loading } from '../components';
 import ModalUnirseEspacio from '../components/ModalUnirseEspacio';
-import ChallengeBoard from '../components/ChallengeBoard';
 
 export default function StudentDashboard({ user, onNavigate }) {
   const [data, setData] = useState(null);
@@ -140,12 +140,9 @@ export default function StudentDashboard({ user, onNavigate }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 24 }}>
-        {/* Left Column: Próximas Tareas */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 24 }}>
+        {/* Columna Izquierda: Próximas Tareas y Mis Materias */}
         <div>
-          {/* Retos Educativos */}
-          <ChallengeBoard userRole={user?.rol} />
-
           {/* Próximas Tareas */}
           <div style={{ marginBottom: 28 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -198,6 +195,124 @@ export default function StudentDashboard({ user, onNavigate }) {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+
+          {/* Mis Materias Activas */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
+                Mis Materias Activas
+              </h3>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => onNavigate('espacios')}
+              >
+                Ver todas ({mis_espacios?.length || 0})
+              </button>
+            </div>
+
+            {(!mis_espacios || mis_espacios.length === 0) ? (
+              <div style={{
+                background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 10,
+                padding: '20px', textAlign: 'center', color: '#64748B'
+              }}>
+                No estás inscrito en materias actualmente.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                {mis_espacios.slice(0, 4).map(esp => (
+                  <div
+                    key={esp.id}
+                    onClick={() => onNavigate('espacio_detail', { espacioId: esp.id })}
+                    style={{
+                      background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 10,
+                      padding: '14px', cursor: 'pointer', transition: 'all 0.15s',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#1E3A8A'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.transform = 'none'; }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: '#EEF2FF', color: '#4F46E5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <BookOpen size={16} />
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#1E3A8A', background: '#EFF6FF', padding: '2px 6px', borderRadius: 4 }}>
+                        {esp.codigo || 'MAT'}
+                      </div>
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: '#0F172A', marginBottom: 2 }}>
+                      {esp.nombre}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: '#64748B' }}>
+                      Docente: {esp.docente_nombre || 'Docente titular'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Columna Derecha: Actividad Reciente y Evaluaciones */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
+              Historial de Entregas y Notas
+            </h3>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => onNavigate('resultados')}
+            >
+              Ver calificaciones
+            </button>
+          </div>
+
+          <div className="activity-feed">
+            {(!actividad_reciente || actividad_reciente.length === 0) ? (
+              <div style={{
+                background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 10,
+                padding: '24px 20px', textAlign: 'center', color: '#64748B', fontSize: 13
+              }}>
+                Aún no tienes entregas registradas.
+              </div>
+            ) : (
+              actividad_reciente.map((act, idx) => (
+                <div key={idx} className="activity-feed-item">
+                  <div className="activity-icon-badge" style={{
+                    background: act.calificada ? '#ECFDF5' : '#FFFBEB',
+                    color: act.calificada ? '#059669' : '#D97706'
+                  }}>
+                    {act.calificada ? <Award size={18} /> : <Inbox size={18} />}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: '#0F172A' }}>
+                      {act.titulo}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                      Espacio: <strong>{act.espacio}</strong>
+                    </div>
+                    {act.nota !== undefined && act.nota !== null && (
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#059669', marginTop: 4 }}>
+                        Calificación: {act.nota} pts
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Clock size={11} />
+                      <span>{new Date(act.fecha).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => onNavigate('tareas', { taskId: act.tarea_id })}
+                    >
+                      {act.calificada ? 'Ver nota' : 'Ver entrega'}
+                    </button>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </div>

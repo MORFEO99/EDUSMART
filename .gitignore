@@ -26,9 +26,7 @@ dist/
 *.swp
 
 # Scratch / Demo temporales
-scratch/frames/
-scratch/*.mp4
-scratch/*.avi
+scratch/
 *.mp4
 *.avi
 demo_edusmart.mp4

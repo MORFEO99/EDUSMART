@@ -1,11 +1,11 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, FolderGit2, CheckSquare, Activity, TrendingUp,
   User, LogOut, Plus, Bell, X, Check, ChevronRight, FileText,
   Clock, Award, MessageSquare, AlertCircle, AlertTriangle, UploadCloud,
   Download, Eye, Share2, Layers, BookOpen, Code, Database, Cpu, Menu,
   CheckCircle2, ArrowRight, Building, Inbox, BarChart2, Search, Sparkles, Target,
-  FileSpreadsheet
+  FileSpreadsheet, GraduationCap, School, Trophy, Settings, UsersRound
 } from 'lucide-react';
 
 // ============================================================
@@ -59,22 +59,61 @@ export function EdusmartLogo({ size = 34, showText = true, subtitle = true }) {
 export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount = 0, isOpen = false, onCloseMobile }) {
   const role = user?.rol || 'ESTUDIANTE';
 
-  // Navegación canónica según requerimiento oficial
-  const NAV_ITEMS = role === 'DOCENTE' ? [
-    { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
-    { id: 'espacios', label: 'Mis espacios', icon: BookOpen },
-    { id: 'tareas', label: 'Tareas', icon: CheckSquare },
-    { id: 'entregas', label: 'Entregas', icon: Inbox },
-    { id: 'resultados', label: 'Resultados', icon: BarChart2 },
-    { id: 'reportes', label: 'Reportes', icon: FileText },
-  ] : [
-    { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
-    { id: 'espacios', label: 'Mis espacios', icon: BookOpen },
-    { id: 'mis-tareas', label: 'Mis tareas', icon: CheckSquare },
-    { id: 'practicas', label: 'Simuladores IA', icon: Sparkles, highlight: true },
-    { id: 'resultados', label: 'Resultados', icon: TrendingUp },
-    { id: 'retos', label: 'Retos Gamificados', icon: Target },
+  // Navegación organizada por categorías — igual que el video de referencia
+  const NAV_DOCENTE = [
+    {
+      category: 'MENÚ PRINCIPAL',
+      items: [
+        { id: 'dashboard',   label: 'Inicio',                 icon: LayoutDashboard },
+        { id: 'colegios',    label: 'Mis Colegios y Cursos',  icon: School },
+      ]
+    },
+    {
+      category: 'GESTIÓN ACADÉMICA',
+      items: [
+        { id: 'tareas',      label: 'Tareas',                 icon: CheckSquare },
+        { id: 'entregas',    label: 'Entregas',               icon: Inbox },
+        { id: 'resultados',  label: 'Resultados y Notas',     icon: BarChart2 },
+        { id: 'seguimiento', label: 'Seguimiento Alumnos',    icon: UsersRound },
+        { id: 'reportes',    label: 'Reportes',               icon: FileText },
+        { id: 'lista-excel', label: 'Lista Estudiantes',      icon: FileSpreadsheet },
+      ]
+    },
+    {
+      category: 'EXTRAS',
+      items: [
+        { id: 'retos',       label: 'Retos Gamificados',      icon: Trophy },
+      ]
+    },
   ];
+
+  const NAV_ESTUDIANTE = [
+    {
+      category: 'MENÚ PRINCIPAL',
+      items: [
+        { id: 'dashboard',       label: 'Inicio',             icon: LayoutDashboard },
+        { id: 'espacios',        label: 'Mis Espacios',       icon: BookOpen },
+        { id: 'mis-tareas',      label: 'Mis Tareas',         icon: CheckSquare },
+      ]
+    },
+    {
+      category: 'SEGUIMIENTO',
+      items: [
+        { id: 'practicas',       label: 'Simuladores IA',     icon: Sparkles },
+        { id: 'resultados',      label: 'Resultados',         icon: TrendingUp },
+        { id: 'retroalimentacion', label: 'Retroalimentación', icon: MessageSquare },
+        { id: 'mi-progreso',     label: 'Mi Progreso',        icon: Activity },
+      ]
+    },
+    {
+      category: 'EXTRAS',
+      items: [
+        { id: 'retos',           label: 'Retos Gamificados',  icon: Trophy },
+      ]
+    },
+  ];
+
+  const NAV_GROUPS = role === 'DOCENTE' ? NAV_DOCENTE : NAV_ESTUDIANTE;
 
   return (
     <>
@@ -113,25 +152,36 @@ export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount 
           </div>
         </div>
 
-        {/* Navigation Menu */}
+        {/* Navigation Menu — categorized like the reference video */}
         <nav className="sidebar-nav">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeSection === item.id;
-            return (
-              <button
-                key={item.id}
-                className={`nav-item ${isActive ? 'active' : ''}`}
-                onClick={() => {
-                  onNavigate(item.id);
-                  if (onCloseMobile) onCloseMobile();
-                }}
-              >
-                <Icon size={18} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+          {NAV_GROUPS.map((group) => (
+            <div key={group.category} className="sidebar-category-group">
+              <div className="sidebar-category-label">{group.category}</div>
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeSection === item.id ||
+                  // Alias matching: "colegios" also active for space detail or spaces
+                  (item.id === 'colegios' && ['colegio-detalle', 'espacios', 'mis-espacios', 'espacio-detalle'].includes(activeSection)) ||
+                  // "tareas" sidebar item also active for 'mis-tareas', 'crear-tarea'
+                  (item.id === 'tareas' && ['mis-tareas', 'crear-tarea'].includes(activeSection)) ||
+                  (item.id === 'espacios' && activeSection === 'espacio-detalle') ||
+                  (item.id === 'resultados' && activeSection === 'calificaciones');
+                return (
+                  <button
+                    key={item.id}
+                    className={`nav-item ${isActive ? 'active' : ''}`}
+                    onClick={() => {
+                      onNavigate(item.id);
+                      if (onCloseMobile) onCloseMobile();
+                    }}
+                  >
+                    <Icon size={17} />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Footer Menu: Perfil y Logout */}

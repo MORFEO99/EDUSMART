@@ -520,7 +520,7 @@ def api_tareas(request):
             return Response({'error': 'Solo los docentes pueden publicar tareas.'}, status=status.HTTP_403_FORBIDDEN)
 
         data = request.data
-        espacio_id = data.get('espacio_id')
+        espacio_id = data.get('espacio_id') or data.get('curso_id')
         titulo = (data.get('titulo') or '').strip()
         descripcion = (data.get('descripcion') or '').strip()
         indicaciones = (data.get('indicaciones') or '').strip()

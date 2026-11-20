@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
   FolderGit2, CheckSquare, Inbox, Award, Plus, ArrowRight,
-  Clock, CheckCircle2, AlertCircle, FileText, User, FileSpreadsheet
+  Clock, CheckCircle2, AlertCircle, FileText, User, FileSpreadsheet, School
 } from 'lucide-react';
 import { dashboardAPI } from '../api';
 import { Loading } from '../components';
-import ChallengeBoard from '../components/ChallengeBoard';
 
 export default function TeacherDashboard({ user, onNavigate, onOpenCreateTask }) {
   const [data, setData] = useState(null);
@@ -44,8 +43,8 @@ export default function TeacherDashboard({ user, onNavigate, onOpenCreateTask })
           >
             <FileSpreadsheet size={16} color="#1E3A8A" /> Lista Estudiantes (Excel)
           </button>
-          <button className="btn btn-secondary" onClick={() => onNavigate('espacios')}>
-            <FolderGit2 size={16} /> Ver espacios
+          <button className="btn btn-secondary" onClick={() => onNavigate('colegios')}>
+            <School size={16} /> Ver colegios y cursos
           </button>
           <button className="btn btn-primary" onClick={onOpenCreateTask} style={{ background: '#1E3A8A' }}>
             <Plus size={16} /> Publicar tarea
@@ -53,17 +52,14 @@ export default function TeacherDashboard({ user, onNavigate, onOpenCreateTask })
         </div>
       </div>
 
-      {/* Retos Educativos del Docente */}
-      <ChallengeBoard userRole={user?.rol || 'DOCENTE'} />
-
-      {/* KPI Cards matching Section 17: Mis espacios, Tareas creadas, Entregas pendientes, Tareas calificadas */}
+      {/* KPI Cards */}
       <div className="kpi-grid">
-        <div className="kpi-card" onClick={() => onNavigate('espacios')} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card" onClick={() => onNavigate('colegios')} style={{ cursor: 'pointer' }}>
           <div className="kpi-icon-box kpi-icon-blue">
-            <FolderGit2 size={22} />
+            <School size={22} />
           </div>
           <div className="kpi-info">
-            <div className="kpi-label">Mis Espacios</div>
+            <div className="kpi-label">Colegios y Cursos</div>
             <div className="kpi-value">{kpis.mis_espacios}</div>
             <div className="kpi-subtext">Materias activas</div>
           </div>
