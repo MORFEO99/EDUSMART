@@ -6,9 +6,10 @@ import {
   Award, Check, Layers, SlidersHorizontal, ArrowRight, FileText,
   Clock, MessageSquare
 } from 'lucide-react';
-import { commonAPI, automationsAPI } from '../api';
+import { commonAPI, automationsAPI, alertasAPI } from '../api';
 import { Loading, EmptyState, Modal } from '../components';
 import SendReportModal from '../components/SendReportModal';
+import ContactoTutorModal from '../components/ContactoTutorModal';
 
 // ── Badge de estado académico oficial Bolivia ─────────────────
 function estadoBadge(estado) {
@@ -79,6 +80,11 @@ export default function ListaExcelDocente({ onNavigate }) {
   const [reporteSemanalData, setReporteSemanalData] = useState(null);
   const [cargandoSemanal, setCargandoSemanal] = useState(false);
 
+  // Alertas a padres y estudiantes
+  const [enviandoAlertas, setEnviandoAlertas] = useState(false);
+  const [alertasResultado, setAlertasResultado] = useState(null);
+  const [contactoTutorTarget, setContactoTutorTarget] = useState(null); // { estudianteId, nombre }
+
   const handleEjecutarRecordatorios = async () => {
     setEjecutandoRecordatorios(true);
     setRecordatoriosMsg('');
@@ -89,6 +95,21 @@ export default function ListaExcelDocente({ onNavigate }) {
       alert(err.message || 'Error al ejecutar recordatorios automáticos.');
     } finally {
       setEjecutandoRecordatorios(false);
+    }
+  };
+
+  const handleEnviarAlertasMasivas = async () => {
+    setEnviandoAlertas(true);
+    setAlertasResultado(null);
+    try {
+      const payload = {};
+      if (cursoActual?.curso_id) payload.curso_id = cursoActual.curso_id;
+      const res = await alertasAPI.enviarAlertasRendimiento(payload);
+      setAlertasResultado(res);
+    } catch (err) {
+      alert(err.message || 'Error al enviar alertas.');
+    } finally {
+      setEnviandoAlertas(false);
     }
   };
 
@@ -584,6 +605,23 @@ export default function ListaExcelDocente({ onNavigate }) {
                 <span>{cargandoSemanal ? 'Generando...' : 'Reporte Semanal'}</span>
               </button>
 
+              {/* 6. Alertas automáticas a padres y estudiantes en riesgo */}
+              <button
+                className="btn btn-sm"
+                onClick={handleEnviarAlertasMasivas}
+                disabled={enviandoAlertas}
+                style={{
+                  background: enviandoAlertas ? '#6B7280' : '#DC2626',
+                  color: '#FFFFFF', padding: '9px 14px', borderRadius: 8,
+                  fontSize: 12.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6,
+                  border: 'none', cursor: 'pointer', boxShadow: '0 2px 6px rgba(220,38,38,0.25)'
+                }}
+                title="Detectar y alertar automáticamente a padres y estudiantes con bajo rendimiento o tareas vencidas"
+              >
+                <AlertTriangle size={15} />
+                <span>{enviandoAlertas ? 'Enviando alertas...' : '📱 Alertar Padres & Estudiantes'}</span>
+              </button>
+
               {/* 4. Exportar Excel */}
               <button
                 className="btn btn-secondary btn-sm"
@@ -617,6 +655,46 @@ export default function ListaExcelDocente({ onNavigate }) {
                 >
                   <X size={15} />
                 </button>
+              </div>
+            )}
+
+            {/* Banner de resultado de alertas masivas */}
+            {alertasResultado && (
+              <div style={{
+                marginTop: 12, padding: '12px 16px', background: '#FFF7ED',
+                border: '1px solid #FED7AA', borderRadius: 8, color: '#92400E',
+                fontSize: 12.5
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <AlertTriangle size={15} color="#DC2626" />
+                      Alertas enviadas: <span style={{ color: '#DC2626' }}>{alertasResultado.alertas_enviadas}</span> estudiante(s) en riesgo
+                    </div>
+                    {alertasResultado.detalle?.slice(0, 4).map((d, i) => (
+                      <div key={i} style={{ marginBottom: 4, fontSize: 11.5, padding: '4px 8px', background: '#FEF3C7', borderRadius: 5 }}>
+                        <strong>{d.estudiante}</strong>: {d.motivos?.[0]}
+                        {' '}
+                        <span style={{ color: d.whatsapp_estudiante?.enviado ? '#16A34A' : '#DC2626', fontSize: 10 }}>
+                          {d.whatsapp_estudiante?.enviado ? '✓ Est.' : '✗ Est.'}
+                        </span>
+                        {' '}
+                        <span style={{ color: d.whatsapp_tutor?.enviado ? '#16A34A' : '#DC2626', fontSize: 10 }}>
+                          {d.whatsapp_tutor?.enviado ? '✓ Tutor' : '✗ Tutor'}
+                        </span>
+                      </div>
+                    ))}
+                    {alertasResultado.alertas_enviadas === 0 && (
+                      <span style={{ color: '#059669', fontWeight: 700 }}>✅ ¡Todos los estudiantes están al día!</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setAlertasResultado(null)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#B45309' }}
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -941,6 +1019,26 @@ export default function ListaExcelDocente({ onNavigate }) {
                             </button>
                           )}
 
+                          {/* Botón para registrar/editar contacto del tutor */}
+                          {(est.estudiante_id || est.id) && (
+                            <button
+                              className="btn btn-sm"
+                              style={{
+                                fontSize: 11, padding: '4px 8px', color: '#7C3AED',
+                                background: '#F5F3FF', border: '1px solid #DDD6FE',
+                                display: 'inline-flex', alignItems: 'center', gap: 3,
+                                marginLeft: 4, fontWeight: 700
+                              }}
+                              onClick={() => setContactoTutorTarget({
+                                estudianteId: est.estudiante_id || est.id,
+                                nombre: est.nombre
+                              })}
+                              title="Registrar o editar número de tutor/padre para alertas automáticas"
+                            >
+                              <span>👨‍👧 Tutor</span>
+                            </button>
+                          )}
+
                           <button
                             className="btn btn-sm"
                             style={{
@@ -1134,6 +1232,15 @@ export default function ListaExcelDocente({ onNavigate }) {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Modal 5: Contacto del Tutor */}
+      {contactoTutorTarget && (
+        <ContactoTutorModal
+          estudianteId={contactoTutorTarget.estudianteId}
+          nombreEstudiante={contactoTutorTarget.nombre}
+          onClose={() => setContactoTutorTarget(null)}
+        />
       )}
 
     </div>

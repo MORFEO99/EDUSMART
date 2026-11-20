@@ -132,6 +132,17 @@ class Estudiante(models.Model):
     carrera_o_area = models.CharField(max_length=150, default='Ingenieria de Sistemas')
     biografia = models.TextField(blank=True, default='Estudiante de sistemas.')
 
+    # === Contacto de tutor / padre de familia ===
+    nombre_tutor = models.CharField(max_length=200, blank=True,
+        help_text='Nombre completo del padre, madre o tutor legal')
+    telefono_tutor = models.CharField(max_length=30, blank=True,
+        help_text='Número WhatsApp del padre/tutor (formato internacional, ej: 59178901234)')
+    relacion_tutor = models.CharField(
+        max_length=50, blank=True,
+        choices=[('PADRE', 'Padre'), ('MADRE', 'Madre'), ('TUTOR', 'Tutor Legal'), ('OTRO', 'Otro')],
+        default='PADRE'
+    )
+
     def __str__(self):
         return f"Est. {self.usuario.nombre_completo}"
 

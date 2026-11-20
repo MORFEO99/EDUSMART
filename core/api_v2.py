@@ -20,6 +20,7 @@ from .models import (
     InvitacionEspacio, Notificacion, Tarea, Entrega, Calificacion, Docente,
     TemaAvance, MuroPublicacion, MuroComentario
 )
+from . import whatsapp_service
 
 from .serializers_v2 import (
 
@@ -2299,3 +2300,191 @@ def api_curso_reporte_semanal(request, curso_id):
         'whatsapp_url': f"https://wa.me/?text={quote(resumen_texto)}"
     })
 
+
+# ==============================================================================
+# ALERTAS AUTOMÁTICAS: BAJO RENDIMIENTO Y TAREAS VENCIDAS
+# ==============================================================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def api_enviar_alertas_rendimiento(request):
+    """
+    POST /api/v2/alertas/enviar-rendimiento/
+    Body (opcional): { "espacio_id": int, "curso_id": int, "umbral_promedio": int }
+
+    Detecta estudiantes con:
+      - Promedio < umbral_promedio (default 51)
+      - O tarea vencida sin entregar
+
+    Envía WhatsApp al estudiante Y a su tutor (si tienen número registrado).
+    Registra Notificacion interna independientemente del canal.
+    """
+    umbral = int(request.data.get('umbral_promedio', 51))
+    espacio_id = request.data.get('espacio_id')
+    curso_id = request.data.get('curso_id')
+    now = timezone.now()
+
+    # Construir queryset base de estudiantes
+    if espacio_id:
+        espacio = get_object_or_404(Espacio, id=espacio_id)
+        estudiantes_ids = espacio.miembros.values_list('estudiante_id', flat=True)
+        estudiantes_qs = Estudiante.objects.filter(id__in=estudiantes_ids)
+    elif curso_id:
+        curso = get_object_or_404(Curso, id=curso_id)
+        estudiantes_ids = curso.estudiantes.filter(estado='ACTIVO').values_list('estudiante_id', flat=True)
+        estudiantes_qs = Estudiante.objects.filter(id__in=estudiantes_ids)
+    else:
+        try:
+            docente = request.user.perfil_docente
+        except Exception:
+            return Response({'error': 'Solo docentes pueden enviar alertas masivas'}, status=403)
+        colegios_ids = DocenteColegio.objects.filter(docente=docente).values_list('colegio_id', flat=True)
+        cursos_ids = Curso.objects.filter(colegio_id__in=colegios_ids).values_list('id', flat=True)
+        estudiantes_ids = EstudianteCurso.objects.filter(
+            curso_id__in=cursos_ids, estado='ACTIVO'
+        ).values_list('estudiante_id', flat=True)
+        estudiantes_qs = Estudiante.objects.filter(id__in=estudiantes_ids)
+
+    estudiantes_qs = estudiantes_qs.select_related('usuario', 'progreso')
+    resultados = []
+
+    for est in estudiantes_qs:
+        motivos = []
+
+        # Verificar promedio
+        try:
+            progreso = est.progreso
+            if 0 < progreso.promedio < umbral:
+                motivos.append(f'Promedio académico: {progreso.promedio:.1f}/100 (límite: {umbral})')
+        except Exception:
+            pass
+
+        # Verificar tareas vencidas sin entregar
+        try:
+            espacios_ids_est = list(est.espacios_inscritos.values_list('espacio_id', flat=True))
+            tareas_vencidas = Tarea.objects.filter(
+                espacio_id__in=espacios_ids_est,
+                estado='PUBLICADA',
+                fecha_limite__lt=now
+            ).exclude(entregas__estudiante=est)
+            for tarea in tareas_vencidas[:3]:
+                motivos.append(
+                    f'Tarea vencida: *{tarea.titulo}* '
+                    f'(venció {tarea.fecha_limite.strftime("%d/%m/%Y")})'
+                )
+        except Exception:
+            pass
+
+        if not motivos:
+            continue
+
+        # Enviar alertas
+        resultado_ws = whatsapp_service.enviar_alerta_rendimiento(est, motivos)
+
+        # Notificacion interna
+        Notificacion.objects.create(
+            usuario=est.usuario,
+            tipo='ALERTA',
+            mensaje=f'⚠️ Alerta académica: {"; ".join(motivos[:2])}'
+        )
+
+        nombre_completo = est.usuario.get_full_name() or est.usuario.username
+        resultados.append({
+            'estudiante': nombre_completo,
+            'motivos': motivos,
+            'whatsapp_estudiante': resultado_ws.get('estudiante', {}),
+            'whatsapp_tutor': resultado_ws.get('tutor', {}),
+        })
+
+    return Response({
+        'alertas_enviadas': len(resultados),
+        'umbral_promedio': umbral,
+        'detalle': resultados
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def api_alertar_tarea_vencida(request, tarea_id):
+    """
+    POST /api/v2/alertas/tarea-vencida/<tarea_id>/
+
+    Envía alerta específica a todos los estudiantes que NO entregaron
+    una tarea particular (ya vencida).
+    """
+    tarea = get_object_or_404(Tarea, id=tarea_id)
+    espacio = tarea.espacio
+    estudiantes_ids = espacio.miembros.values_list('estudiante_id', flat=True)
+    estudiantes_sin_entrega = Estudiante.objects.filter(
+        id__in=estudiantes_ids
+    ).exclude(
+        entregas__tarea=tarea
+    ).select_related('usuario')
+
+    resultados = []
+    for est in estudiantes_sin_entrega:
+        resultado_ws = whatsapp_service.enviar_alerta_tarea_vencida(est, tarea)
+
+        Notificacion.objects.create(
+            usuario=est.usuario,
+            tipo='ALERTA',
+            mensaje=f'⚠️ Tienes una tarea vencida sin entregar: {tarea.titulo}',
+            tarea_id=tarea.id,
+            espacio_id=espacio.id
+        )
+
+        nombre_completo = est.usuario.get_full_name() or est.usuario.username
+        resultados.append({
+            'estudiante': nombre_completo,
+            'whatsapp_estudiante': resultado_ws.get('estudiante', {}),
+            'whatsapp_tutor': resultado_ws.get('tutor', {}),
+        })
+
+    return Response({
+        'tarea': tarea.titulo,
+        'alertas_enviadas': len(resultados),
+        'detalle': resultados
+    })
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def api_actualizar_contacto_tutor(request, estudiante_id):
+    """
+    GET  /api/v2/alertas/estudiante/<id>/contacto/ → ver datos del tutor
+    PATCH /api/v2/alertas/estudiante/<id>/contacto/ → actualizar contacto del tutor
+
+    Permitido para: el propio estudiante o un docente.
+    """
+    est = get_object_or_404(Estudiante, id=estudiante_id)
+
+    es_propio = (request.user == est.usuario)
+    es_docente = hasattr(request.user, 'perfil_docente')
+    if not (es_propio or es_docente):
+        return Response({'error': 'Sin permiso'}, status=403)
+
+    if request.method == 'GET':
+        return Response({
+            'nombre_tutor': est.nombre_tutor,
+            'telefono_tutor': est.telefono_tutor,
+            'relacion_tutor': est.relacion_tutor,
+            'telefono_estudiante': est.usuario.telefono,
+        })
+
+    # PATCH
+    for campo in ['nombre_tutor', 'telefono_tutor', 'relacion_tutor']:
+        if campo in request.data:
+            setattr(est, campo, request.data[campo])
+
+    if 'telefono_estudiante' in request.data and es_propio:
+        est.usuario.telefono = request.data['telefono_estudiante']
+        est.usuario.save(update_fields=['telefono'])
+
+    est.save(update_fields=['nombre_tutor', 'telefono_tutor', 'relacion_tutor'])
+
+    return Response({
+        'ok': True,
+        'nombre_tutor': est.nombre_tutor,
+        'telefono_tutor': est.telefono_tutor,
+        'relacion_tutor': est.relacion_tutor,
+    })

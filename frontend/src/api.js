@@ -281,4 +281,21 @@ export const automationsAPI = {
   reporteSemanalCurso: (cursoId) => apiFetch(`/api/v2/cursos/${cursoId}/reporte-semanal/`),
 };
 
+export const alertasAPI = {
+  // Envía alertas masivas de bajo rendimiento / tareas vencidas
+  enviarAlertasRendimiento: (data = {}) =>
+    apiFetch('/api/v2/alertas/enviar-rendimiento/', { method: 'POST', body: JSON.stringify(data) }),
+  // Alerta específica por tarea vencida
+  alertarTareaVencida: (tareaId) =>
+    apiFetch(`/api/v2/alertas/tarea-vencida/${tareaId}/`, { method: 'POST' }),
+  // Ver/actualizar contacto del tutor de un estudiante
+  getContactoTutor: (estudianteId) =>
+    apiFetch(`/api/v2/alertas/estudiante/${estudianteId}/contacto/`),
+  updateContactoTutor: (estudianteId, data) =>
+    apiFetch(`/api/v2/alertas/estudiante/${estudianteId}/contacto/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+};
+
 export default apiFetch;

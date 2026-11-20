@@ -122,6 +122,13 @@ urlpatterns = [
     path('mongo/api/colecciones/', mongo_panel_views.api_mongo_colecciones, name='mongo_api_colecciones'),
     path('mongo/api/colecciones/<str:coleccion>/', mongo_panel_views.api_mongo_documentos, name='mongo_api_documentos'),
 
+    # =======================================================
+    # ALERTAS AUTOMÁTICAS A PADRES Y ESTUDIANTES
+    # =======================================================
+    path('api/v2/alertas/enviar-rendimiento/', api_v2.api_enviar_alertas_rendimiento, name='api_v2_alertas_rendimiento'),
+    path('api/v2/alertas/tarea-vencida/<int:tarea_id>/', api_v2.api_alertar_tarea_vencida, name='api_v2_alertar_tarea_vencida'),
+    path('api/v2/alertas/estudiante/<int:estudiante_id>/contacto/', api_v2.api_actualizar_contacto_tutor, name='api_v2_contacto_tutor'),
+
     # SPA React Catch-all (sirve index.html en / y en cualquier ruta del frontend)
     re_path(r'^.*$', views.serve_react_app, name='react_spa'),
 ]
