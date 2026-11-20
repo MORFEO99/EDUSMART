@@ -323,7 +323,7 @@ export default function ListaExcelDocente({ onNavigate }) {
           <div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#1E3A8A', marginBottom: 6 }}>
               <Building2 size={15} color="#1E3A8A" />
-              1. Colegio Institucional:
+              Colegio:
             </label>
             <select
               className="form-control"
@@ -346,7 +346,7 @@ export default function ListaExcelDocente({ onNavigate }) {
           <div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#0369A1', marginBottom: 6 }}>
               <GraduationCap size={15} color="#0284C7" />
-              2. Curso / Año de Escolaridad:
+              Curso:
             </label>
             <select
               className="form-control"
@@ -386,7 +386,7 @@ export default function ListaExcelDocente({ onNavigate }) {
           <div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#4338CA', marginBottom: 6 }}>
               <BookOpen size={15} color="#4338CA" />
-              3. Materia / Asignatura:
+              Materia:
             </label>
             <select
               className="form-control"

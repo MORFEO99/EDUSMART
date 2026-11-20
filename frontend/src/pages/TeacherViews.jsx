@@ -830,7 +830,7 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
 
           {/* 1. Colegio */}
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#1E3A8A', marginBottom: 6 }}>&#127979; 1. Colegio</label>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#1E3A8A', marginBottom: 6 }}>&#127979; Colegio</label>
             <select
               className="form-control"
               value={selectedColegioId || ''}
@@ -844,7 +844,7 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
 
           {/* 2. Curso */}
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#0369A1', marginBottom: 6 }}>&#127891; 2. Curso</label>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#0369A1', marginBottom: 6 }}>&#127891; Curso</label>
             <select
               className="form-control"
               value={selectedCursoId || ''}
@@ -859,7 +859,7 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
 
           {/* 3. Materia */}
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#4338CA', marginBottom: 6 }}>&#128214; 3. Materia</label>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#4338CA', marginBottom: 6 }}>&#128214; Materia</label>
             <select
               className="form-control"
               value={selectedMateriaId || ''}
@@ -1594,7 +1594,7 @@ export function TeacherSubmissionsView({ initialTaskId }) {
           {/* 1. Colegio */}
           <div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#1E3A8A', marginBottom: 6 }}>
-              <School size={14} style={{ color: '#1E3A8A' }} /> 1. Colegio
+              <School size={14} style={{ color: '#1E3A8A' }} /> Colegio
             </label>
             <select
               className="form-control"
@@ -1612,7 +1612,7 @@ export function TeacherSubmissionsView({ initialTaskId }) {
           {/* 2. Curso */}
           <div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#0369A1', marginBottom: 6 }}>
-              <GraduationCap size={14} style={{ color: '#0369A1' }} /> 2. Curso
+              <GraduationCap size={14} style={{ color: '#0369A1' }} /> Curso
             </label>
             <select
               className="form-control"
@@ -1630,7 +1630,7 @@ export function TeacherSubmissionsView({ initialTaskId }) {
           {/* 3. Materia */}
           <div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#3730A3', marginBottom: 6 }}>
-              <BookOpen size={14} style={{ color: '#3730A3' }} /> 3. Materia
+              <BookOpen size={14} style={{ color: '#3730A3' }} /> Materia
             </label>
             <select
               className="form-control"
