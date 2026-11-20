@@ -1648,7 +1648,7 @@ export function TeacherSubmissionsView({ initialTaskId }) {
           {/* 4. Tarea especifica */}
           <div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#0F766E', marginBottom: 6 }}>
-              <ClipboardList size={14} style={{ color: '#0F766E' }} /> 4. Tarea
+              <ClipboardList size={14} style={{ color: '#0F766E' }} /> Tarea
             </label>
             <select
               className="form-control"
