@@ -3,7 +3,7 @@ import {
   ArrowLeft, BookOpen, ClipboardList, Users, Award,
   CheckCircle, AlertCircle, ChevronDown, ChevronRight,
   Calendar, FileText, Eye, EyeOff, BarChart2, Plus, X,
-  Upload, Send, Check, Target, Sparkles
+  Upload, Send, Check, Target, Sparkles, MessageSquare
 } from 'lucide-react';
 import { Loading, EmptyState, Modal } from '../components';
 import { getNoteColor } from '../utils';
@@ -11,6 +11,7 @@ import { GradeSubmissionModal } from './TeacherViews';
 import { SubmitTaskForm } from './MyTasks';
 import SendReportModal from '../components/SendReportModal';
 import ChallengeBoard from '../components/ChallengeBoard';
+import MuroMateria from '../components/MuroMateria';
 import apiFetch from '../api';
 
 function getBadgeStyle(estado, vencida) {
@@ -449,6 +450,14 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
           <Target size={13} color={activeTab === 'retos' ? '#4F46E5' : '#64748B'} />
           <span>Retos con IA</span>
         </button>
+        <button
+          className={`teams-tab ${activeTab === 'muro' ? 'active' : ''}`}
+          onClick={() => setActiveTab('muro')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+        >
+          <MessageSquare size={13} color={activeTab === 'muro' ? '#059669' : '#64748B'} />
+          <span>Muro y Consultas</span>
+        </button>
         {!isEstudiante && (
           <button
             className="btn btn-primary btn-sm"
@@ -767,6 +776,15 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
           espacioNombre={espacio?.materia || espacio?.nombre}
           cursoNombre={espacio?.curso}
           tareas={tareas}
+        />
+      )}
+
+      {/* ── Muro de Avisos y Consultas por Materia (Alternativa a WhatsApp) ── */}
+      {activeTab === 'muro' && (
+        <MuroMateria
+          espacioId={espacioId}
+          userRole={user?.rol}
+          currentUserId={user?.id}
         />
       )}
 

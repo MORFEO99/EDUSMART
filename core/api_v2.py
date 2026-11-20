@@ -1,40 +1,24 @@
 import random
-
 import string
-
 import pandas as pd
+from urllib.parse import quote
 
 from rest_framework.decorators import api_view, permission_classes
-
 from rest_framework.permissions import IsAuthenticated
-
 from rest_framework.response import Response
-
 from rest_framework import status
-
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
 from .pdf_service import generate_course_gradebook_pdf
-
 from django.db import transaction
-
 from django.utils import timezone
-
-
-
 from django.db.models import Avg, Q
 
-
-
 from .models import (
-
     Colegio, DocenteColegio, Curso, Materia, EstudianteCurso,
-
     Estudiante, Usuario, Invitacion, Espacio, MiembroEspacio,
-
     InvitacionEspacio, Notificacion, Tarea, Entrega, Calificacion, Docente,
-    TemaAvance
-
+    TemaAvance, MuroPublicacion, MuroComentario
 )
 
 from .serializers_v2 import (
@@ -1677,16 +1661,100 @@ def _build_student_list_excel(espacio, tareas):
             estado_ac = 'Sin notas'
 
         try:
-
             ec = EstudianteCurso.objects.filter(estudiante=est, curso=espacio.curso).first() if espacio.curso else None
-
             ru = ec.codigo_ru if ec and ec.codigo_ru else ('RUDE-' + str(est.id).zfill(6))
-
         except Exception:
-
             ru = 'RUDE-' + str(est.id).zfill(6)
 
-        estudiantes_data.append({'estudiante_id': est.id, 'nombre': est.usuario.nombre_completo, 'email': est.usuario.email, 'ru': ru, 'tareas_entregadas': entregas_count, 'tareas_pendientes': total_t - entregas_count, 'total_tareas': total_t, 'porcentaje_cumplimiento': cumplimiento, 'promedio': promedio, 'estado_academico': estado_ac, 'en_riesgo': cumplimiento < 50 or (promedio is not None and promedio < 51), 'calificaciones': calificaciones_por_tarea})
+        # ── Algoritmo Silencioso de Detección de Deserción y Riesgo ──
+        # Factor 1: Inactividad en la plataforma (>= 5 días)
+        now_dt = timezone.now()
+        if est.usuario.last_login:
+            dias_inactivo = (now_dt - est.usuario.last_login).days
+        else:
+            dias_inactivo = (now_dt - est.usuario.date_joined).days
+
+        # Factor 2: Tareas consecutivas sin entregar (últimas 2 tareas vencidas)
+        tareas_vencidas_ordenadas = sorted(
+            [t for t in tareas if t.fecha_limite and t.fecha_limite < now_dt],
+            key=lambda t: t.fecha_limite,
+            reverse=True
+        )[:3]
+        pendientes_seguidas = 0
+        for tv in tareas_vencidas_ordenadas:
+            ent = all_entregas.get((est.id, tv.id))
+            if not ent or ent.estado in ['VENCIDA', 'NO_ENTREGADO']:
+                pendientes_seguidas += 1
+            else:
+                break
+
+        # Factor 3: Promedio reprobatorio (< 51)
+        promedio_bajo = promedio is not None and promedio < 51
+
+        factores_riesgo = []
+        if dias_inactivo is not None and dias_inactivo >= 5:
+            factores_riesgo.append(f"Inactivo en plataforma ({dias_inactivo} días)")
+        if pendientes_seguidas >= 2:
+            factores_riesgo.append(f"{pendientes_seguidas} tareas consecutivas sin entregar")
+        if promedio_bajo:
+            factores_riesgo.append(f"Promedio reprobatorio ({promedio}/100 pts)")
+        elif cumplimiento < 50 and total_t >= 2:
+            factores_riesgo.append(f"Bajo cumplimiento de actividades ({cumplimiento}%)")
+
+        if len(factores_riesgo) >= 2 or (promedio is not None and promedio < 40):
+            nivel_riesgo = 'ALTO'       # 🔴 Semáforo Rojo
+        elif len(factores_riesgo) == 1:
+            nivel_riesgo = 'MEDIO'      # 🟠 Semáforo Naranja
+        else:
+            nivel_riesgo = 'BAJO'       # 🟢 Semáforo Verde
+
+        en_riesgo = len(factores_riesgo) > 0
+
+        # Plantilla prearmada para WhatsApp a Padre de Familia / Tutor
+        materia_label = espacio.nombre or (espacio.materia.nombre if espacio.materia else 'Materia')
+        telefono = (est.usuario.telefono or '').strip()
+        motivos_str = "\n".join([f"• {f}" for f in factores_riesgo]) if factores_riesgo else "• Ninguna observación de riesgo"
+
+        whatsapp_msg = (
+            f"Estimado tutor/padre de familia de {est.usuario.nombre_completo}:\n\n"
+            f"Le contactamos de {materia_label} (EduSmart Bolivia).\n"
+            f"Estado Académico: {'🚨 ALERTA ALTA DE RIESGO' if nivel_riesgo == 'ALTO' else ('⚠️ ALERTA ACADÉMICA' if nivel_riesgo == 'MEDIO' else '✅ DESEMPEÑO ESTABLE')}\n\n"
+            f"Motivos observados:\n{motivos_str}\n\n"
+            f"Resumen de Desempeño:\n"
+            f"• Tareas entregadas: {entregas_count} de {total_t}\n"
+            f"• Tareas pendientes: {total_t - entregas_count}\n"
+            f"• Promedio acumulado: {promedio if promedio is not None else 'Sin notas'} / 100 pts\n\n"
+            f"Le solicitamos coordinar con el docente para el plan de regularización y apoyo pedagógico."
+        )
+
+        clean_phone = ''.join(filter(str.isdigit, telefono))
+        if clean_phone.startswith('0'):
+            clean_phone = clean_phone[1:]
+        if len(clean_phone) == 8 and not clean_phone.startswith('591'):
+            clean_phone = '591' + clean_phone
+        whatsapp_url = f"https://wa.me/{clean_phone}?text={quote(whatsapp_msg)}" if clean_phone else f"https://wa.me/?text={quote(whatsapp_msg)}"
+
+        estudiantes_data.append({
+            'estudiante_id': est.id,
+            'nombre': est.usuario.nombre_completo,
+            'email': est.usuario.email,
+            'ru': ru,
+            'telefono': telefono,
+            'tareas_entregadas': entregas_count,
+            'tareas_pendientes': total_t - entregas_count,
+            'total_tareas': total_t,
+            'porcentaje_cumplimiento': cumplimiento,
+            'promedio': promedio,
+            'estado_academico': estado_ac,
+            'en_riesgo': en_riesgo,
+            'nivel_riesgo': nivel_riesgo,
+            'dias_inactivo': dias_inactivo,
+            'tareas_sin_entregar_seguidas': pendientes_seguidas,
+            'factores_riesgo': factores_riesgo,
+            'whatsapp_url': whatsapp_url,
+            'whatsapp_mensaje': whatsapp_msg,
+            'calificaciones': calificaciones_por_tarea
+        })
 
     return sorted(estudiantes_data, key=lambda x: x['nombre'])
 
@@ -1923,3 +1991,311 @@ def api_descargar_boletin_curso(request, curso_id):
     response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{safe_name}"'
     return response
+
+
+# ==============================================================================
+# MURO DE AVISOS Y CONSULTAS POR MATERIA (Muro & Q&A)
+# ==============================================================================
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def api_muro_list_create(request, espacio_id):
+    """
+    GET  /api/v2/espacios/<espacio_id>/muro/ -> Lista publicaciones con comentarios
+    POST /api/v2/espacios/<espacio_id>/muro/ -> Crea publicación (Aviso o Consulta)
+    """
+    espacio = get_object_or_404(Espacio, id=espacio_id)
+    es_docente = hasattr(request.user, 'perfil_docente') and espacio.docente.usuario_id == request.user.id
+
+    if not es_docente:
+        if not hasattr(request.user, 'perfil_estudiante'):
+            return Response({'error': 'No autorizado.'}, status=403)
+        est = request.user.perfil_estudiante
+        if not MiembroEspacio.objects.filter(espacio=espacio, estudiante=est).exists():
+            if not (espacio.curso and EstudianteCurso.objects.filter(curso=espacio.curso, estudiante=est, estado='ACTIVO').exists()):
+                return Response({'error': 'No eres miembro de esta materia.'}, status=403)
+
+    if request.method == 'GET':
+        pubs = MuroPublicacion.objects.filter(espacio=espacio).select_related('autor').prefetch_related('comentarios__autor')
+        tipo_filter = request.query_params.get('tipo')
+        if tipo_filter:
+            pubs = pubs.filter(tipo=tipo_filter)
+
+        data = []
+        for p in pubs:
+            comentarios_data = []
+            for c in p.comentarios.all():
+                comentarios_data.append({
+                    'id': c.id,
+                    'autor_id': c.autor.id,
+                    'autor_nombre': c.autor.nombre_completo,
+                    'autor_rol': c.autor.rol,
+                    'autor_avatar': c.autor.avatar_url,
+                    'contenido': c.contenido,
+                    'es_docente': c.es_docente,
+                    'es_solucion': c.es_solucion,
+                    'fecha_creacion': c.fecha_creacion.isoformat(),
+                })
+
+            data.append({
+                'id': p.id,
+                'espacio_id': p.espacio_id,
+                'autor_id': p.autor.id,
+                'autor_nombre': p.autor.nombre_completo,
+                'autor_rol': p.autor.rol,
+                'autor_avatar': p.autor.avatar_url,
+                'tipo': p.tipo,
+                'titulo': p.titulo,
+                'contenido': p.contenido,
+                'fijado': p.fijado,
+                'resuelto': p.resuelto,
+                'total_comentarios': len(comentarios_data),
+                'comentarios': comentarios_data,
+                'fecha_creacion': p.fecha_creacion.isoformat(),
+                'puede_editar': es_docente or p.autor_id == request.user.id,
+            })
+
+        return Response({
+            'publicaciones': data,
+            'horario_atencion': {
+                'inicio': '08:00',
+                'fin': '18:00',
+                'dias': 'Lunes a Viernes',
+                'mensaje': 'Horario de consultas del docente: 08:00 a 18:00 (Lunes a Viernes). Consultas fuera de este rango se atenderán al iniciar la siguiente jornada escolar.'
+            }
+        })
+
+    elif request.method == 'POST':
+        tipo = request.data.get('tipo', 'CONSULTA')
+        if tipo == 'AVISO' and not es_docente:
+            tipo = 'CONSULTA'
+
+        titulo = request.data.get('titulo', '').strip()
+        contenido = request.data.get('contenido', '').strip()
+        fijado = bool(request.data.get('fijado', False)) if es_docente else False
+
+        if not titulo or not contenido:
+            return Response({'error': 'El título y el contenido son obligatorios.'}, status=400)
+
+        pub = MuroPublicacion.objects.create(
+            espacio=espacio,
+            autor=request.user,
+            tipo=tipo,
+            titulo=titulo,
+            contenido=contenido,
+            fijado=fijado
+        )
+
+        # Notificar a los estudiantes si es un aviso oficial
+        if tipo == 'AVISO':
+            miembros_usuarios = Usuario.objects.filter(perfil_estudiante__espacios_inscritos__espacio=espacio)
+            for u in miembros_usuarios:
+                if u.id != request.user.id:
+                    Notificacion.objects.create(
+                        usuario=u,
+                        tipo='AVISO_NUEVO',
+                        mensaje=f"Nuevo aviso en {espacio.nombre}: {titulo}",
+                        espacio_id=espacio.id
+                    )
+
+        return Response({
+            'id': pub.id,
+            'mensaje': 'Publicación creada exitosamente.',
+            'titulo': pub.titulo,
+            'tipo': pub.tipo,
+        }, status=201)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def api_muro_comentar(request, publicacion_id):
+    pub = get_object_or_404(MuroPublicacion, id=publicacion_id)
+    contenido = request.data.get('contenido', '').strip()
+    if not contenido:
+        return Response({'error': 'El comentario no puede estar vacío.'}, status=400)
+
+    es_docente = hasattr(request.user, 'perfil_docente') and pub.espacio.docente.usuario_id == request.user.id
+
+    comentario = MuroComentario.objects.create(
+        publicacion=pub,
+        autor=request.user,
+        contenido=contenido,
+        es_docente=es_docente,
+        es_solucion=bool(request.data.get('es_solucion', False)) and es_docente
+    )
+
+    if es_docente and pub.autor_id != request.user.id:
+        Notificacion.objects.create(
+            usuario=pub.autor,
+            tipo='AVISO_NUEVO',
+            mensaje=f"El profesor respondió a tu consulta: '{pub.titulo}'",
+            espacio_id=pub.espacio_id
+        )
+
+    return Response({
+        'id': comentario.id,
+        'autor_nombre': comentario.autor.nombre_completo,
+        'autor_rol': comentario.autor.rol,
+        'contenido': comentario.contenido,
+        'es_docente': comentario.es_docente,
+        'es_solucion': comentario.es_solucion,
+        'fecha_creacion': comentario.fecha_creacion.isoformat(),
+    }, status=201)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def api_muro_toggle_fijar(request, publicacion_id):
+    pub = get_object_or_404(MuroPublicacion, id=publicacion_id)
+    es_docente = hasattr(request.user, 'perfil_docente') and pub.espacio.docente.usuario_id == request.user.id
+    if not es_docente:
+        return Response({'error': 'Solo el docente puede fijar publicaciones.'}, status=403)
+    pub.fijado = not pub.fijado
+    pub.save(update_fields=['fijado'])
+    return Response({'fijado': pub.fijado})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def api_muro_toggle_resolver(request, publicacion_id):
+    pub = get_object_or_404(MuroPublicacion, id=publicacion_id)
+    es_docente = hasattr(request.user, 'perfil_docente') and pub.espacio.docente.usuario_id == request.user.id
+    if not es_docente and pub.autor_id != request.user.id:
+        return Response({'error': 'No autorizado.'}, status=403)
+    pub.resuelto = not pub.resuelto
+    pub.save(update_fields=['resuelto'])
+    return Response({'resuelto': pub.resuelto})
+
+
+# ==============================================================================
+# AUTOMATIZACIONES: RECORDATORIOS ESCALONADOS Y REPORTE SEMANAL
+# ==============================================================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def api_ejecutar_recordatorios_tareas(request):
+    """
+    Escanea tareas activas y genera recordatorios escalonados preventivos:
+    - T-24h: Tareas que vencen en menos de 24 horas.
+    - T-2h: Alertas urgentes de última hora que vencen en menos de 2 horas.
+    """
+    now = timezone.now()
+    limite_24h = now + timezone.timedelta(hours=24)
+    limite_2h = now + timezone.timedelta(hours=2)
+
+    tareas_24h = Tarea.objects.filter(estado='PUBLICADA', fecha_limite__gt=now, fecha_limite__lte=limite_24h)
+
+    enviados_24h = 0
+    enviados_2h = 0
+
+    for tarea in tareas_24h:
+        estudiantes_ids = tarea.espacio.miembros.values_list('estudiante_id', flat=True)
+        entregados_ids = Entrega.objects.filter(tarea=tarea, estudiante_id__in=estudiantes_ids).values_list('estudiante_id', flat=True)
+        pendientes_est = Estudiante.objects.filter(id__in=estudiantes_ids).exclude(id__in=entregados_ids).select_related('usuario')
+
+        is_urgente = tarea.fecha_limite <= limite_2h
+        horas_restantes = max(1, int((tarea.fecha_limite - now).total_seconds() // 3600))
+
+        for est in pendientes_est:
+            hace_6h = now - timezone.timedelta(hours=6)
+            ya_notificado = Notificacion.objects.filter(
+                usuario=est.usuario,
+                tarea_id=tarea.id,
+                tipo='PROXIMA_VENCER',
+                fecha__gte=hace_6h
+            ).exists()
+
+            if not ya_notificado:
+                if is_urgente:
+                    msg = f"⏰ ¡ÚLTIMA HORA! Te quedan menos de 2 horas para entregar '{tarea.titulo}' en {tarea.espacio.nombre}."
+                    enviados_2h += 1
+                else:
+                    msg = f"📌 Recordatorio: Te quedan {horas_restantes} horas para entregar '{tarea.titulo}' en {tarea.espacio.nombre}."
+                    enviados_24h += 1
+
+                Notificacion.objects.create(
+                    usuario=est.usuario,
+                    tipo='PROXIMA_VENCER',
+                    mensaje=msg,
+                    espacio_id=tarea.espacio_id,
+                    tarea_id=tarea.id
+                )
+
+    return Response({
+        'status': 'OK',
+        'tareas_analizadas': tareas_24h.count(),
+        'recordatorios_24h_generados': enviados_24h,
+        'recordatorios_urgentes_2h_generados': enviados_2h,
+        'fecha_ejecucion': now.isoformat()
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_curso_reporte_semanal(request, curso_id):
+    """
+    Genera el consolidado semanal para un curso (últimos 7 días):
+    - Tareas entregadas y pendientes en la semana
+    - Calificaciones emitidas
+    - Estudiantes con alertas preventivas
+    - Texto listo para envío por WhatsApp / Correo
+    """
+    curso = get_object_or_404(Curso, id=curso_id)
+    now = timezone.now()
+    hace_7dias = now - timezone.timedelta(days=7)
+
+    espacios = Espacio.objects.filter(curso=curso)
+    espacios_ids = list(espacios.values_list('id', flat=True))
+
+    tareas_semana = Tarea.objects.filter(espacio_id__in=espacios_ids, fecha_publicacion__gte=hace_7dias)
+    entregas_semana = Entrega.objects.filter(tarea__espacio_id__in=espacios_ids, fecha_entrega__gte=hace_7dias)
+
+    estudiantes = Estudiante.objects.filter(cursos_inscritos__curso=curso, cursos_inscritos__estado='ACTIVO').select_related('usuario')
+    total_alumnos = estudiantes.count()
+
+    alumnos_atencion = []
+    for est in estudiantes:
+        entregadas = entregas_semana.filter(estudiante=est).count()
+        califs = Calificacion.objects.filter(entrega__estudiante=est, fecha_calificacion__gte=hace_7dias)
+        avg = califs.aggregate(Avg('nota'))['nota__avg']
+        if (tareas_semana.count() > 0 and entregadas == 0) or (avg is not None and avg < 51):
+            alumnos_atencion.append({
+                'nombre': est.usuario.nombre_completo,
+                'entregadas': entregadas,
+                'promedio_semana': round(avg, 1) if avg else None,
+                'telefono': est.usuario.telefono or ''
+            })
+
+    colegio_nombre = curso.colegio.nombre if curso.colegio else 'EduSmart Bolivia'
+    resumen_texto = (
+        f"📊 *REPORTE SEMANAL DE ACTIVIDADES — {curso.grado} \"{curso.paralelo}\"*\n"
+        f"Colegio: {colegio_nombre}\n"
+        f"Semana: {hace_7dias.strftime('%d/%m')} al {now.strftime('%d/%m/%Y')}\n\n"
+        f"• Total Estudiantes: {total_alumnos}\n"
+        f"• Tareas Asignadas esta semana: {tareas_semana.count()}\n"
+        f"• Entregas registradas: {entregas_semana.count()}\n"
+        f"• Estudiantes en alerta preventiva: {len(alumnos_atencion)}\n\n"
+        f"Acceda a EduSmart para revisar calificaciones y retroalimentaciones detalladas."
+    )
+
+    return Response({
+        'curso': {
+            'id': curso.id,
+            'nombre': curso.nombre_completo,
+            'colegio': colegio_nombre
+        },
+        'periodo': {
+            'inicio': hace_7dias.date().isoformat(),
+            'fin': now.date().isoformat(),
+        },
+        'estadisticas': {
+            'total_estudiantes': total_alumnos,
+            'tareas_semana': tareas_semana.count(),
+            'entregas_semana': entregas_semana.count(),
+            'estudiantes_atencion_count': len(alumnos_atencion),
+        },
+        'estudiantes_atencion': alumnos_atencion,
+        'resumen_texto': resumen_texto,
+        'whatsapp_url': f"https://wa.me/?text={quote(resumen_texto)}"
+    })
+

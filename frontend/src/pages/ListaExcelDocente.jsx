@@ -3,9 +3,10 @@ import {
   Users, ChevronRight, Download, Search, AlertTriangle,
   Building2, BookOpen, GraduationCap, FileSpreadsheet, X, Send,
   CheckCircle2, Filter, AlertCircle, ShieldAlert, Sparkles, TrendingUp,
-  Award, Check, Layers, SlidersHorizontal, ArrowRight, FileText
+  Award, Check, Layers, SlidersHorizontal, ArrowRight, FileText,
+  Clock, MessageSquare
 } from 'lucide-react';
-import { commonAPI } from '../api';
+import { commonAPI, automationsAPI } from '../api';
 import { Loading, EmptyState, Modal } from '../components';
 import SendReportModal from '../components/SendReportModal';
 
@@ -71,6 +72,38 @@ export default function ListaExcelDocente({ onNavigate }) {
   const [reportCourseTarget, setReportCourseTarget] = useState(null);
   const [reportRiskTarget, setReportRiskTarget] = useState(null);
   const [reportSuccessMsg, setReportSuccessMsg] = useState('');
+
+  // Automatizaciones Proactivas
+  const [ejecutandoRecordatorios, setEjecutandoRecordatorios] = useState(false);
+  const [recordatoriosMsg, setRecordatoriosMsg] = useState('');
+  const [reporteSemanalData, setReporteSemanalData] = useState(null);
+  const [cargandoSemanal, setCargandoSemanal] = useState(false);
+
+  const handleEjecutarRecordatorios = async () => {
+    setEjecutandoRecordatorios(true);
+    setRecordatoriosMsg('');
+    try {
+      const res = await automationsAPI.ejecutarRecordatorios();
+      setRecordatoriosMsg(`✓ Proceso completado: se revisaron ${res.tareas_analizadas} tareas, emitiendo ${res.recordatorios_24h_generados} recordatorios T-24h y ${res.recordatorios_urgentes_2h_generados} alertas urgentes T-2h.`);
+    } catch (err) {
+      alert(err.message || 'Error al ejecutar recordatorios automáticos.');
+    } finally {
+      setEjecutandoRecordatorios(false);
+    }
+  };
+
+  const handleCargarReporteSemanal = async () => {
+    if (!cursoActual?.curso_id) return;
+    setCargandoSemanal(true);
+    try {
+      const res = await automationsAPI.reporteSemanalCurso(cursoActual.curso_id);
+      setReporteSemanalData(res);
+    } catch (err) {
+      alert(err.message || 'Error al generar reporte semanal.');
+    } finally {
+      setCargandoSemanal(false);
+    }
+  };
 
   const loadData = () => {
     setLoading(true);
@@ -519,6 +552,38 @@ export default function ListaExcelDocente({ onNavigate }) {
                 <span>Boletín Oficial (PDF)</span>
               </button>
 
+              {/* 4. Recordatorios Escalonados T-24h y T-2h */}
+              <button
+                className="btn btn-sm"
+                onClick={handleEjecutarRecordatorios}
+                disabled={ejecutandoRecordatorios}
+                style={{
+                  background: '#4F46E5', color: '#FFFFFF', padding: '9px 14px', borderRadius: 8,
+                  fontSize: 12.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6,
+                  border: 'none', cursor: 'pointer', boxShadow: '0 2px 6px rgba(79,70,229,0.25)'
+                }}
+                title="Escanear y enviar automáticamente recordatorios preventivos T-24h y T-2h a alumnos con tareas por vencer"
+              >
+                <Clock size={15} />
+                <span>{ejecutandoRecordatorios ? 'Enviando...' : 'Recordatorios T-24h'}</span>
+              </button>
+
+              {/* 5. Reporte Semanal a Padres */}
+              <button
+                className="btn btn-sm"
+                onClick={handleCargarReporteSemanal}
+                disabled={cargandoSemanal}
+                style={{
+                  background: '#0D9488', color: '#FFFFFF', padding: '9px 14px', borderRadius: 8,
+                  fontSize: 12.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6,
+                  border: 'none', cursor: 'pointer', boxShadow: '0 2px 6px rgba(13,148,136,0.25)'
+                }}
+                title="Generar consolidado semanal de actividades y asistencia para enviar a padres de familia"
+              >
+                <MessageSquare size={15} />
+                <span>{cargandoSemanal ? 'Generando...' : 'Reporte Semanal'}</span>
+              </button>
+
               {/* 4. Exportar Excel */}
               <button
                 className="btn btn-secondary btn-sm"
@@ -533,6 +598,27 @@ export default function ListaExcelDocente({ onNavigate }) {
                 <span>Exportar Excel</span>
               </button>
             </div>
+
+            {/* Banner de resultado de recordatorios automáticos */}
+            {recordatoriosMsg && (
+              <div style={{
+                marginTop: 12, padding: '10px 14px', background: '#EEF2FF',
+                border: '1px solid #C7D2FE', borderRadius: 8, color: '#3730A3',
+                fontSize: 12.5, fontWeight: 600, display: 'flex',
+                justifyContent: 'space-between', alignItems: 'center'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Clock size={16} color="#4F46E5" />
+                  <span>{recordatoriosMsg}</span>
+                </div>
+                <button
+                  onClick={() => setRecordatoriosMsg('')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6366F1' }}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* TARJETAS RESUMEN DE RENDIMIENTO ACADÉMICO */}
@@ -711,12 +797,32 @@ export default function ListaExcelDocente({ onNavigate }) {
                               {est.nombre.charAt(0)}
                             </div>
                             <div style={{ minWidth: 0 }}>
-                              <div style={{ fontWeight: 700, fontSize: 13, color: esRiesgo ? '#991B1B' : '#0F172A' }}>
-                                {est.nombre}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontWeight: 700, fontSize: 13, color: esRiesgo ? '#991B1B' : '#0F172A' }}>
+                                  {est.nombre}
+                                </span>
+                                {est.nivel_riesgo && est.nivel_riesgo !== 'BAJO' && (
+                                  <span
+                                    style={{
+                                      fontSize: 10, fontWeight: 800, padding: '1px 5px', borderRadius: 4,
+                                      background: est.nivel_riesgo === 'ALTO' ? '#FEE2E2' : '#FEF3C7',
+                                      color: est.nivel_riesgo === 'ALTO' ? '#991B1B' : '#92400E',
+                                      border: `1px solid ${est.nivel_riesgo === 'ALTO' ? '#FCA5A5' : '#FDE68A'}`
+                                    }}
+                                    title={est.factores_riesgo?.join(' · ')}
+                                  >
+                                    {est.nivel_riesgo === 'ALTO' ? '🔴 ALTO RIESGO' : '🟠 RIESGO MEDIO'}
+                                  </span>
+                                )}
                               </div>
                               <div style={{ fontSize: 11, color: '#64748B' }}>
                                 {est.email}
                               </div>
+                              {est.factores_riesgo && est.factores_riesgo.length > 0 && (
+                                <div style={{ fontSize: 10, color: '#B91C1C', fontWeight: 600, marginTop: 1 }}>
+                                  ⚠️ {est.factores_riesgo[0]}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -819,13 +925,29 @@ export default function ListaExcelDocente({ onNavigate }) {
                             <span>{esRiesgo ? 'Notificar Riesgo' : 'Mandar Reporte'}</span>
                           </button>
 
+                          {est.whatsapp_url && (
+                            <button
+                              className="btn btn-sm"
+                              style={{
+                                fontSize: 11, padding: '4px 8px', color: '#15803D',
+                                background: '#DCFCE7', border: '1px solid #86EFAC',
+                                display: 'inline-flex', alignItems: 'center', gap: 3,
+                                marginLeft: 4, fontWeight: 700
+                              }}
+                              onClick={() => window.open(est.whatsapp_url, '_blank')}
+                              title="Abrir WhatsApp con mensaje prearmado para el padre o tutor"
+                            >
+                              <span>💬 WA</span>
+                            </button>
+                          )}
+
                           <button
                             className="btn btn-sm"
                             style={{
                               fontSize: 11, padding: '4px 8px', color: '#0284C7',
                               background: '#F0F9FF', border: '1px solid #BAE6FD',
                               display: 'inline-flex', alignItems: 'center', gap: 4,
-                              marginLeft: 6
+                              marginLeft: 4
                             }}
                             onClick={() => {
                               const stId = est.estudiante_id || est.id;
@@ -945,6 +1067,72 @@ export default function ListaExcelDocente({ onNavigate }) {
               setReportSuccessMsg(`Alerta pedagógica y plan de refuerzo enviado a los ${reportRiskTarget.atRiskStudents.length} estudiantes en riesgo de ${reportRiskTarget.curso.curso_nombre}.`);
             }}
           />
+        </Modal>
+      )}
+
+      {/* Modal 4: Reporte Semanal Oficial a Padres */}
+      {reporteSemanalData && (
+        <Modal
+          open={true}
+          onClose={() => setReporteSemanalData(null)}
+          title={`📊 Reporte Semanal Oficial — ${reporteSemanalData.curso?.nombre}`}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ background: '#F0FDFA', border: '1px solid #99F6E4', borderRadius: 8, padding: '10px 14px' }}>
+              <div style={{ fontWeight: 800, fontSize: 13, color: '#0F766E' }}>
+                Período: {reporteSemanalData.periodo?.inicio} al {reporteSemanalData.periodo?.fin}
+              </div>
+              <div style={{ display: 'flex', gap: 14, marginTop: 6, fontSize: 12, color: '#134E4A', flexWrap: 'wrap' }}>
+                <span>👥 <strong>{reporteSemanalData.estadisticas?.total_estudiantes}</strong> Estudiantes</span>
+                <span>📋 <strong>{reporteSemanalData.estadisticas?.tareas_semana}</strong> Tareas en la semana</span>
+                <span>📥 <strong>{reporteSemanalData.estadisticas?.entregas_semana}</strong> Entregas recibidas</span>
+                <span>⚠️ <strong>{reporteSemanalData.estadisticas?.estudiantes_atencion_count}</strong> En alerta preventiva</span>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 4 }}>
+                Mensaje Consolidado para Padres de Familia / Grupo Escolar:
+              </label>
+              <textarea
+                readOnly
+                rows={8}
+                value={reporteSemanalData.resumen_texto}
+                style={{ width: '100%', padding: '10px', borderRadius: 6, border: '1px solid #CBD5E1', fontSize: 12, lineHeight: 1.5, background: '#F8FAFC', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(reporteSemanalData.resumen_texto);
+                  alert('¡Mensaje semanal copiado al portapapeles!');
+                }}
+              >
+                📋 Copiar Texto
+              </button>
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setReporteSemanalData(null)}
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => window.open(reporteSemanalData.whatsapp_url, '_blank')}
+                  style={{ background: '#16A34A', color: '#FFFFFF', fontWeight: 700, padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer' }}
+                >
+                  💬 Enviar por WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
         </Modal>
       )}
 

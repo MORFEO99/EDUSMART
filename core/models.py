@@ -818,3 +818,53 @@ class IntentoPracticaEstudiante(models.Model):
         return f"{self.estudiante.usuario.nombre_completo} - {self.practica.titulo} ({self.puntaje_obtenido} pts)"
 
 
+# ==============================================================================
+# MURO DE AVISOS Y CONSULTAS POR MATERIA (Muro & Q&A)
+# ==============================================================================
+
+class MuroPublicacion(models.Model):
+    TIPOS = (
+        ('AVISO', 'Aviso Oficial'),
+        ('CONSULTA', 'Consulta / Pregunta'),
+        ('DUDA', 'Duda sobre Tarea'),
+        ('RECURSO', 'Aporte o Recurso'),
+    )
+    espacio = models.ForeignKey(Espacio, on_delete=models.CASCADE, related_name='publicaciones_muro')
+    autor = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='publicaciones_muro')
+    tipo = models.CharField(max_length=20, choices=TIPOS, default='CONSULTA')
+    titulo = models.CharField(max_length=250)
+    contenido = models.TextField()
+    fijado = models.BooleanField(default=False)
+    resuelto = models.BooleanField(default=False)
+    fecha_creacion = models.DateTimeField(default=timezone.now)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'muro_publicaciones'
+        ordering = ['-fijado', '-fecha_creacion']
+
+    def __str__(self):
+        return f"[{self.tipo}] {self.titulo} - {self.espacio.nombre}"
+
+    @property
+    def total_comentarios(self):
+        return self.comentarios.count()
+
+
+class MuroComentario(models.Model):
+    publicacion = models.ForeignKey(MuroPublicacion, on_delete=models.CASCADE, related_name='comentarios')
+    autor = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='comentarios_muro')
+    contenido = models.TextField()
+    es_docente = models.BooleanField(default=False)
+    es_solucion = models.BooleanField(default=False)
+    fecha_creacion = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = 'muro_comentarios'
+        ordering = ['fecha_creacion']
+
+    def __str__(self):
+        return f"Comentario de {self.autor.nombre_completo} en {self.publicacion.titulo}"
+
+
+

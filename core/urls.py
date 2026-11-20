@@ -86,6 +86,16 @@ urlpatterns = [
     path('api/v2/espacios/<int:espacio_id>/tareas/', api_v2.api_tareas_espacio, name='api_v2_tareas_espacio'),
     path('api/v2/espacios/<int:espacio_id>/crear-tarea/', api_v2.api_crear_tarea_espacio, name='api_v2_crear_tarea_espacio'),
 
+    # Muro de Avisos y Consultas por Materia
+    path('api/v2/espacios/<int:espacio_id>/muro/', api_v2.api_muro_list_create, name='api_v2_muro_list_create'),
+    path('api/v2/muro/<int:publicacion_id>/comentar/', api_v2.api_muro_comentar, name='api_v2_muro_comentar'),
+    path('api/v2/muro/<int:publicacion_id>/toggle-fijar/', api_v2.api_muro_toggle_fijar, name='api_v2_muro_toggle_fijar'),
+    path('api/v2/muro/<int:publicacion_id>/toggle-resolver/', api_v2.api_muro_toggle_resolver, name='api_v2_muro_toggle_resolver'),
+
+    # Automatizaciones Proactivas (Recordatorios y Reporte Semanal)
+    path('api/v2/tareas/ejecutar-recordatorios/', api_v2.api_ejecutar_recordatorios_tareas, name='api_v2_ejecutar_recordatorios'),
+    path('api/v2/cursos/<int:curso_id>/reporte-semanal/', api_v2.api_curso_reporte_semanal, name='api_v2_curso_reporte_semanal'),
+
     # =======================================================
     # V2 API GAMIFICACIÓN
     # =======================================================

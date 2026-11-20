@@ -303,22 +303,46 @@ export default function SendReportModal({ student, course, isRiskOnly = false, a
       </div>
 
       {/* Actions */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-        <button className="btn btn-secondary btn-sm" onClick={onClose} disabled={sending}>
-          Cancelar
-        </button>
-        <button
-          className="btn btn-primary btn-sm"
-          onClick={handleSend}
-          disabled={sending || !asunto.trim() || !mensaje.trim()}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: isRiskOnly ? '#DC2626' : '#1E3A8A',
-            border: isRiskOnly ? '1px solid #B91C1C' : 'none'
-          }}
-        >
-          <Send size={13} /> {sending ? 'Enviando...' : isRiskOnly ? `Notificar a los ${atRiskStudents.length} en riesgo` : isBulk ? 'Emitir a todo el curso' : 'Enviar reporte individual'}
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+        {!isBulk && !isRiskOnly && (
+          <button
+            type="button"
+            onClick={() => {
+              const fullMsg = `*${asunto}*\n\n${mensaje}`;
+              const phone = (student?.telefono || '').replace(/\D/g, '');
+              const cleanPhone = phone.length === 8 ? '591' + phone : phone;
+              const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(fullMsg)}` : `https://wa.me/?text=${encodeURIComponent(fullMsg)}`;
+              window.open(url, '_blank');
+            }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: '#16A34A', color: '#FFFFFF', border: 'none',
+              borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700,
+              cursor: 'pointer', boxShadow: '0 2px 4px rgba(22,163,74,0.25)'
+            }}
+            title="Abrir WhatsApp con el reporte prearmado para el padre o tutor"
+          >
+            <span>💬 Notificar por WhatsApp</span>
+          </button>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginLeft: 'auto' }}>
+          <button className="btn btn-secondary btn-sm" onClick={onClose} disabled={sending}>
+            Cancelar
+          </button>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={handleSend}
+            disabled={sending || !asunto.trim() || !mensaje.trim()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: isRiskOnly ? '#DC2626' : '#1E3A8A',
+              border: isRiskOnly ? '1px solid #B91C1C' : 'none'
+            }}
+          >
+            <Send size={13} /> {sending ? 'Enviando...' : isRiskOnly ? `Notificar a los ${atRiskStudents.length} en riesgo` : isBulk ? 'Emitir a todo el curso' : 'Enviar por Correo'}
+          </button>
+        </div>
       </div>
     </div>
   );

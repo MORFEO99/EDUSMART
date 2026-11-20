@@ -276,4 +276,9 @@ export const gamificationAPI = {
   getBadges: () => apiFetch('/api/v2/gamificacion/badges/'),
 };
 
+export const automationsAPI = {
+  ejecutarRecordatorios: () => apiFetch('/api/v2/tareas/ejecutar-recordatorios/', { method: 'POST' }),
+  reporteSemanalCurso: (cursoId) => apiFetch(`/api/v2/cursos/${cursoId}/reporte-semanal/`),
+};
+
 export default apiFetch;
