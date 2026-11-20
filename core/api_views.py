@@ -170,7 +170,8 @@ def api_register(request):
         last_name=last_name,
         rol=rol,
         avatar_url=avatar_url,
-        estado='ACTIVO'
+        estado='ACTIVO',
+        telefono=(data.get('telefono') or '').strip()
     )
 
     role_info = {}
@@ -188,7 +189,10 @@ def api_register(request):
     else:
         est = Estudiante.objects.create(
             usuario=user,
-            carrera_o_area=data.get('carrera_o_area', 'Ingeniería y Tecnología')
+            carrera_o_area=data.get('carrera_o_area', 'Ingeniería y Tecnología'),
+            nombre_tutor=(data.get('nombre_tutor') or '').strip(),
+            relacion_tutor=(data.get('relacion_tutor') or 'PADRE').strip(),
+            telefono_tutor=(data.get('telefono_tutor') or '').strip(),
         )
         est.actualizar_progreso()
         role_info = {

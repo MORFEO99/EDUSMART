@@ -557,6 +557,11 @@ export function RegisterPage({ onRegisterSuccess, onGoToLogin, onGoToLanding }) 
     especialidad: 'Bases de Datos y Software',
     carrera_o_area: 'Ingeniería de Sistemas e Informática',
     codigo_docente: '',
+    // Contactos (solo estudiante)
+    telefono: '',
+    nombre_tutor: '',
+    relacion_tutor: 'PADRE',
+    telefono_tutor: '',
   });
   const [carnetFile, setCarnetFile] = useState(null);
   const [carnetPreview, setCarnetPreview] = useState(null);
@@ -770,15 +775,101 @@ export function RegisterPage({ onRegisterSuccess, onGoToLogin, onGoToLanding }) 
               />
             </div>
           ) : (
-            <div className="form-group">
-              <label className="form-label">Carrera o Área de Estudio:</label>
-              <input
-                className="form-control"
-                placeholder="Ej. Ingeniería de Sistemas e Informática"
-                value={formData.carrera_o_area}
-                onChange={(e) => setFormData(p => ({ ...p, carrera_o_area: e.target.value }))}
-              />
-            </div>
+            <>
+              <div className="form-group">
+                <label className="form-label">Carrera o Área de Estudio:</label>
+                <input
+                  className="form-control"
+                  placeholder="Ej. Ingeniería de Sistemas e Informática"
+                  value={formData.carrera_o_area}
+                  onChange={(e) => setFormData(p => ({ ...p, carrera_o_area: e.target.value }))}
+                />
+              </div>
+
+              {/* ══ Sección de Contacto ══ */}
+              <div style={{
+                background: 'linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%)',
+                border: '1.5px solid #BAE6FD', borderRadius: 10,
+                padding: '16px 18px', marginBottom: 4
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14 }}>
+                  <span style={{ fontSize: 16 }}>📱</span>
+                  <span style={{ fontWeight: 800, fontSize: 13, color: '#0369A1' }}>
+                    Contacto de Emergencia y Alertas Académicas
+                  </span>
+                </div>
+
+                {/* Celular del estudiante */}
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label" style={{ color: '#0369A1' }}>
+                    Tu número de celular (WhatsApp):
+                  </label>
+                  <input
+                    className="form-control"
+                    type="tel"
+                    placeholder="Ej: 72345678 ó 59172345678"
+                    value={formData.telefono}
+                    onChange={(e) => setFormData(p => ({ ...p, telefono: e.target.value }))}
+                  />
+                  <span style={{ fontSize: 11, color: '#64748B' }}>
+                    Se usará para enviarte alertas de tareas y recordatorios.
+                  </span>
+                </div>
+
+                {/* Separador */}
+                <div style={{ borderTop: '1px dashed #BAE6FD', margin: '12px 0' }} />
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#0369A1', marginBottom: 10 }}>
+                  👨‍👧 Contacto del Padre / Madre / Tutor
+                </div>
+
+                {/* Relación */}
+                <div className="form-group" style={{ marginBottom: 10 }}>
+                  <label className="form-label" style={{ color: '#334155' }}>Relación familiar:</label>
+                  <select
+                    className="form-control"
+                    value={formData.relacion_tutor}
+                    onChange={(e) => setFormData(p => ({ ...p, relacion_tutor: e.target.value }))}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <option value="PADRE">Padre</option>
+                    <option value="MADRE">Madre</option>
+                    <option value="TUTOR">Tutor Legal</option>
+                    <option value="OTRO">Otro familiar</option>
+                  </select>
+                </div>
+
+                {/* Nombre del tutor */}
+                <div className="form-group" style={{ marginBottom: 10 }}>
+                  <label className="form-label" style={{ color: '#334155' }}>
+                    Nombre del {formData.relacion_tutor === 'PADRE' ? 'Padre' : formData.relacion_tutor === 'MADRE' ? 'Madre' : formData.relacion_tutor === 'TUTOR' ? 'Tutor' : 'Familiar'}:
+                  </label>
+                  <input
+                    className="form-control"
+                    type="text"
+                    placeholder="Ej: María Mamani López"
+                    value={formData.nombre_tutor}
+                    onChange={(e) => setFormData(p => ({ ...p, nombre_tutor: e.target.value }))}
+                  />
+                </div>
+
+                {/* Celular del tutor */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ color: '#334155' }}>
+                    Celular del {formData.relacion_tutor === 'PADRE' ? 'Padre' : formData.relacion_tutor === 'MADRE' ? 'Madre' : 'Tutor'} (WhatsApp):
+                  </label>
+                  <input
+                    className="form-control"
+                    type="tel"
+                    placeholder="Ej: 71234567 ó 59171234567"
+                    value={formData.telefono_tutor}
+                    onChange={(e) => setFormData(p => ({ ...p, telefono_tutor: e.target.value }))}
+                  />
+                  <span style={{ fontSize: 11, color: '#64748B' }}>
+                    Se notificará en caso de bajo rendimiento o tareas vencidas.
+                  </span>
+                </div>
+              </div>
+            </>
           )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
