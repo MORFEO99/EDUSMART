@@ -15,7 +15,7 @@ from django.utils.encoding import force_bytes, force_str
 from .validators import validate_file_size, validate_file_extension, sanitize_filename, validate_grade
 from .email_service import send_grade_notification_email, send_password_reset_email
 from .pdf_service import generate_student_boletin_pdf
-# from .analisis_numerico import (  # removed numeric lab
+from .analisis_numerico import (
     calcular_regresion_lineal,
     calcular_interpolacion_lagrange,
     calcular_extrapolacion_rendimiento,

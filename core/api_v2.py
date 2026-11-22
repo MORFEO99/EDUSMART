@@ -21,8 +21,8 @@ from .models import (
     TemaAvance, MuroPublicacion, MuroComentario
 )
 from . import whatsapp_service
-# # from . import analisis_numerico  # removed numeric lab_service  # removed numeric lab
-# from . import analisis_numerico  # removed numeric lab
+from . import analisis_numerico
+from . import analisis_numerico_service
 
 from .serializers_v2 import (
 
