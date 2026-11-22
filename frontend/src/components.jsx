@@ -82,8 +82,7 @@ export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount 
     {
       category: 'EXTRAS',
       items: [
-        { id: 'retos',                label: 'Retos Gamificados',      icon: Trophy },
-        { id: 'laboratorio-numerico', label: 'Laboratorio Numérico',   icon: Calculator },
+        { id: 'retos', label: 'Retos Gamificados', icon: Trophy },
       ]
     },
   ];
@@ -109,8 +108,7 @@ export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount 
     {
       category: 'EXTRAS',
       items: [
-        { id: 'retos',                label: 'Retos Gamificados',    icon: Trophy },
-        { id: 'laboratorio-numerico', label: 'Laboratorio Numérico', icon: Calculator },
+        { id: 'retos', label: 'Retos Gamificados', icon: Trophy },
       ]
     },
   ];

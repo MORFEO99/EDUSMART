@@ -10,6 +10,9 @@ import { getNoteColor } from '../utils';
 export default function StudentProgress() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [simuladorObjetivo, setSimuladorObjetivo] = useState(70);
+  const [simResultado, setSimResultado] = useState(null);
+  const [simLoading, setSimLoading] = useState(false);
 
   useEffect(() => {
     studentAPI.progress().then(setData).catch(console.error).finally(() => setLoading(false));
@@ -24,10 +27,6 @@ export default function StudentProgress() {
   const meta = analisis_numerico?.simulacion_meta;
   const newton = analisis_numerico?.nivelacion_newton;
   const extrapolacion = analisis_numerico?.extrapolacion;
-
-  const [simuladorObjetivo, setSimuladorObjetivo] = useState(70);
-  const [simResultado, setSimResultado] = useState(null);
-  const [simLoading, setSimLoading] = useState(false);
 
   const handleSimularMeta = async (notaObj) => {
     setSimuladorObjetivo(notaObj);

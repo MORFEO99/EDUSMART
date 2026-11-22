@@ -12,7 +12,7 @@ import { SubmitTaskForm } from './MyTasks';
 import SendReportModal from '../components/SendReportModal';
 import ChallengeBoard from '../components/ChallengeBoard';
 import MuroMateria from '../components/MuroMateria';
-import LaboratorioNumerico from '../components/LaboratorioNumerico';
+
 import apiFetch from '../api';
 
 function getBadgeStyle(estado, vencida) {
@@ -467,19 +467,6 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
           <MessageSquare size={13} color={activeTab === 'muro' ? '#059669' : '#64748B'} />
           <span>Muro y Consultas</span>
         </button>
-        <button
-          className={`teams-tab ${activeTab === 'laboratorio' ? 'active' : ''}`}
-          onClick={() => setActiveTab('laboratorio')}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-        >
-          <Calculator size={13} color={activeTab === 'laboratorio' ? '#0284C7' : '#64748B'} />
-          <span>Laboratorio Numérico</span>
-          {isAnalisisNumerico && (
-            <span style={{ fontSize: 9, background: '#0284C7', color: 'white', padding: '1px 5px', borderRadius: 8, fontWeight: 700 }}>
-              OFICIAL
-            </span>
-          )}
-        </button>
         {!isEstudiante && (
           <button
             className="btn btn-primary btn-sm"
@@ -807,14 +794,6 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
           espacioId={espacioId}
           userRole={user?.rol}
           currentUserId={user?.id}
-        />
-      )}
-
-      {/* ── Laboratorio Computacional de Análisis Numérico (USB) ── */}
-      {activeTab === 'laboratorio' && (
-        <LaboratorioNumerico
-          espacioNombre={espacio?.materia || espacio?.nombre}
-          userRole={user?.rol}
         />
       )}
 
