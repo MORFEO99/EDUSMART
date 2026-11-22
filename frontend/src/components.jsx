@@ -5,7 +5,7 @@ import {
   Clock, Award, MessageSquare, AlertCircle, AlertTriangle, UploadCloud,
   Download, Eye, Share2, Layers, BookOpen, Code, Database, Cpu, Menu,
   CheckCircle2, ArrowRight, Building, Inbox, BarChart2, Search, Sparkles, Target,
-  FileSpreadsheet, GraduationCap, School, Trophy, Settings, UsersRound
+  FileSpreadsheet, GraduationCap, School, Trophy, Settings, UsersRound, Calculator
 } from 'lucide-react';
 
 // ============================================================
@@ -82,7 +82,8 @@ export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount 
     {
       category: 'EXTRAS',
       items: [
-        { id: 'retos',       label: 'Retos Gamificados',      icon: Trophy },
+        { id: 'retos',                label: 'Retos Gamificados',      icon: Trophy },
+        { id: 'laboratorio-numerico', label: 'Laboratorio Numérico',   icon: Calculator },
       ]
     },
   ];
@@ -108,7 +109,8 @@ export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount 
     {
       category: 'EXTRAS',
       items: [
-        { id: 'retos',           label: 'Retos Gamificados',  icon: Trophy },
+        { id: 'retos',                label: 'Retos Gamificados',    icon: Trophy },
+        { id: 'laboratorio-numerico', label: 'Laboratorio Numérico', icon: Calculator },
       ]
     },
   ];

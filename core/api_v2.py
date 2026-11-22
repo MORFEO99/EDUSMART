@@ -21,6 +21,7 @@ from .models import (
     TemaAvance, MuroPublicacion, MuroComentario
 )
 from . import whatsapp_service
+from . import analisis_numerico_service
 
 from .serializers_v2 import (
 
@@ -2545,3 +2546,74 @@ def api_actualizar_contacto_tutor(request, estudiante_id):
         'telefono_tutor': est.telefono_tutor,
         'relacion_tutor': est.relacion_tutor,
     })
+
+
+# ==============================================================================
+# LABORATORIO COMPUTACIONAL DE ANÁLISIS NUMÉRICO
+# ==============================================================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def api_analisis_numerico_calcular(request):
+    """
+    POST /api/v2/analisis-numerico/calcular/
+    Permite a docentes y estudiantes resolver, comprobar y simular paso a paso
+    ejercicios de Métodos Numéricos (Sección 9.8 del informe académico).
+    """
+    metodo = request.data.get('metodo', '').lower().strip()
+    params = request.data.get('parametros', {})
+
+    try:
+        if metodo == 'biseccion':
+            expr = params.get('funcion', 'x**3 - x - 2')
+            a = float(params.get('a', 1.0))
+            b = float(params.get('b', 2.0))
+            max_iter = int(params.get('max_iter', 6))
+            res = analisis_numerico_service.resolver_biseccion(expr, a, b, max_iter=max_iter)
+            return Response(res)
+
+        elif metodo == 'newton':
+            expr = params.get('funcion', 'x**3 - x - 2')
+            x0 = float(params.get('x0', 1.5))
+            max_iter = int(params.get('max_iter', 5))
+            res = analisis_numerico_service.resolver_newton_raphson(expr, x0, max_iter=max_iter)
+            return Response(res)
+
+        elif metodo == 'gauss':
+            A = params.get('A', [[2, 1, 1], [1, 3, 2], [3, 1, 4]])
+            b = params.get('b', [7, 13, 17])
+            res = analisis_numerico_service.resolver_eliminacion_gauss(A, b)
+            return Response(res)
+
+        elif metodo == 'lagrange':
+            puntos = params.get('puntos', [[0, 1], [1, 3], [2, 7]])
+            x_eval = float(params.get('x_eval', 1.5)) if params.get('x_eval') is not None else None
+            res = analisis_numerico_service.resolver_lagrange(puntos, x_eval=x_eval)
+            return Response(res)
+
+        elif metodo == 'integracion':
+            expr = params.get('funcion', 'x**2')
+            a = float(params.get('a', 0.0))
+            b = float(params.get('b', 2.0))
+            n = int(params.get('n', 4))
+            res = analisis_numerico_service.resolver_integracion(expr, a, b, n=n)
+            return Response(res)
+
+        elif metodo == 'euler':
+            expr_fxy = params.get('edo', 'x + y')
+            x0 = float(params.get('x0', 0.0))
+            y0 = float(params.get('y0', 1.0))
+            h = float(params.get('h', 0.1))
+            x_final = float(params.get('x_final', 0.3))
+            expr_exacta = params.get('exacta', '2 * exp(x) - x - 1')
+            res = analisis_numerico_service.resolver_euler(expr_fxy, x0, y0, h, x_final, expr_exacta=expr_exacta)
+            return Response(res)
+
+        else:
+            return Response({
+                'error': f'Método "{metodo}" no soportado. Métodos disponibles: biseccion, newton, gauss, lagrange, integracion, euler'
+            }, status=400)
+
+    except Exception as e:
+        return Response({'error': f'Error al calcular: {str(e)}'}, status=400)
+

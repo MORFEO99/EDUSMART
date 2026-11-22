@@ -298,4 +298,12 @@ export const alertasAPI = {
     }),
 };
 
+export const analisisNumericoAPI = {
+  calcular: (metodo, parametros) =>
+    apiFetch('/api/v2/analisis-numerico/calcular/', {
+      method: 'POST',
+      body: JSON.stringify({ metodo, parametros }),
+    }),
+};
+
 export default apiFetch;

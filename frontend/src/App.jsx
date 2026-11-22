@@ -27,6 +27,7 @@ import EspacioDetallePage from './pages/EspacioDetallePage';
 import ListaExcelDocente from './pages/ListaExcelDocente';
 import StudentPracticeView from './pages/StudentPracticeView';
 import ChallengeBoard from './components/ChallengeBoard';
+import LaboratorioNumerico from './components/LaboratorioNumerico';
 
 // ============================================================
 // PAGE TITLES
@@ -59,6 +60,7 @@ const PAGE_TITLES = {
   'retroalimentacion':      ['Retroalimentación',          'Observaciones y comentarios formativos del docente'],
   'mi-progreso':            ['Mi Progreso',                'Indicadores de avance y desempeño académico'],
   'presentar-tarea':        ['Presentar Tarea',            'Envío de trabajos y archivos adjuntos'],
+  'laboratorio-numerico':   ['Laboratorio de Análisis Numérico', 'Resolución paso a paso de métodos matemáticos y computacionales'],
 
   // ── SUBPÁGINAS (sin ítem en sidebar) ────────────────────
   'teacher_courses':        ['Administración del Curso',   'Gestión de estudiantes y asignaturas'],
@@ -157,6 +159,12 @@ export default function App() {
               <ChallengeBoard userRole="ESTUDIANTE" />
             </div>
           );
+        case 'laboratorio-numerico':
+          return (
+            <div style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem 1rem' }}>
+              <LaboratorioNumerico userRole="ESTUDIANTE" />
+            </div>
+          );
         case 'mis-tareas':
         case 'tareas':
           return <MyTasks initialTaskId={extraData?.taskId} initialFilter={extraData?.filtro || 'todos'} onNavigate={handleNavigate} />;
@@ -239,6 +247,13 @@ export default function App() {
           return (
             <div style={{ maxWidth: 1100, margin: '0 auto', padding: '1.5rem 1rem' }}>
               <ChallengeBoard userRole="DOCENTE" />
+            </div>
+          );
+
+        case 'laboratorio-numerico':
+          return (
+            <div style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem 1rem' }}>
+              <LaboratorioNumerico userRole="DOCENTE" />
             </div>
           );
 

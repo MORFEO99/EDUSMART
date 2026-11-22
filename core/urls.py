@@ -129,6 +129,11 @@ urlpatterns = [
     path('api/v2/alertas/tarea-vencida/<int:tarea_id>/', api_v2.api_alertar_tarea_vencida, name='api_v2_alertar_tarea_vencida'),
     path('api/v2/alertas/estudiante/<int:estudiante_id>/contacto/', api_v2.api_actualizar_contacto_tutor, name='api_v2_contacto_tutor'),
 
+    # =======================================================
+    # LABORATORIO COMPUTACIONAL DE ANÁLISIS NUMÉRICO
+    # =======================================================
+    path('api/v2/analisis-numerico/calcular/', api_v2.api_analisis_numerico_calcular, name='api_analisis_numerico_calcular'),
+
     # SPA React Catch-all (sirve index.html en / y en cualquier ruta del frontend)
     re_path(r'^.*$', views.serve_react_app, name='react_spa'),
 ]

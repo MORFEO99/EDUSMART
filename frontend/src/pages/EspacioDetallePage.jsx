@@ -3,7 +3,7 @@ import {
   ArrowLeft, BookOpen, ClipboardList, Users, Award,
   CheckCircle, AlertCircle, ChevronDown, ChevronRight,
   Calendar, FileText, Eye, EyeOff, BarChart2, Plus, X,
-  Upload, Send, Check, Target, Sparkles, MessageSquare
+  Upload, Send, Check, Target, Sparkles, MessageSquare, Calculator
 } from 'lucide-react';
 import { Loading, EmptyState, Modal } from '../components';
 import { getNoteColor } from '../utils';
@@ -12,6 +12,7 @@ import { SubmitTaskForm } from './MyTasks';
 import SendReportModal from '../components/SendReportModal';
 import ChallengeBoard from '../components/ChallengeBoard';
 import MuroMateria from '../components/MuroMateria';
+import LaboratorioNumerico from '../components/LaboratorioNumerico';
 import apiFetch from '../api';
 
 function getBadgeStyle(estado, vencida) {
@@ -355,6 +356,9 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
   const pendientesCalificar = tareas.reduce((acc, t) => acc + (Array.isArray(t.entregas) ? t.entregas.filter(e => !e?.calificacion).length : 0), 0);
   const entregadasEstudiante = tareas.filter(t => t.mi_entrega).length;
   const pendientesEstudiante = tareas.filter(t => !t.mi_entrega && !t.esta_vencida).length;
+  const isAnalisisNumerico = (espacio?.codigo === 'AN2026') ||
+    (espacio?.materia && espacio.materia.toLowerCase().includes('numér')) ||
+    (espacio?.nombre && espacio.nombre.toLowerCase().includes('numér'));
 
   return (
     <div className="page-container">
@@ -390,6 +394,11 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
             <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
               {[espacio?.colegio, espacio?.curso].filter(Boolean).join(' · ')}
             </div>
+            {isAnalisisNumerico && (
+              <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.18)', padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>
+                <Calculator size={12} /> Materia Oficial · Métodos Numéricos Computacionales (USB)
+              </div>
+            )}
           </div>
           {/* Stats */}
           <div style={{ display: 'flex', gap: 24, fontSize: 13, textAlign: 'center' }}>
@@ -457,6 +466,19 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
         >
           <MessageSquare size={13} color={activeTab === 'muro' ? '#059669' : '#64748B'} />
           <span>Muro y Consultas</span>
+        </button>
+        <button
+          className={`teams-tab ${activeTab === 'laboratorio' ? 'active' : ''}`}
+          onClick={() => setActiveTab('laboratorio')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+        >
+          <Calculator size={13} color={activeTab === 'laboratorio' ? '#0284C7' : '#64748B'} />
+          <span>Laboratorio Numérico</span>
+          {isAnalisisNumerico && (
+            <span style={{ fontSize: 9, background: '#0284C7', color: 'white', padding: '1px 5px', borderRadius: 8, fontWeight: 700 }}>
+              OFICIAL
+            </span>
+          )}
         </button>
         {!isEstudiante && (
           <button
@@ -785,6 +807,14 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
           espacioId={espacioId}
           userRole={user?.rol}
           currentUserId={user?.id}
+        />
+      )}
+
+      {/* ── Laboratorio Computacional de Análisis Numérico (USB) ── */}
+      {activeTab === 'laboratorio' && (
+        <LaboratorioNumerico
+          espacioNombre={espacio?.materia || espacio?.nombre}
+          userRole={user?.rol}
         />
       )}
 
