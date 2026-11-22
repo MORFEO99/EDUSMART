@@ -15,6 +15,15 @@ from django.utils.encoding import force_bytes, force_str
 from .validators import validate_file_size, validate_file_extension, sanitize_filename, validate_grade
 from .email_service import send_grade_notification_email, send_password_reset_email
 from .pdf_service import generate_student_boletin_pdf
+from .analisis_numerico import (
+    calcular_regresion_lineal,
+    calcular_interpolacion_lagrange,
+    calcular_extrapolacion_rendimiento,
+    calcular_irec_trapecio,
+    calcular_irec_simpson,
+    calcular_nota_necesaria,
+    calcular_nivelacion_newton_raphson
+)
 
 from .models import (
     Usuario, Docente, Estudiante, Espacio, MiembroEspacio,
@@ -1686,6 +1695,70 @@ def api_progreso_academico(request):
                 'fecha': c.fecha_calificacion.strftime('%d/%m')
             })
 
+        # =====================================================================
+        # ANÁLISIS NUMÉRICO APLICADO AL RENDIMIENTO DEL ESTUDIANTE
+        # =====================================================================
+        puntos_notas = [(float(i + 1), float(c.nota)) for i, c in enumerate(calificaciones)]
+        notas_list = [float(c.nota) for c in calificaciones]
+
+        regresion = calcular_regresion_lineal(puntos_notas) if len(puntos_notas) >= 2 else {'valido': False, 'mensaje': 'Se requieren al menos 2 notas para calcular regresión.'}
+        irec_trap = calcular_irec_trapecio(puntos_notas) if len(puntos_notas) >= 2 else {'valido': False, 'mensaje': 'Se requieren al menos 2 notas para calcular IREC.'}
+        extrapolacion = calcular_extrapolacion_rendimiento(notas_list, pasos_futuros=2) if len(notas_list) >= 2 else {'valido': False, 'mensaje': 'Sin notas suficientes para extrapolar.'}
+
+        irec_simp = None
+        if len(notas_list) >= 3 and (len(notas_list) - 1) % 2 == 0:
+            irec_simp = calcular_irec_simpson(notas_list)
+
+        # Nivelación con Newton-Raphson: estimación de tiempo para alcanzar 70 pts si promedio < 70
+        nivelacion_70 = None
+        if 0 < progreso.promedio < 70:
+            nivelacion_70 = calcular_nivelacion_newton_raphson(
+                t0_inicial=1.0,
+                rendimiento_inicial=progreso.promedio,
+                tasa_aprendizaje=0.25,
+                nota_objetivo=70.0
+            )
+
+        # Meta de aprobación: cuántos puntos requiere en pendientes si tiene tareas por entregar
+        simulacion_meta = None
+        if progreso.tareas_pendientes > 0 and len(notas_list) > 0:
+            # Estimar peso equivalente por tarea
+            total_evals = len(notas_list) + progreso.tareas_pendientes
+            peso_por_tarea = 100.0 / total_evals if total_evals > 0 else 20.0
+            completadas = [{'nota': n, 'peso': peso_por_tarea} for n in notas_list]
+            peso_restante = peso_por_tarea * progreso.tareas_pendientes
+            # Normalizar para que completadas + restante = 100
+            factor_norm = 100.0 / ((len(notas_list) * peso_por_tarea) + peso_restante)
+            completadas_norm = [{'nota': n, 'peso': peso_por_tarea * factor_norm} for n in notas_list]
+            simulacion_meta = calcular_nota_necesaria(completadas_norm, peso_pendiente=peso_restante * factor_norm, nota_objetivo=51.0)
+
+        # Materias adaptadas para StudentProgress.jsx
+        materias_list = []
+        for e in espacios_data:
+            materias_list.append({
+                'materia': e['espacio_nombre'],
+                'codigo': f"ESP-{e['espacio_id']}",
+                'tareas_entregadas': e['tareas_entregadas'],
+                'tareas_totales': e['total_tareas'],
+                'promedio': e['promedio'],
+                'porcentaje_cumplimiento': e['cumplimiento'],
+                'tareas_pendientes': max(0, e['total_tareas'] - e['tareas_entregadas'])
+            })
+
+        # Resumen explicativo generado a partir de métodos numéricos
+        if regresion.get('valido'):
+            resumen_texto = (
+                f"Promedio general de {progreso.promedio} pts. "
+                f"Tendencia {regresion.get('tendencia')}: {regresion.get('diagnostico')} "
+                f"(Ecuación de ajuste: {regresion.get('ecuacion_recta')}, R² = {regresion.get('coeficiente_determinacion_r2')}). "
+                f"Proyección próxima evaluación: {regresion.get('proyeccion_estimada')} pts."
+            )
+        else:
+            resumen_texto = (
+                f"Promedio general de {progreso.promedio} pts con {progreso.porcentaje_cumplimiento}% de cumplimiento. "
+                f"Registra más entregas para desbloquear el análisis de tendencia numérica."
+            )
+
         return Response({
             'estudiante_id': estudiante.id,
             'resumen': {
@@ -1696,8 +1769,26 @@ def api_progreso_academico(request):
                 'tareas_vencidas': progreso.tareas_vencidas,
                 'porcentaje_cumplimiento': progreso.porcentaje_cumplimiento
             },
+            'metricas_generales': {
+                'promedio_general': progreso.promedio,
+                'tareas_completadas': progreso.tareas_entregadas,
+                'tareas_pendientes': progreso.tareas_pendientes,
+                'tareas_vencidas': progreso.tareas_vencidas,
+                'porcentaje_entregadas': progreso.porcentaje_cumplimiento
+            },
+            'materias': materias_list,
+            'evolucion_calificaciones': historial_notas,
+            'resumen_texto': resumen_texto,
             'por_espacio': espacios_data,
-            'historial_notas': historial_notas
+            'historial_notas': historial_notas,
+            'analisis_numerico': {
+                'regresion': regresion,
+                'irec_trapecio': irec_trap,
+                'irec_simpson': irec_simp,
+                'extrapolacion': extrapolacion,
+                'nivelacion_newton': nivelacion_70,
+                'simulacion_meta': simulacion_meta
+            }
         })
 
     elif user.rol == 'DOCENTE' and hasattr(user, 'perfil_docente'):

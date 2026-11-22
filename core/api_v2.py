@@ -22,6 +22,7 @@ from .models import (
 )
 from . import whatsapp_service
 from . import analisis_numerico_service
+from . import analisis_numerico
 
 from .serializers_v2 import (
 
@@ -2616,4 +2617,144 @@ def api_analisis_numerico_calcular(request):
 
     except Exception as e:
         return Response({'error': f'Error al calcular: {str(e)}'}, status=400)
+
+
+# ==============================================================================
+# ANÁLISIS NUMÉRICO APLICADO: RENDIMIENTO, GAUSS Y METAS
+# ==============================================================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_estudiante_analisis_rendimiento(request, estudiante_id):
+    """
+    Retorna el informe analítico completo del rendimiento académico de un estudiante
+    mediante Métodos de Análisis Numérico:
+      - Regresión lineal (Mínimos Cuadrados) y tendencia
+      - Interpolación de Lagrange
+      - Extrapolación acotada
+      - Índice de Rendimiento y Esfuerzo Continuo (IREC Trapecio y Simpson)
+      - Modelo logístico de nivelación (Newton-Raphson)
+    """
+    estudiante = get_object_or_404(Estudiante, id=estudiante_id)
+
+    # Filtrar por espacio si se especifica
+    espacio_id = request.query_params.get('espacio_id')
+    califs_query = Calificacion.objects.filter(entrega__estudiante=estudiante)
+    if espacio_id:
+        califs_query = califs_query.filter(entrega__tarea__espacio_id=espacio_id)
+    califs_query = califs_query.select_related('entrega__tarea__espacio').order_by('fecha_calificacion')
+
+    historial = []
+    for idx, c in enumerate(califs_query, start=1):
+        historial.append({
+            'indice': idx,
+            'tarea': c.entrega.tarea.titulo,
+            'espacio': c.entrega.tarea.espacio.nombre,
+            'nota': float(c.nota),
+            'fecha': c.fecha_calificacion.strftime('%d/%m/%Y')
+        })
+
+    puntos = [(float(h['indice']), float(h['nota'])) for h in historial]
+    notas = [float(h['nota']) for h in historial]
+
+    # 1. Regresión Lineal
+    regresion = analisis_numerico.calcular_regresion_lineal(puntos) if len(puntos) >= 2 else {'valido': False, 'mensaje': 'Mínimo 2 notas requeridas.'}
+
+    # 2. Extrapolación
+    extrapolacion = analisis_numerico.calcular_extrapolacion_rendimiento(notas, pasos_futuros=2) if len(notas) >= 2 else {'valido': False, 'mensaje': 'Mínimo 2 notas requeridas.'}
+
+    # 3. IREC (Trapecio y Simpson)
+    irec_trapecio = analisis_numerico.calcular_irec_trapecio(puntos) if len(puntos) >= 2 else {'valido': False, 'mensaje': 'Mínimo 2 notas requeridas.'}
+    irec_simpson = None
+    if len(notas) >= 3 and (len(notas) - 1) % 2 == 0:
+        irec_simpson = analisis_numerico.calcular_irec_simpson(notas)
+
+    # 4. Interpolación de Lagrange en punto intermedio
+    x_eval_param = request.query_params.get('x_eval')
+    if x_eval_param is not None and len(puntos) >= 2:
+        try:
+            x_eval = float(x_eval_param)
+            lagrange = analisis_numerico.calcular_interpolacion_lagrange(puntos, x_evaluar=x_eval)
+        except ValueError:
+            lagrange = {'valido': False, 'mensaje': 'Parámetro x_eval inválido.'}
+    elif len(puntos) >= 2:
+        # Evaluar en el punto medio entre la penúltima y última evaluación
+        punto_medio = (puntos[-2][0] + puntos[-1][0]) / 2.0
+        lagrange = analisis_numerico.calcular_interpolacion_lagrange(puntos, x_evaluar=punto_medio)
+    else:
+        lagrange = {'valido': False, 'mensaje': 'Se requieren al menos 2 evaluaciones para interpolar.'}
+
+    # 5. Nivelación con Newton-Raphson
+    promedio_actual = (sum(notas) / len(notas)) if notas else 0.0
+    newton_nivelacion = None
+    if 0 < promedio_actual < 70:
+        newton_nivelacion = analisis_numerico.calcular_nivelacion_newton_raphson(
+            t0_inicial=1.0,
+            rendimiento_inicial=promedio_actual,
+            tasa_aprendizaje=0.25,
+            nota_objetivo=70.0
+        )
+
+    return Response({
+        'estudiante': {
+            'id': estudiante.id,
+            'nombre_completo': estudiante.usuario.nombre_completo,
+            'matricula': estudiante.carrera_o_area,
+            'promedio_actual': round(promedio_actual, 1),
+            'total_evaluaciones': len(historial)
+        },
+        'historial_evaluaciones': historial,
+        'analisis_numerico': {
+            'regresion_lineal': regresion,
+            'extrapolacion': extrapolacion,
+            'lagrange': lagrange,
+            'irec_trapecio': irec_trapecio,
+            'irec_simpson': irec_simpson,
+            'newton_raphson': newton_nivelacion
+        }
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def api_calibrar_ponderaciones_gauss(request):
+    """
+    Aplica el método de Eliminación de Gauss con pivoteo parcial para calibrar
+    las ponderaciones de dimensiones curriculares (Saber, Hacer, Decidir)
+    a partir de 3 evaluaciones compuestas.
+    """
+    evaluaciones = request.data.get('evaluaciones', [])
+    if not isinstance(evaluaciones, list) or len(evaluaciones) != 3:
+        return Response({
+            'error': 'Se requieren exactamente 3 registros de evaluaciones con los campos saber, hacer, decidir y nota_final.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    resultado = analisis_numerico.calibrar_ponderaciones_competencias(evaluaciones)
+    if not resultado.get('valido'):
+        return Response(resultado, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(resultado)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def api_simular_nota_meta(request):
+    """
+    Determina la calificación requerida en una evaluación futura para alcanzar
+    una nota objetivo mediante cálculo analítico de ponderaciones.
+    """
+    completadas = request.data.get('evaluaciones_completadas', [])
+    peso_pendiente = float(request.data.get('peso_pendiente', 30.0))
+    nota_objetivo = float(request.data.get('nota_objetivo', 51.0))
+
+    resultado = analisis_numerico.calcular_nota_necesaria(
+        evaluaciones_completadas=completadas,
+        peso_pendiente=peso_pendiente,
+        nota_objetivo=nota_objetivo
+    )
+    if not resultado.get('valido'):
+        return Response(resultado, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(resultado)
+
 

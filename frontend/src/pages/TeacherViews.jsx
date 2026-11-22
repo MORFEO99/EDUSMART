@@ -5,9 +5,10 @@ import {
   Send, AlertTriangle, Paperclip, Calendar, FileSpreadsheet,
   BookOpen, CheckSquare, Square, Layers, Trash2, Edit3, X, TrendingUp,
   ChevronDown, ChevronUp, RefreshCw, EyeOff, Bell, ExternalLink, RotateCcw,
-  Check, FileText, School, GraduationCap, Sparkles
+  Check, FileText, School, GraduationCap, Sparkles, Calculator, Target, Activity,
+  ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
-import { teacherAPI, commonAPI, topicTrackerAPI, aiPracticeAPI } from '../api';
+import { teacherAPI, commonAPI, topicTrackerAPI, aiPracticeAPI, analisisNumericoAPI } from '../api';
 import { Loading, EmptyState, Modal, Alert, ProgressBar, StatCard, MiniBarChart } from '../components';
 import { formatDate, formatDateTime, getNoteColor, getPriorityBadge, getTaskBadge } from '../utils';
 import RubricaEditor from '../components/RubricaEditor';
@@ -2366,11 +2367,233 @@ export function TeacherSubmissionsView({ initialTaskId }) {
 // ============================================================
 // 4. TEACHER GRADEBOOK VIEW (LIBRO DE CALIFICACIONES)
 // ============================================================
+// ============================================================
+// MODAL: ANALÍTICA NUMÉRICA AVANZADA DEL ESTUDIANTE
+// ============================================================
+function ModalAnaliticaEstudiante({ student, onClose }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [xEval, setXEval] = useState('');
+
+  const loadData = (evalParam = null) => {
+    setLoading(true);
+    const params = evalParam !== null ? { x_eval: evalParam } : {};
+    analisisNumericoAPI.estudianteAnalisis(student.id, params)
+      .then(res => setData(res))
+      .catch(err => setError(err.message || 'Error al obtener análisis numérico'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (student?.id) loadData();
+  }, [student?.id]);
+
+  const a = data?.analisis_numerico || {};
+  const reg = a.regresion_lineal;
+  const lag = a.lagrange;
+  const extrap = a.extrapolacion;
+  const irecTrap = a.irec_trapecio;
+  const irecSimp = a.irec_simpson;
+  const newton = a.newton_raphson;
+
+  return (
+    <div style={{ maxHeight: '80vh', overflowY: 'auto', padding: '4px 2px' }}>
+      {/* Header Info */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 12, borderBottom: '1px solid #E2E8F0', marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>{student.nombre_completo}</div>
+          <div style={{ fontSize: 12, color: '#64748B' }}>
+            {student.matricula} · {student.grado} "{student.paralelo}"
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 11, color: '#64748B' }}>Promedio Oficial</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: getNoteColor(student.promedio) }}>
+            {student.promedio}/100
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <Loading text="Calculando métodos de análisis numérico (Mínimos Cuadrados, Lagrange, Trapecio, Newton-Raphson)..." />
+      ) : error ? (
+        <div style={{ padding: 14, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, color: '#DC2626', fontSize: 13 }}>
+          {error}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* 1. Mínimos Cuadrados (Regresión Lineal) */}
+          <div style={{ background: '#F8FAFC', padding: 14, borderRadius: 8, border: '1px solid #E2E8F0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#0369A1', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <TrendingUp size={15} /> 1. Regresión Lineal por Mínimos Cuadrados
+              </div>
+              {reg?.valido && (
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                  background: reg.pendiente_b >= 0 ? '#DCFCE7' : '#FEE2E2',
+                  color: reg.pendiente_b >= 0 ? '#15803D' : '#B91C1C'
+                }}>
+                  {reg.tendencia}
+                </span>
+              )}
+            </div>
+
+            {reg?.valido ? (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 8 }}>
+                  <div style={{ background: '#FFFFFF', padding: 10, borderRadius: 6, border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>ECUACIÓN DE AJUSTE</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'monospace', color: '#0F172A', marginTop: 2 }}>{reg.ecuacion_recta}</div>
+                  </div>
+                  <div style={{ background: '#FFFFFF', padding: 10, borderRadius: 6, border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>COEFICIENTE R²</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginTop: 2 }}>{reg.coeficiente_determinacion_r2} (r={reg.coeficiente_correlacion_r})</div>
+                  </div>
+                  <div style={{ background: '#FFFFFF', padding: 10, borderRadius: 6, border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>PENDIENTE (TASA)</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: reg.pendiente_b >= 0 ? '#16A34A' : '#DC2626', marginTop: 2 }}>
+                      {reg.pendiente_b > 0 ? `+${reg.pendiente_b}` : reg.pendiente_b} pts/tarea
+                    </div>
+                  </div>
+                  <div style={{ background: '#FFFFFF', padding: 10, borderRadius: 6, border: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>PROYECCIÓN PRÓXIMA</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#7C3AED', marginTop: 2 }}>~ {reg.proyeccion_estimada} pts</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 11.5, color: '#475569', background: '#FFFFFF', padding: '8px 12px', borderRadius: 6, border: '1px solid #E2E8F0' }}>
+                  💬 <strong>Diagnóstico:</strong> {reg.diagnostico}
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: '#64748B' }}>{reg?.mensaje || 'Insuficientes datos para regresión.'}</div>
+            )}
+          </div>
+
+          {/* 2. Interpolación de Lagrange */}
+          <div style={{ background: '#F8FAFC', padding: 14, borderRadius: 8, border: '1px solid #E2E8F0' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#4338CA', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <Compass size={15} /> 2. Interpolación Polinomial de Lagrange (Estimación Intermedia)
+            </div>
+
+            {lag?.valido ? (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, color: '#334155' }}>
+                    Punto evaluado: <strong>x = {lag.x_evaluado}</strong> · Grado del polinomio: <strong>{lag.grado_polinomio}</strong>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#4338CA', marginLeft: 'auto' }}>
+                    Valor interpolado estimado: {lag.valor_interpolado} pts
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="number"
+                    step="0.5"
+                    className="form-control"
+                    style={{ width: 140, height: 30, fontSize: 12 }}
+                    placeholder="Evaluar en x..."
+                    value={xEval}
+                    onChange={(e) => setXEval(e.target.value)}
+                  />
+                  <button
+                    className="btn btn-outline btn-sm"
+                    style={{ fontSize: 11, height: 30 }}
+                    onClick={() => { if (xEval) loadData(Number(xEval)); }}
+                  >
+                    Recalcular Lagrange
+                  </button>
+                  <span style={{ fontSize: 10.5, color: '#94A3B8' }}>
+                    * Estimación pedagógica continua, no constituye nota oficial.
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: '#64748B' }}>{lag?.mensaje || 'Insuficientes notas para interpolar.'}</div>
+            )}
+          </div>
+
+          {/* 3. Extrapolación Acotada */}
+          {extrap?.valido && (
+            <div style={{ background: '#F8FAFC', padding: 14, borderRadius: 8, border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#B45309', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <Sparkles size={15} /> 3. Extrapolación de Rendimiento Acotada [0, 100]
+              </div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {extrap.proyecciones.map((p, i) => (
+                  <div key={i} style={{ background: '#FFFFFF', padding: '8px 12px', borderRadius: 6, border: '1px solid #E2E8F0', flex: 1, minWidth: 160 }}>
+                    <div style={{ fontSize: 11, color: '#64748B' }}>Periodo Futuro (x = {p.periodo_evaluacion})</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: getNoteColor(p.calificacion_proyectada), marginTop: 2 }}>
+                      {p.calificacion_proyectada} / 100
+                    </div>
+                    {p.limite_alcanzado && (
+                      <div style={{ fontSize: 10, color: '#DC2626' }}>Cota física aplicada</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 4. Integración Numérica (IREC) & Newton-Raphson */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
+            {/* Trapecio IREC */}
+            <div style={{ background: '#F8FAFC', padding: 14, borderRadius: 8, border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#0F766E', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <Activity size={15} /> 4. Índice IREC (Trapecio Compuesto)
+              </div>
+              {irecTrap?.valido ? (
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#0F766E' }}>
+                    {irecTrap.rendimiento_medio_continuo} <span style={{ fontSize: 12, fontWeight: 500, color: '#64748B' }}>pts continuos</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
+                    Área bajo la curva: <strong>{irecTrap.area_total_acumulada}</strong> en {irecTrap.tiempo_total_semanas} etapas.
+                  </div>
+                  <div style={{ fontSize: 11, color: '#0F766E', marginTop: 2 }}>
+                    ✓ {irecTrap.interpretacion}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: '#64748B' }}>{irecTrap?.mensaje || 'Insuficientes etapas para integrar.'}</div>
+              )}
+            </div>
+
+            {/* Newton-Raphson Nivelación */}
+            <div style={{ background: '#F8FAFC', padding: 14, borderRadius: 8, border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#7E22CE', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <Target size={15} /> 5. Nivelación con Newton-Raphson
+              </div>
+              {newton?.valido ? (
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#7E22CE' }}>
+                    Semana ~ {newton.semana_nivelacion}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>
+                    Estimación para alcanzar {newton.nota_objetivo} pts con modelo logístico de aprendizaje ({newton.total_iteraciones} iteraciones).
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: '#64748B' }}>
+                  {student.promedio >= 70 ? 'El estudiante ya supera la cota de 70 pts.' : 'Modelo no requerido o datos limitados.'}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TeacherGradebookView({ onNavigate }) {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [reportStudent, setReportStudent] = useState(null);
+  const [analisisStudent, setAnalisisStudent] = useState(null);
 
   useEffect(() => {
     teacherAPI.studentsList()
@@ -2502,15 +2725,25 @@ export function TeacherGradebookView({ onNavigate }) {
                         {s.estado_academico}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <button
-                        className="btn btn-outline btn-sm"
-                        style={{ fontSize: 11, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                        onClick={() => setReportStudent(s)}
-                        title="Enviar reporte de desempeno academico"
-                      >
-                        <Send size={11} /> Reporte
-                      </button>
+                    <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', gap: 6 }}>
+                        <button
+                          className="btn btn-outline btn-sm"
+                          style={{ fontSize: 11, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 4, color: '#0284C7', borderColor: '#BAE6FD' }}
+                          onClick={() => setAnalisisStudent(s)}
+                          title="Ver análisis numérico de tendencias, regresión e IREC"
+                        >
+                          <Calculator size={11} /> Analítica
+                        </button>
+                        <button
+                          className="btn btn-outline btn-sm"
+                          style={{ fontSize: 11, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                          onClick={() => setReportStudent(s)}
+                          title="Enviar reporte de desempeno academico"
+                        >
+                          <Send size={11} /> Reporte
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -2530,6 +2763,20 @@ export function TeacherGradebookView({ onNavigate }) {
           <SendReportModal
             student={reportStudent}
             onClose={() => setReportStudent(null)}
+          />
+        </Modal>
+      )}
+
+      {/* Modal: Analítica Numérica del Estudiante */}
+      {analisisStudent && (
+        <Modal
+          open={true}
+          onClose={() => setAnalisisStudent(null)}
+          title={`📐 Analítica Numérica y Proyección — ${analisisStudent.nombre_completo}`}
+        >
+          <ModalAnaliticaEstudiante
+            student={analisisStudent}
+            onClose={() => setAnalisisStudent(null)}
           />
         </Modal>
       )}

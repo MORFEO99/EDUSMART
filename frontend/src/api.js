@@ -304,6 +304,20 @@ export const analisisNumericoAPI = {
       method: 'POST',
       body: JSON.stringify({ metodo, parametros }),
     }),
+  estudianteAnalisis: (estudianteId, params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return apiFetch(`/api/v2/estudiantes/${estudianteId}/analisis-rendimiento/${qs ? `?${qs}` : ''}`);
+  },
+  calibrarPesosGauss: (evaluaciones) =>
+    apiFetch('/api/v2/analisis-numerico/calibrar-pesos/', {
+      method: 'POST',
+      body: JSON.stringify({ evaluaciones }),
+    }),
+  simularMeta: (data) =>
+    apiFetch('/api/v2/analisis-numerico/simular-meta/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 export default apiFetch;

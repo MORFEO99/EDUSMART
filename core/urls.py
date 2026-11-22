@@ -130,9 +130,12 @@ urlpatterns = [
     path('api/v2/alertas/estudiante/<int:estudiante_id>/contacto/', api_v2.api_actualizar_contacto_tutor, name='api_v2_contacto_tutor'),
 
     # =======================================================
-    # LABORATORIO COMPUTACIONAL DE ANÁLISIS NUMÉRICO
+    # LABORATORIO Y ANÁLISIS NUMÉRICO APLICADO
     # =======================================================
     path('api/v2/analisis-numerico/calcular/', api_v2.api_analisis_numerico_calcular, name='api_analisis_numerico_calcular'),
+    path('api/v2/estudiantes/<int:estudiante_id>/analisis-rendimiento/', api_v2.api_estudiante_analisis_rendimiento, name='api_estudiante_analisis_rendimiento'),
+    path('api/v2/analisis-numerico/calibrar-pesos/', api_v2.api_calibrar_ponderaciones_gauss, name='api_calibrar_ponderaciones_gauss'),
+    path('api/v2/analisis-numerico/simular-meta/', api_v2.api_simular_nota_meta, name='api_simular_nota_meta'),
 
     # SPA React Catch-all (sirve index.html en / y en cualquier ruta del frontend)
     re_path(r'^.*$', views.serve_react_app, name='react_spa'),
