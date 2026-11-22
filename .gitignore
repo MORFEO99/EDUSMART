@@ -29,6 +29,7 @@ dist/
 scratch/
 *.mp4
 *.avi
+*.sql
 demo_edusmart.mp4
 EJECUTAR_COMO_ADMIN.bat
 GRABAR_VIDEO_DEMO.bat
