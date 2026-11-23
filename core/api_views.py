@@ -68,9 +68,15 @@ def api_login(request):
         if not user:
             return Response({'error': 'Usuario de demostración no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
         login(request, user)
-        # Ensure student profile exists for demo accounts
+        # Ensure profile exists for demo accounts
         if user.rol == 'ESTUDIANTE' and not hasattr(user, 'perfil_estudiante'):
             Estudiante.objects.create(usuario=user)
+        elif user.rol == 'DOCENTE' and not hasattr(user, 'perfil_docente'):
+            Docente.objects.create(
+                usuario=user,
+                especialidad='Docencia e Investigación',
+                titulo_academico='Profesor Titular'
+            )
     else:
         email_or_user = data.get('email') or data.get('username')
         password = data.get('password')
@@ -86,9 +92,15 @@ def api_login(request):
                     status=status.HTTP_403_FORBIDDEN
                 )
             login(request, user)
-            # Ensure student profile exists for real accounts
+            # Ensure profile exists for real accounts
             if user.rol == 'ESTUDIANTE' and not hasattr(user, 'perfil_estudiante'):
                 Estudiante.objects.create(usuario=user)
+            elif user.rol == 'DOCENTE' and not hasattr(user, 'perfil_docente'):
+                Docente.objects.create(
+                    usuario=user,
+                    especialidad='Docencia e Investigación',
+                    titulo_academico='Profesor Titular'
+                )
         else:
             return Response({'error': 'Credenciales inválidas. Verifique su correo y contraseña.'}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -102,8 +114,13 @@ def api_login(request):
             'carrera_o_area': est.carrera_o_area,
             'biografia': est.biografia,
         }
-    elif user.rol == 'DOCENTE' and hasattr(user, 'perfil_docente'):
-        doc = user.perfil_docente
+    elif user.rol == 'DOCENTE':
+        doc = getattr(user, 'perfil_docente', None)
+        if not doc:
+            doc, _ = Docente.objects.get_or_create(
+                usuario=user,
+                defaults={'especialidad': 'Docencia e Investigación', 'titulo_academico': 'Profesor Titular'}
+            )
         role_info = {
             'docente_id': doc.id,
             'especialidad': doc.especialidad,
@@ -260,8 +277,13 @@ def api_me(request):
             'carrera_o_area': est.carrera_o_area,
             'biografia': est.biografia,
         }
-    elif user.rol == 'DOCENTE' and hasattr(user, 'perfil_docente'):
-        doc = user.perfil_docente
+    elif user.rol == 'DOCENTE':
+        doc = getattr(user, 'perfil_docente', None)
+        if not doc:
+            doc, _ = Docente.objects.get_or_create(
+                usuario=user,
+                defaults={'especialidad': 'Docencia e Investigación', 'titulo_academico': 'Profesor Titular'}
+            )
         role_info = {
             'docente_id': doc.id,
             'especialidad': doc.especialidad,

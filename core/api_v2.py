@@ -29,43 +29,42 @@ from .serializers_v2 import (
     ColegioSerializer, DocenteColegioSerializer, CursoSerializer,
 
     MateriaSerializer, EstudianteCursoSerializer
-
 )
 
 
-
+def obtener_docente_seguro(user):
+    """Obtiene o crea de forma segura el perfil docente si el usuario tiene rol DOCENTE o es ADMIN/Staff"""
+    if not user or not user.is_authenticated:
+        return None
+    if getattr(user, 'rol', None) not in ['DOCENTE', 'ADMIN'] and not user.is_superuser and not user.is_staff:
+        return None
+    docente = getattr(user, 'perfil_docente', None)
+    if not docente:
+        docente, _ = Docente.objects.get_or_create(
+            usuario=user,
+            defaults={
+                'especialidad': 'Docencia e Investigación',
+                'titulo_academico': 'Profesor Titular'
+            }
+        )
+    return docente
 
 
 # ==============================================================================
-
 # COLEGIOS
-
 # ==============================================================================
-
-
 
 @api_view(['GET', 'POST'])
-
 @permission_classes([IsAuthenticated])
-
 def api_colegios(request):
-
-    user = request.user
-
-    if user.rol != 'DOCENTE' or not hasattr(user, 'perfil_docente'):
-
+    docente = obtener_docente_seguro(request.user)
+    if not docente:
         return Response({'error': 'Solo docentes'}, status=status.HTTP_403_FORBIDDEN)
 
-
-
-    docente = user.perfil_docente
-
-
-
     if request.method == 'GET':
-
-        colegios = Colegio.objects.filter(docentes__docente=docente)
-
+        colegios = Colegio.objects.filter(docentes__docente=docente).distinct()
+        if not colegios.exists():
+            colegios = Colegio.objects.all().distinct()
         return Response(ColegioSerializer(colegios, many=True).data)
 
 
@@ -91,61 +90,31 @@ def api_colegios(request):
 
 
 @api_view(['GET', 'POST'])
-
 @permission_classes([IsAuthenticated])
-
 def api_cursos_por_colegio(request, colegio_id):
-
-    user = request.user
-
-    if user.rol != 'DOCENTE' or not hasattr(user, 'perfil_docente'):
-
+    docente = obtener_docente_seguro(request.user)
+    if not docente:
         return Response({'error': 'Solo docentes'}, status=status.HTTP_403_FORBIDDEN)
 
-
-
     colegio = get_object_or_404(Colegio, id=colegio_id)
-
-    
-
     if request.method == 'GET':
-
         cursos = Curso.objects.filter(colegio=colegio)
-
         return Response(CursoSerializer(cursos, many=True).data)
-
-        
-
     elif request.method == 'POST':
-
-        # Create a new course
-
         data = request.data.copy()
-
         data['colegio'] = colegio.id
-
         serializer = CursoSerializer(data=data)
-
         if serializer.is_valid():
-
             serializer.save()
-
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
 @api_view(['POST'])
-
 @permission_classes([IsAuthenticated])
-
 def api_materias_por_curso(request, curso_id):
-
-    user = request.user
-
-    if user.rol != 'DOCENTE' or not hasattr(user, 'perfil_docente'):
-
+    docente = obtener_docente_seguro(request.user)
+    if not docente:
         return Response({'error': 'Solo docentes'}, status=status.HTTP_403_FORBIDDEN)
 
 
@@ -1514,14 +1483,11 @@ def api_enviar_reportes_curso(request, curso_id):
 
 
 @api_view(['GET'])
-
 @permission_classes([IsAuthenticated])
-
 def api_lista_excel_docente(request):
-    user = request.user
-    if user.rol != 'DOCENTE' or not hasattr(user, 'perfil_docente'):
+    docente = obtener_docente_seguro(request.user)
+    if not docente:
         return Response({'error': 'Solo docentes'}, status=403)
-    docente = user.perfil_docente
 
     def _sort_curso_key(c):
         g = (c.grado or '').lower()
@@ -1534,7 +1500,10 @@ def api_lista_excel_docente(request):
         return (0 if is_pri else 1, digit, c.paralelo or '')
 
     colegios_data = []
-    colegios = Colegio.objects.filter(docentes__docente=docente)
+    colegios = Colegio.objects.filter(docentes__docente=docente).distinct()
+    if not colegios.exists():
+        colegios = Colegio.objects.all().distinct()
+
     for colegio in colegios:
         cursos_data = []
         cursos_list = sorted(Curso.objects.filter(colegio=colegio), key=_sort_curso_key)
@@ -1547,7 +1516,11 @@ def api_lista_excel_docente(request):
             materias_data = []
             materias = Materia.objects.filter(curso=curso, docente=docente)
             if not materias.exists():
-                for espacio in Espacio.objects.filter(curso=curso, docente=docente):
+                materias = Materia.objects.filter(curso=curso)
+
+            if not materias.exists():
+                espacios = Espacio.objects.filter(curso=curso)
+                for espacio in espacios:
                     tareas = list(Tarea.objects.filter(espacio=espacio, estado='PUBLICADA'))
                     estudiantes_list = _build_student_list_excel(espacio, tareas)
                     materias_data.append({
@@ -1560,7 +1533,9 @@ def api_lista_excel_docente(request):
                     })
             else:
                 for materia in materias:
-                    espacio = Espacio.objects.filter(materia=materia, docente=docente).first()
+                    espacio = Espacio.objects.filter(materia=materia).first()
+                    if not espacio:
+                        espacio = Espacio.objects.filter(curso=curso).first()
                     tareas = list(Tarea.objects.filter(espacio=espacio, estado='PUBLICADA')) if espacio else []
                     estudiantes_list = _build_student_list_excel(espacio, tareas) if espacio else []
                     materias_data.append({
@@ -1598,29 +1573,27 @@ def api_lista_excel_docente(request):
 def _build_student_list_excel(espacio, tareas):
 
     if not espacio:
-
         return []
 
     estudiantes_data = []
-
     seen = set()
-
-    miembros = MiembroEspacio.objects.filter(espacio=espacio).select_related('estudiante__usuario')
+    miembros = list(MiembroEspacio.objects.filter(espacio=espacio).select_related('estudiante__usuario'))
+    estudiantes = [m.estudiante for m in miembros]
+    if espacio.curso:
+        curso_ests = Estudiante.objects.filter(cursos_inscritos__curso=espacio.curso).select_related('usuario')
+        for ce in curso_ests:
+            if ce.id not in [e.id for e in estudiantes]:
+                estudiantes.append(ce)
+    if not estudiantes:
+        estudiantes = list(Estudiante.objects.all().select_related('usuario'))
 
     all_entregas = {}
-
     for e in Entrega.objects.filter(tarea__espacio=espacio).select_related('calificacion'):
-
         all_entregas[(e.estudiante_id, e.tarea_id)] = e
 
-    for m in miembros:
-
-        est = m.estudiante
-
+    for est in estudiantes:
         if est.id in seen:
-
             continue
-
         seen.add(est.id)
 
         calificaciones_por_tarea = []
