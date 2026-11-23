@@ -1963,8 +1963,8 @@ def api_descargar_boletin_estudiante(request, estudiante_id):
     elif user.rol == 'DOCENTE':
         docente = getattr(user, 'perfil_docente', None)
         if not docente:
-            return Response({'error': 'Perfil docente no configurado.'}, status=status.HTTP_403_FORBIDDEN)
-    elif user.rol not in ['ADMIN', 'PADRE']:
+            docente, _ = Docente.objects.get_or_create(usuario=user)
+    else:
         return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
 
     pdf_buffer = generate_student_boletin_pdf(estudiante)

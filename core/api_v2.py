@@ -33,10 +33,10 @@ from .serializers_v2 import (
 
 
 def obtener_docente_seguro(user):
-    """Obtiene o crea de forma segura el perfil docente si el usuario tiene rol DOCENTE o es ADMIN/Staff"""
+    """Obtiene o crea de forma segura el perfil docente si el usuario tiene rol DOCENTE"""
     if not user or not user.is_authenticated:
         return None
-    if getattr(user, 'rol', None) not in ['DOCENTE', 'ADMIN'] and not user.is_superuser and not user.is_staff:
+    if getattr(user, 'rol', None) != 'DOCENTE':
         return None
     docente = getattr(user, 'perfil_docente', None)
     if not docente:
@@ -1994,8 +1994,8 @@ def api_descargar_boletin_curso(request, curso_id):
     if not user.is_authenticated:
         return Response({'error': 'Autenticación requerida.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    if user.rol not in ['DOCENTE', 'ADMIN']:
-        return Response({'error': 'Solo docentes y directores tienen permiso para descargar el boletín general del curso.'}, status=status.HTTP_403_FORBIDDEN)
+    if user.rol != 'DOCENTE':
+        return Response({'error': 'Solo docentes tienen permiso para descargar el boletín general del curso.'}, status=status.HTTP_403_FORBIDDEN)
 
     curso = get_object_or_404(Curso, id=curso_id)
     pdf_buffer = generate_course_gradebook_pdf(curso)

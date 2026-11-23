@@ -24,8 +24,8 @@ class Command(BaseCommand):
             return
 
         self.stdout.write(self.style.SUCCESS("Limpiando y regenerando datos de prueba EDUSMART..."))
-        # Limpieza segura para recrear datos de pruebas completos
-        Usuario.objects.exclude(is_superuser=True).delete()
+        # Limpieza completa: el sistema es estrictamente Docente <-> Estudiante
+        Usuario.objects.all().delete()
         Espacio.objects.all().delete()
         Rubrica.objects.all().delete()
         Colegio.objects.all().delete()
@@ -394,13 +394,6 @@ class Command(BaseCommand):
             mensaje='Tu entrega de "T1: Raíces — Bisección y Newton-Raphson" fue calificada con 85/100.',
             espacio_id=espacio_an.id, tarea_id=t_an1.id, fecha=now - timedelta(days=7)
         )
-
-        # Crear superusuario si no existe
-        if not Usuario.objects.filter(username='admin').exists():
-            Usuario.objects.create_superuser(
-                username='admin', email='admin@edusmart.edu',
-                password='adminpassword123', first_name='Admin', last_name='EduSmart', rol='DOCENTE'
-            )
 
         self.stdout.write(self.style.SUCCESS("\n" + "="*65))
         self.stdout.write(self.style.SUCCESS("✅ EDUSMART SEED COMPLETADO SATISFACTORIAMENTE"))
