@@ -1630,6 +1630,7 @@ def api_student_dashboard(request):
         },
         'actividad_reciente': actividades[:6],
         'proximas_tareas': TareaSerializer(proximas_tareas, many=True, context={'request': request}).data,
+        'notificaciones': NotificacionSerializer(Notificacion.objects.filter(usuario=user)[:25], many=True).data,
         'mis_espacios': EspacioSerializer(espacios, many=True, context={'request': request}).data
     })
 
