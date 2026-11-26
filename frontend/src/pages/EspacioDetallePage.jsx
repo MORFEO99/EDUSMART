@@ -307,16 +307,25 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
       if (isEstudiante) {
         const [tareasRes, espInfo] = await Promise.all([
           apiFetch(`/api/tareas/?espacio_id=${espacioId}&filtro=todas`).catch(() => []),
-          apiFetch(`/api/espacios/${espacioId}/`).catch(() => ({ nombre: 'Materia' }))
+          apiFetch(`/api/espacios/${espacioId}/`).catch(() => ({ espacio: { nombre: 'Materia' } }))
         ]);
         setData({
-          espacio: espInfo,
+          espacio: espInfo?.espacio || espInfo,
           tareas: Array.isArray(tareasRes) ? tareasRes : [],
-          estudiantes: []
+          estudiantes: [],
+          temas_avance: espInfo?.temas_avance || [],
+          recursos: espInfo?.recursos || []
         });
       } else {
-        const res = await apiFetch(`/api/v2/espacios/${espacioId}/tareas/`);
-        setData(res);
+        const [res, espInfo] = await Promise.all([
+          apiFetch(`/api/v2/espacios/${espacioId}/tareas/`),
+          apiFetch(`/api/espacios/${espacioId}/`).catch(() => ({}))
+        ]);
+        setData({
+          ...res,
+          temas_avance: espInfo?.temas_avance || [],
+          recursos: espInfo?.recursos || []
+        });
       }
     } catch (err) {
       setError(err.message || 'Error cargando el espacio');
@@ -352,6 +361,8 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
   const espacio = data?.espacio;
   const tareas = data?.tareas || [];
   const estudiantes = data?.estudiantes || [];
+  const temasAvance = data?.temas_avance || [];
+  const recursos = data?.recursos || [];
   const totalEntregas = tareas.reduce((acc, t) => acc + (t.total_entregas || (t.mi_entrega ? 1 : 0) || 0), 0);
   const pendientesCalificar = tareas.reduce((acc, t) => acc + (Array.isArray(t.entregas) ? t.entregas.filter(e => !e?.calificacion).length : 0), 0);
   const entregadasEstudiante = tareas.filter(t => t.mi_entrega).length;
@@ -443,6 +454,9 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
 
       {/* Main tab navigation */}
       <div className="teams-tabs" style={{ marginBottom: 16 }}>
+        <button className={`teams-tab ${activeTab === 'contenidos' ? 'active' : ''}`} onClick={() => setActiveTab('contenidos')}>
+          <BookOpen size={13} /> Contenidos y Temas ({temasAvance.length + recursos.length})
+        </button>
         <button className={`teams-tab ${activeTab === 'tareas' ? 'active' : ''}`} onClick={() => setActiveTab('tareas')}>
           <ClipboardList size={13} /> Tareas ({tareas.length})
         </button>
@@ -477,6 +491,150 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
           </button>
         )}
       </div>
+
+      {/* ── Contenidos y Temas Avanzados ── */}
+      {activeTab === 'contenidos' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Sección 1: Temas Avanzados por el Docente */}
+          <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 10, padding: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div>
+                <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <BookOpen size={16} color="#1E3A8A" /> Temas Avanzados por el Maestro
+                </h3>
+                <p style={{ fontSize: 12, color: '#64748B', margin: '2px 0 0' }}>
+                  Plan de unidades y contenidos curriculares avanzados en la materia
+                </p>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, background: '#EFF6FF', color: '#1E3A8A', padding: '4px 10px', borderRadius: 12 }}>
+                {temasAvance.length} {temasAvance.length === 1 ? 'tema' : 'temas'}
+              </span>
+            </div>
+
+            {temasAvance.length === 0 ? (
+              <EmptyState
+                icon={BookOpen}
+                title="Sin temas registrados aún"
+                description="El maestro aún no ha registrado unidades o temas avanzados en esta materia."
+              />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {temasAvance.map((tema, idx) => {
+                  const isCompletado = tema.estado === 'COMPLETADO';
+                  const isEnProgreso = tema.estado === 'EN_PROGRESO';
+                  return (
+                    <div
+                      key={tema.id || idx}
+                      style={{
+                        border: '1px solid #E2E8F0',
+                        borderLeft: `4px solid ${isCompletado ? '#10B981' : (isEnProgreso ? '#2563EB' : '#94A3B8')}`,
+                        borderRadius: 8,
+                        padding: '12px 16px',
+                        background: '#F8FAFC'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                        <div>
+                          {tema.unidad && (
+                            <div style={{ fontSize: 10.5, fontWeight: 700, color: '#1E3A8A', textTransform: 'uppercase', marginBottom: 2 }}>
+                              {tema.unidad}
+                            </div>
+                          )}
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+                            {tema.titulo}
+                          </div>
+                        </div>
+                        <span style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '3px 9px',
+                          borderRadius: 12,
+                          background: isCompletado ? '#ECFDF5' : (isEnProgreso ? '#EFF6FF' : '#F1F5F9'),
+                          color: isCompletado ? '#065F46' : (isEnProgreso ? '#1E40AF' : '#475569'),
+                          border: `1px solid ${isCompletado ? '#A7F3D0' : (isEnProgreso ? '#BFDBFE' : '#E2E8F0')}`
+                        }}>
+                          {isCompletado ? '✓ Tema Avanzado' : (isEnProgreso ? 'En Progreso' : 'Pendiente')}
+                        </span>
+                      </div>
+
+                      {tema.descripcion && (
+                        <p style={{ fontSize: 12.5, color: '#475569', margin: '8px 0 0', lineHeight: 1.45 }}>
+                          {tema.descripcion}
+                        </p>
+                      )}
+
+                      {(tema.fecha_inicio || tema.fecha_fin) && (
+                        <div style={{ fontSize: 11, color: '#64748B', marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Calendar size={11} />
+                          <span>
+                            {tema.fecha_inicio ? `Inicio: ${tema.fecha_inicio}` : ''}
+                            {tema.fecha_inicio && tema.fecha_fin ? ' · ' : ''}
+                            {tema.fecha_fin ? `Finalizado: ${tema.fecha_fin}` : ''}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Sección 2: Materiales y Contenidos Subidos */}
+          <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 10, padding: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div>
+                <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FileText size={16} color="#059669" /> Contenidos y Materiales de Apoyo
+                </h3>
+                <p style={{ fontSize: 12, color: '#64748B', margin: '2px 0 0' }}>
+                  Documentos, guías de estudio y enlaces compartidos por el docente
+                </p>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, background: '#ECFDF5', color: '#065F46', padding: '4px 10px', borderRadius: 12 }}>
+                {recursos.length} {recursos.length === 1 ? 'material' : 'materiales'}
+              </span>
+            </div>
+
+            {recursos.length === 0 ? (
+              <EmptyState
+                icon={FileText}
+                title="Sin materiales subidos aún"
+                description="Cuando el profesor suba guías, diapositivas o enlaces de lectura, aparecerán aquí."
+              />
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+                {recursos.map(rec => (
+                  <div key={rec.id} style={{
+                    border: '1px solid #E2E8F0', borderRadius: 8, padding: '12px 14px',
+                    background: '#F8FAFC', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 8
+                  }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{rec.titulo}</div>
+                      {rec.descripcion && (
+                        <div style={{ fontSize: 11.5, color: '#475569', marginTop: 4 }}>{rec.descripcion}</div>
+                      )}
+                    </div>
+                    {(rec.archivo_url || rec.enlace_url) && (
+                      <a
+                        href={rec.archivo_url || rec.enlace_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          fontSize: 12, fontWeight: 700, color: '#1E3A8A',
+                          textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4
+                        }}
+                      >
+                        <FileText size={12} /> Abrir / Descargar
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Tareas tab: ESTUDIANTE VIEW ── */}
       {activeTab === 'tareas' && isEstudiante && (

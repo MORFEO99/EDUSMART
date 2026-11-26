@@ -326,14 +326,14 @@ export function StudentEspaciosView({ onNavigate }) {
                 {/* Action Buttons */}
                 <div style={{ display: 'flex', gap: 8, marginTop: 14, paddingTop: 12, borderTop: '1px solid #F1F5F9' }}>
                   <button
-                    onClick={(e) => { e.stopPropagation(); onNavigate('espacio_detail', { espacioId: esp.id }); }}
+                    onClick={(e) => { e.stopPropagation(); onNavigate('espacio_detail', { espacioId: esp.id, defaultTab: 'contenidos' }); }}
                     style={{
                       flex: 1, padding: '7px 0', background: '#EFF6FF', color: '#1E3A8A',
                       border: '1px solid #BFDBFE', borderRadius: 6, cursor: 'pointer',
                       fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5
                     }}
                   >
-                    <BookOpen size={12} /> Ver Tareas
+                    <BookOpen size={12} /> Ver Contenidos
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); onNavigate('espacio_detail', { espacioId: esp.id, defaultTab: 'retos' }); }}

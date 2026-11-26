@@ -30,7 +30,7 @@ from .models import (
     Tarea, Material, Entrega, VersionEntrega, Calificacion, Retroalimentacion,
     ProgresoAcademico, Notificacion, AvisoEspacio, RecursoEspacio,
     ExtensionFechaTarea, PlantillaTarea, TareaVisualizacion,
-    IntentoPracticaEstudiante, EstudianteCurso, PracticaTema
+    IntentoPracticaEstudiante, EstudianteCurso, PracticaTema, TemaAvance
 )
 from .serializers import (
     UsuarioSerializer, DocenteSerializer, EstudianteSerializer,
@@ -472,11 +472,32 @@ def api_espacio_detail(request, pk):
                 'fecha_union': m.fecha_union
             })
 
+    # Temas avanzados y recursos subidos por el docente
+    temas_avance = []
+    if espacio.materia:
+        temas_qs = TemaAvance.objects.filter(materia=espacio.materia).order_by('orden', 'id')
+        for t in temas_qs:
+            temas_avance.append({
+                'id': t.id,
+                'titulo': t.titulo,
+                'unidad': t.unidad,
+                'orden': t.orden,
+                'estado': t.estado,
+                'descripcion': t.descripcion,
+                'fecha_inicio': t.fecha_inicio.strftime('%d/%m/%Y') if t.fecha_inicio else None,
+                'fecha_fin': t.fecha_fin.strftime('%d/%m/%Y') if t.fecha_fin else None,
+            })
+
+    recursos_qs = RecursoEspacio.objects.filter(espacio=espacio).order_by('-fecha_creacion')
+    recursos_data = RecursoEspacioSerializer(recursos_qs, many=True).data
+
     return Response({
         'espacio': espacio_data,
         'tareas': tareas_data,
         'actividad': actividades[:10],
-        'miembros': miembros
+        'miembros': miembros,
+        'temas_avance': temas_avance,
+        'recursos': recursos_data,
     })
 
 
