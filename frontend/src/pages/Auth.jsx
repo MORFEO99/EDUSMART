@@ -554,8 +554,8 @@ export function RegisterPage({ onRegisterSuccess, onGoToLogin, onGoToLanding }) 
     password: '',
     confirm_password: '',
     rol: 'ESTUDIANTE',
-    especialidad: 'Bases de Datos y Software',
-    carrera_o_area: 'Ingeniería de Sistemas e Informática',
+    especialidad: 'Matemáticas y Ciencias Naturales',
+    carrera_o_area: 'Educación Secundaria Regular',
     codigo_docente: '',
     // Contactos (solo estudiante)
     telefono: '',
@@ -777,10 +777,10 @@ export function RegisterPage({ onRegisterSuccess, onGoToLogin, onGoToLanding }) 
           ) : (
             <>
               <div className="form-group">
-                <label className="form-label">Carrera o Área de Estudio:</label>
+                <label className="form-label">Grado o Nivel Escolar:</label>
                 <input
                   className="form-control"
-                  placeholder="Ej. Ingeniería de Sistemas e Informática"
+                  placeholder="Ej. 6to de Secundaria / Bachillerato"
                   value={formData.carrera_o_area}
                   onChange={(e) => setFormData(p => ({ ...p, carrera_o_area: e.target.value }))}
                 />

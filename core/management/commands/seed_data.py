@@ -12,7 +12,7 @@ from core.models import (
 
 
 class Command(BaseCommand):
-    help = 'Poblar EDUSMART con datos completos: 4 colegios, 6 materias principales, 20 alumnos por materia/curso'
+    help = 'Poblar EDUSMART con datos 100% escolares de secundaria: 4 colegios, materias de colegio y 20 alumnos por curso'
 
     def add_arguments(self, parser):
         parser.add_argument('--if-empty', action='store_true', help='Solo ejecutar si la base está vacía')
@@ -23,8 +23,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("Ya hay datos. Usa --reset para limpiar primero."))
             return
 
-        self.stdout.write(self.style.SUCCESS("Limpiando y regenerando datos de prueba EDUSMART..."))
-        # Limpieza completa: el sistema es estrictamente Docente <-> Estudiante
+        self.stdout.write(self.style.SUCCESS("Limpiando y regenerando datos de nivel escolar secundario en EDUSMART..."))
         Usuario.objects.all().delete()
         Espacio.objects.all().delete()
         Rubrica.objects.all().delete()
@@ -34,7 +33,7 @@ class Command(BaseCommand):
         now = timezone.now()
 
         # =====================================================================
-        # 1. DOCENTES (3 docentes)
+        # 1. TRES (3) DOCENTES DE NIVEL SECUNDARIA
         # =====================================================================
         def make_docente(username, first, last, especialidad, titulo, bio, avatar):
             u = Usuario.objects.create_user(
@@ -50,29 +49,29 @@ class Command(BaseCommand):
 
         docente_juan = make_docente(
             'prof_juan@edusmart.edu', 'Juan', 'Pérez',
-            'Bases de Datos, Ingeniería de Software y Métodos Numéricos',
-            'Ph.D. en Sistemas de Información',
-            'Docente titular de Bases de Datos I, Análisis y Diseño de Sistemas y Análisis Numérico.',
+            'Matemáticas y Física',
+            'Lic. en Educación Secundaria y Matemáticas',
+            'Profesor titular de Matemáticas y Física para nivel secundaria.',
             'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'
         )
         docente_maria = make_docente(
             'prof_maria@edusmart.edu', 'María', 'López',
-            'Ingeniería de Software y Algorítmica',
-            'Magíster en Ciencias de la Computación',
-            'Especialista en Programación, Optimización e Investigación Operativa.',
+            'Lenguaje, Literatura y Ciencias Sociales',
+            'Lic. en Letras y Ciencias de la Educación',
+            'Profesora de Lenguaje, Literatura e Historia de nivel secundaria.',
             'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150'
         )
         docente_roberto = make_docente(
             'prof_roberto@edusmart.edu', 'Roberto', 'Sánchez',
-            'Matemáticas Aplicadas y Ciencias Exactas',
-            'Magíster en Matemáticas Aplicadas',
-            'Especialista en cálculo avanzado, estadística y álgebra lineal.',
+            'Química, Biología y Ciencias Naturales',
+            'Lic. en Ciencias Naturales y Química Escolar',
+            'Profesor de Química y Biología de nivel secundaria.',
             'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'
         )
-        self.stdout.write("✓ Docentes creados (3)")
+        self.stdout.write("✓ Docentes escolares creados (3)")
 
         # =====================================================================
-        # 2. CUATRO (4) COLEGIOS
+        # 2. CUATRO (4) COLEGIOS / UNIDADES EDUCATIVAS ESCOLARES
         # =====================================================================
         colegio_1 = Colegio.objects.create(
             nombre='Colegio Nacional Simón Bolívar',
@@ -91,14 +90,6 @@ class Command(BaseCommand):
             logo_url='https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=150'
         )
         colegio_3 = Colegio.objects.create(
-            nombre='Instituto Tecnológico Cochabamba',
-            ciudad='Cochabamba', pais='Bolivia',
-            direccion='Av. Blanco Galindo Km 5, Quillacollo, Cochabamba',
-            telefono='+591 4 4567890',
-            color='#7C3AED',
-            logo_url='https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=150'
-        )
-        colegio_4 = Colegio.objects.create(
             nombre='Colegio San Agustín',
             ciudad='Cochabamba', pais='Bolivia',
             direccion='Av. América Este N° 789, Cala Cala, Cochabamba',
@@ -106,80 +97,123 @@ class Command(BaseCommand):
             color='#EA580C',
             logo_url='https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=150'
         )
-        self.stdout.write("✓ Colegios creados (4)")
+        colegio_4 = Colegio.objects.create(
+            nombre='Colegio La Salle',
+            ciudad='Cochabamba', pais='Bolivia',
+            direccion='Av. Melchor Pérez de Olguín N° 321, Cochabamba',
+            telefono='+591 4 4488990',
+            color='#7C3AED',
+            logo_url='https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=150'
+        )
+        self.stdout.write("✓ Colegios escolares creados (4)")
 
-        # Docente Juan vinculado a los 4 colegios para pruebas totales
+        # Vinculación de docentes a los colegios
         for col in [colegio_1, colegio_2, colegio_3, colegio_4]:
             DocenteColegio.objects.create(docente=docente_juan, colegio=col, cargo='Docente Titular', fecha_incorporacion=date(2024, 2, 1))
 
-        # Docentes secundarios vinculados
-        DocenteColegio.objects.create(docente=docente_maria,   colegio=colegio_2, cargo='Docente Titular', fecha_incorporacion=date(2024, 1, 15))
-        DocenteColegio.objects.create(docente=docente_maria,   colegio=colegio_3, cargo='Docente Invitado', fecha_incorporacion=date(2025, 2, 1))
+        DocenteColegio.objects.create(docente=docente_maria,   colegio=colegio_1, cargo='Docente Titular', fecha_incorporacion=date(2024, 1, 15))
+        DocenteColegio.objects.create(docente=docente_maria,   colegio=colegio_2, cargo='Docente Titular', fecha_incorporacion=date(2024, 2, 1))
         DocenteColegio.objects.create(docente=docente_roberto, colegio=colegio_1, cargo='Docente Titular', fecha_incorporacion=date(2024, 3, 1))
-        DocenteColegio.objects.create(docente=docente_roberto, colegio=colegio_4, cargo='Docente Titular', fecha_incorporacion=date(2024, 2, 10))
-        self.stdout.write("✓ Docentes vinculados a los 4 colegios")
+        DocenteColegio.objects.create(docente=docente_roberto, colegio=colegio_3, cargo='Docente Titular', fecha_incorporacion=date(2024, 2, 10))
+        DocenteColegio.objects.create(docente=docente_roberto, colegio=colegio_4, cargo='Docente Titular', fecha_incorporacion=date(2024, 2, 15))
+        self.stdout.write("✓ Docentes vinculados a los colegios")
 
         # =====================================================================
-        # 3. CURSOS POR COLEGIO
+        # 3. CURSOS DE SECUNDARIA POR COLEGIO
         # =====================================================================
-        curso_col1 = Curso.objects.create(colegio=colegio_1, nombre='6to de Secundaria A', grado='6to de Secundaria', paralelo='A', nivel='Secundaria', anio_lectivo='2026-2027')
-        curso_col2 = Curso.objects.create(colegio=colegio_2, nombre='5to de Secundaria B', grado='5to de Secundaria', paralelo='B', nivel='Secundaria', anio_lectivo='2026-2027')
-        curso_col3 = Curso.objects.create(colegio=colegio_3, nombre='Ingeniería 3er Semestre A', grado='3er Semestre', paralelo='A', nivel='Superior', anio_lectivo='2026-2027')
-        curso_col4 = Curso.objects.create(colegio=colegio_4, nombre='6to de Secundaria Ciencias B', grado='6to de Secundaria', paralelo='B', nivel='Secundaria', anio_lectivo='2026-2027')
-        self.stdout.write("✓ Cursos creados (4)")
+        curso_bolivar = Curso.objects.create(
+            colegio=colegio_1, nombre='6to de Secundaria "A"',
+            grado='6to de Secundaria', paralelo='A', nivel='Secundaria', anio_lectivo='2026'
+        )
+        curso_scz = Curso.objects.create(
+            colegio=colegio_2, nombre='5to de Secundaria "A"',
+            grado='5to de Secundaria', paralelo='A', nivel='Secundaria', anio_lectivo='2026'
+        )
+        curso_agustin = Curso.objects.create(
+            colegio=colegio_3, nombre='6to de Secundaria "B"',
+            grado='6to de Secundaria', paralelo='B', nivel='Secundaria', anio_lectivo='2026'
+        )
+        curso_lasalle = Curso.objects.create(
+            colegio=colegio_4, nombre='5to de Secundaria "B"',
+            grado='5to de Secundaria', paralelo='B', nivel='Secundaria', anio_lectivo='2026'
+        )
+        self.stdout.write("✓ Cursos escolares de secundaria creados (4)")
 
         # =====================================================================
-        # 4. SEIS (6) MATERIAS Y SUS ESPACIOS ACADÉMICOS
+        # 4. MATERIAS Y ESPACIOS 100% NIVEL ESCOLAR (SECUNDARIA)
         # =====================================================================
-        # Materias en los modelos
-        mat_1 = Materia.objects.create(curso=curso_col3, docente=docente_juan,    nombre='Base de Datos I',              codigo='BD-101',  horas_semanales=4, color='#1E3A8A')
-        mat_2 = Materia.objects.create(curso=curso_col2, docente=docente_maria,   nombre='Programación y Algoritmos',    codigo='PRG-102', horas_semanales=5, color='#0284C7')
-        mat_3 = Materia.objects.create(curso=curso_col3, docente=docente_juan,    nombre='Análisis y Diseño de Sistemas',codigo='ADS-103', horas_semanales=4, color='#4338CA')
-        mat_4 = Materia.objects.create(curso=curso_col1, docente=docente_maria,   nombre='Investigación Operativa',      codigo='IO-104',  horas_semanales=4, color='#0D9488')
-        mat_5 = Materia.objects.create(curso=curso_col4, docente=docente_roberto, nombre='Matemáticas Aplicadas',       codigo='MAT-105', horas_semanales=5, color='#7C3AED')
-        mat_6 = Materia.objects.create(curso=curso_col3, docente=docente_juan,    nombre='Análisis Numérico 2026',       codigo='AN-106',  horas_semanales=4, color='#0284C7')
+        # Materias escolares para el curso principal (6to de Secundaria "A" - Simón Bolívar)
+        mat_mat = Materia.objects.create(curso=curso_bolivar, docente=docente_juan,    nombre='Matemáticas',                   codigo='MAT-601', horas_semanales=5, color='#1E3A8A')
+        mat_fis = Materia.objects.create(curso=curso_bolivar, docente=docente_juan,    nombre='Física',                        codigo='FIS-602', horas_semanales=4, color='#0284C7')
+        mat_qmc = Materia.objects.create(curso=curso_bolivar, docente=docente_roberto, nombre='Química',                       codigo='QMC-603', horas_semanales=4, color='#0D9488')
+        mat_bio = Materia.objects.create(curso=curso_bolivar, docente=docente_roberto, nombre='Biología y Geografía',          codigo='BIO-604', horas_semanales=4, color='#16A34A')
+        mat_lit = Materia.objects.create(curso=curso_bolivar, docente=docente_maria,   nombre='Lenguaje y Literatura',         codigo='LIT-605', horas_semanales=5, color='#7C3AED')
+        mat_soc = Materia.objects.create(curso=curso_bolivar, docente=docente_maria,   nombre='Ciencias Sociales e Historia',   codigo='SOC-606', horas_semanales=4, color='#EA580C')
 
-        # Espacios vinculados directamente a Colegios, Cursos y Materias
-        espacio_bd = Espacio.objects.create(
-            nombre='Base de Datos I',
-            descripcion='Modelado relacional, diseño físico, SQL interactivo y normalización de bases de datos.',
-            codigo='BD2026', docente=docente_juan, colegio=colegio_3, curso=curso_col3, materia=mat_1,
-            color='#1E3A8A', icono='database', imagen_url='https://images.unsplash.com/photo-1544383835-bda2bc66a55d?w=400'
-        )
-        espacio_prog = Espacio.objects.create(
-            nombre='Programación y Algoritmos',
-            descripcion='Programación orientada a objetos, estructuras de datos, recursividad y patrones de diseño.',
-            codigo='PROG2026', docente=docente_maria, colegio=colegio_2, curso=curso_col2, materia=mat_2,
-            color='#0284C7', icono='code', imagen_url='https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=400'
-        )
-        espacio_ads = Espacio.objects.create(
-            nombre='Análisis y Diseño de Sistemas',
-            descripcion='Ingeniería de software, diagramas UML, especificación de requerimientos y metodologías ágiles.',
-            codigo='ADS2026', docente=docente_juan, colegio=colegio_3, curso=curso_col3, materia=mat_3,
-            color='#4338CA', icono='layers', imagen_url='https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400'
-        )
-        espacio_io = Espacio.objects.create(
-            nombre='Investigación Operativa',
-            descripcion='Modelos de programación lineal, método simplex, transporte, asignación y teoría de colas.',
-            codigo='IO2026', docente=docente_maria, colegio=colegio_1, curso=curso_col1, materia=mat_4,
-            color='#0D9488', icono='cpu', imagen_url='https://images.unsplash.com/photo-1509228468518-180dd4864904?w=400'
-        )
+        # Espacios académicos de 6to de Secundaria "A"
         espacio_mat = Espacio.objects.create(
-            nombre='Matemáticas Aplicadas',
-            descripcion='Cálculo diferencial e integral, vectores, matrices y resolución de modelos analíticos.',
-            codigo='MAT2026', docente=docente_roberto, colegio=colegio_4, curso=curso_col4, materia=mat_5,
-            color='#7C3AED', icono='sigma', imagen_url='https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=400'
+            nombre='Matemáticas',
+            descripcion='Álgebra, trigonometría, geometría analítica, funciones y cálculo pre-universitario.',
+            codigo='MAT601', docente=docente_juan, colegio=colegio_1, curso=curso_bolivar, materia=mat_mat,
+            color='#1E3A8A', icono='calculator', imagen_url='https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=400'
         )
-        espacio_an = Espacio.objects.create(
-            nombre='Análisis Numérico 2026',
-            descripcion='Cálculo de raíces no lineales, sistemas de ecuaciones lineales, interpolación polinomial, integración numérica y resolución numérica de EDOs.',
-            codigo='AN2026', docente=docente_juan, colegio=colegio_3, curso=curso_col3, materia=mat_6,
-            color='#0284C7', icono='sigma', imagen_url='https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=400'
+        espacio_fis = Espacio.objects.create(
+            nombre='Física',
+            descripcion='Cinemática, dinámica, leyes de Newton, trabajo, energía, termodinámica y electromagnetismo.',
+            codigo='FIS602', docente=docente_juan, colegio=colegio_1, curso=curso_bolivar, materia=mat_fis,
+            color='#0284C7', icono='activity', imagen_url='https://images.unsplash.com/photo-1509228468518-180dd4864904?w=400'
         )
-        self.stdout.write("✓ 6 Materias y 6 Espacios vinculados creados")
+        espacio_qmc = Espacio.objects.create(
+            nombre='Química',
+            descripcion='Estructura de la materia, tabla periódica, nomenclatura inorgánica, estequiometría y soluciones.',
+            codigo='QMC603', docente=docente_roberto, colegio=colegio_1, curso=curso_bolivar, materia=mat_qmc,
+            color='#0D9488', icono='flask-conical', imagen_url='https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400'
+        )
+        espacio_bio = Espacio.objects.create(
+            nombre='Biología y Geografía',
+            descripcion='Genética mendeliana, ecología, ecosistemas, anatomía humana y geografía física.',
+            codigo='BIO604', docente=docente_roberto, colegio=colegio_1, curso=curso_bolivar, materia=mat_bio,
+            color='#16A34A', icono='leaf', imagen_url='https://images.unsplash.com/photo-1530595467537-0b5996c41f2d?w=400'
+        )
+        espacio_lit = Espacio.objects.create(
+            nombre='Lenguaje y Literatura',
+            descripcion='Comprensión lectora, redacción ensayística, ortografía, literatura boliviana y universal.',
+            codigo='LIT605', docente=docente_maria, colegio=colegio_1, curso=curso_bolivar, materia=mat_lit,
+            color='#7C3AED', icono='book-open', imagen_url='https://images.unsplash.com/photo-1457369804613-52c61a468e7d?w=400'
+        )
+        espacio_soc = Espacio.objects.create(
+            nombre='Ciencias Sociales e Historia',
+            descripcion='Historia de Bolivia, geografía social, procesos contemporáneos y educación cívica.',
+            codigo='SOC606', docente=docente_maria, colegio=colegio_1, curso=curso_bolivar, materia=mat_soc,
+            color='#EA580C', icono='globe', imagen_url='https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=400'
+        )
+
+        # Materias y Espacios escolares para los otros 3 colegios
+        mat_scz = Materia.objects.create(curso=curso_scz, docente=docente_juan, nombre='Matemáticas 5to', codigo='MAT-501', horas_semanales=5, color='#0D9488')
+        Espacio.objects.create(
+            nombre='Matemáticas 5to', descripcion='Álgebra y trigonometría escolar.',
+            codigo='MAT501', docente=docente_juan, colegio=colegio_2, curso=curso_scz, materia=mat_scz,
+            color='#0D9488', icono='calculator'
+        )
+
+        mat_agu = Materia.objects.create(curso=curso_agustin, docente=docente_roberto, nombre='Física 6to "B"', codigo='FIS-603', horas_semanales=4, color='#EA580C')
+        Espacio.objects.create(
+            nombre='Física 6to "B"', descripcion='Mecánica y termodinámica de secundaria.',
+            codigo='FIS603', docente=docente_roberto, colegio=colegio_3, curso=curso_agustin, materia=mat_agu,
+            color='#EA580C', icono='activity'
+        )
+
+        mat_las = Materia.objects.create(curso=curso_lasalle, docente=docente_roberto, nombre='Química 5to "B"', codigo='QMC-502', horas_semanales=4, color='#7C3AED')
+        Espacio.objects.create(
+            nombre='Química 5to "B"', descripcion='Química general escolar.',
+            codigo='QMC502', docente=docente_roberto, colegio=colegio_4, curso=curso_lasalle, materia=mat_las,
+            color='#7C3AED', icono='flask-conical'
+        )
+
+        self.stdout.write("✓ 6 Materias y Espacios escolares creados para 6to de Secundaria 'A' (y materias de soporte en otros colegios)")
 
         # =====================================================================
-        # 5. VEINTE (20) ESTUDIANTES COMPLETOS
+        # 5. VEINTE (20) ESTUDIANTES DE SECUNDARIA
         # =====================================================================
         estudiantes_data = [
             ("Carlos", "Gómez", "carlos.gomez@edusmart.edu", "RU-2026-001", "Roberto Gómez", "59171234501", "PADRE", "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150"),
@@ -215,168 +249,188 @@ class Command(BaseCommand):
             )
             est = Estudiante.objects.create(
                 usuario=user,
-                carrera_o_area='Ingeniería y Ciencias',
+                carrera_o_area='Educación Secundaria',
+                biografia=f'Estudiante de 6to de Secundaria en el Colegio Nacional Simón Bolívar.',
                 nombre_tutor=tutor,
                 telefono_tutor=tel_tutor,
                 relacion_tutor=rel_tutor
             )
-            # Inscribir formalmente en el curso principal (curso_col3 de Cochabamba / o distribuido)
-            EstudianteCurso.objects.create(estudiante=est, curso=curso_col3, codigo_ru=ru)
+            # Inscribir formalmente al estudiante en SU curso: 6to de Secundaria "A" del Colegio Simón Bolívar
+            EstudianteCurso.objects.create(estudiante=est, curso=curso_bolivar, codigo_ru=ru)
             estudiantes_objs.append(est)
 
-        self.stdout.write("✓ 20 Estudiantes creados con datos de tutor y RU")
+        self.stdout.write("✓ 20 Estudiantes inscritos formalmente en 6to de Secundaria 'A' del Colegio Simón Bolívar")
 
-        # Inscribir a los 20 estudiantes en las 6 materias/espacios para que cada materia tenga 20 alumnos
-        todos_los_espacios = [espacio_bd, espacio_prog, espacio_ads, espacio_io, espacio_mat, espacio_an]
-        for espacio in todos_los_espacios:
+        # Inscribir a los 20 estudiantes ÚNICAMENTE en las 6 materias/espacios de su curso
+        espacios_del_curso = [espacio_mat, espacio_fis, espacio_qmc, espacio_bio, espacio_lit, espacio_soc]
+        for espacio in espacios_del_curso:
             for est in estudiantes_objs:
                 MiembroEspacio.objects.create(espacio=espacio, estudiante=est)
 
-        self.stdout.write("✓ Los 20 estudiantes inscritos en las 6 materias/espacios (20 alumnos por materia)")
+        self.stdout.write("✓ Cada uno de los 20 alumnos está asignado exclusivamente a sus 6 materias escolares")
 
         # =====================================================================
-        # 6. RÚBRICA Y TAREAS
+        # 6. RÚBRICA Y TAREAS 100% NIVEL ESCOLAR SECUNDARIA
         # =====================================================================
-        rubrica_an = Rubrica.objects.create(
-            nombre='Rúbrica de Evaluación de Métodos Numéricos',
-            descripcion='Rúbrica estándar de cuatro criterios pedagógicos.',
+        rubrica_secundaria = Rubrica.objects.create(
+            nombre='Rúbrica de Evaluación Continua - Nivel Secundaria',
+            descripcion='Criterios de evaluación para trabajos y prácticas escolares.',
             docente=docente_juan, puntaje_total=100
         )
         for nombre, desc, pts, orden in [
-            ('Planteamiento y fórmula', 'Definición correcta de la función, intervalo y fórmulas matemáticas.', 30, 1),
-            ('Desarrollo y procedimiento', 'Iteraciones paso a paso y control tabular del procedimiento.', 30, 2),
-            ('Resultado y error', 'Valor aproximado final y cálculo del error absoluto o relativo.', 20, 3),
-            ('Interpretación', 'Análisis de convergencia y comparación con el valor analítico.', 20, 4),
+            ('Planteamiento y Comprensión', 'Identificación correcta de datos, fórmulas y conceptos escolares.', 30, 1),
+            ('Procedimiento y Desarrollo', 'Pasos ordenados, desarrollo lógico y aplicación adecuada de métodos.', 35, 2),
+            ('Resultado y Conclusiones', 'Precisión en los cálculos finales y respuestas fundamentadas.', 20, 3),
+            ('Presentación y Orden', 'Limpieza, legibilidad, estructura y puntualidad en la entrega.', 15, 4),
         ]:
-            CriterioRubrica.objects.create(rubrica=rubrica_an, nombre=nombre, descripcion=desc, puntaje_maximo=pts, orden=orden)
+            CriterioRubrica.objects.create(rubrica=rubrica_secundaria, nombre=nombre, descripcion=desc, puntaje_maximo=pts, orden=orden)
 
-        # Tareas en Análisis Numérico
-        t_an1 = Tarea.objects.create(espacio=espacio_an, docente=docente_juan, rubrica=rubrica_an,
-            titulo='T1: Raíces — Bisección y Newton-Raphson',
-            descripcion='Hallar la raíz de f(x)=x³-x-2 en [1,2] con 4 iteraciones de Bisección y Newton-Raphson (x₀=1.5).',
-            indicaciones='1. Bisección: c=(a+b)/2, cota Emax=(b-a)/2^n.\n2. Newton: x_(n+1)=x_n-f(x_n)/f\'(x_n).\n3. Tablas de iteraciones.',
-            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=15),
-            fecha_limite=now - timedelta(days=7), estado='PUBLICADA')
+        # ── TAREAS EN MATEMÁTICAS (MAT601) ──
+        t_mat1 = Tarea.objects.create(
+            espacio=espacio_mat, docente=docente_juan, rubrica=rubrica_secundaria,
+            titulo='Taller: Trigonometría y Resolución de Triángulos',
+            descripcion='Resolver la guía práctica de 10 ejercicios aplicando identidades trigonométricas y teoremas de seno y coseno.',
+            indicaciones='1. Dibujar el triángulo correspondiente a cada problema.\n2. Plantear las ecuaciones con procedimiento completo.\n3. Presentar en PDF o fotos claras del cuaderno.',
+            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=14),
+            fecha_limite=now - timedelta(days=7), estado='PUBLICADA'
+        )
 
-        t_an2 = Tarea.objects.create(espacio=espacio_an, docente=docente_juan, rubrica=rubrica_an,
-            titulo='T2: Sistemas Lineales — Eliminación de Gauss',
-            descripcion='Resolver sistema 3x3: 2x+y+z=7; x+3y+2z=13; 3x+y+4z=17.',
-            indicaciones='1. Multiplicadores m_ij=a_ij/a_jj.\n2. F_i←F_i-m_ij*F_j.\n3. Sustitución regresiva.',
-            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=11),
-            fecha_limite=now - timedelta(days=4), estado='PUBLICADA')
-
-        t_an3 = Tarea.objects.create(espacio=espacio_an, docente=docente_juan, rubrica=rubrica_an,
-            titulo='T3: Interpolación — Lagrange y Extrapolación',
-            descripcion='Estimar f(1.5) con puntos (0,1),(1,3),(2,7) mediante Polinomio de Lagrange.',
-            indicaciones='1. Bases L_i(x) y polinomio P(x).\n2. Calcular f(1.5).\n3. Analizar sobreestimación.',
-            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=7),
-            fecha_limite=now - timedelta(days=2), estado='PUBLICADA')
-
-        t_an4 = Tarea.objects.create(espacio=espacio_an, docente=docente_juan, rubrica=rubrica_an,
-            titulo='T4: Integración — Trapecio y Simpson 1/3',
-            descripcion='Calcular ∫x²dx en [0,2] con n=4. Comparar con valor exacto (8/3≈2.6667).',
-            indicaciones='1. Trapecio compuesta n=4.\n2. Simpson 1/3 compuesta.\n3. Comparar exactitud.',
-            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=3),
-            fecha_limite=now + timedelta(days=4), estado='PUBLICADA')
-
-        # Tareas en Base de Datos I
-        t_bd1 = Tarea.objects.create(espacio=espacio_bd, docente=docente_juan,
-            titulo='Modelo Entidad-Relación Caso Clínica Médica',
-            descripcion='Elaborar el diagrama ER completo para el caso de estudio de la clínica médica.',
-            indicaciones='1. Identificar entidades y atributos.\n2. Establecer cardinalidades.\n3. Especificar claves en PDF.',
-            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=12),
-            fecha_limite=now - timedelta(days=4), estado='PUBLICADA')
-
-        t_bd2 = Tarea.objects.create(espacio=espacio_bd, docente=docente_juan,
-            titulo='Diseño de Base de Datos y Normalización 3FN',
-            descripcion='Normalización hasta 3FN y script DDL con claves foráneas.',
-            indicaciones='Aplicar 1FN, 2FN y 3FN al modelo ER aprobado.',
-            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=5),
-            fecha_limite=now + timedelta(days=4), estado='PUBLICADA')
-
-        # Tareas en Programación
-        t_prg1 = Tarea.objects.create(espacio=espacio_prog, docente=docente_maria,
-            titulo='POO — Sistema de Cuentas Bancarias con Herencia',
-            descripcion='Implementar el sistema aplicando herencia, encapsulamiento y polimorfismo.',
-            indicaciones='Crear jerarquía de clases con suite de tests.',
-            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=10),
-            fecha_limite=now - timedelta(days=2), estado='PUBLICADA')
-
-        # Tareas en ADS, IO y Matemáticas
-        t_ads1 = Tarea.objects.create(espacio=espacio_ads, docente=docente_juan,
-            titulo='Diagramas de Casos de Uso UML y Especificaciones',
-            descripcion='Modelar casos de uso para facturación electrónica.',
-            indicaciones='Incluir flujos principales y alternativos.',
-            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=6),
-            fecha_limite=now + timedelta(days=3), estado='PUBLICADA')
-
-        t_io1 = Tarea.objects.create(espacio=espacio_io, docente=docente_maria,
-            titulo='Optimización con Método Simplex y Sensibilidad',
-            descripcion='Resolver el problema de mezcla de producción óptima.',
-            indicaciones='Presentar la tabla simplex paso a paso.',
+        t_mat2 = Tarea.objects.create(
+            espacio=espacio_mat, docente=docente_juan, rubrica=rubrica_secundaria,
+            titulo='Guía Práctica: Ecuaciones Exponenciales y Logarítmicas',
+            descripcion='Aplicar propiedades de logaritmos y bases exponenciales para resolver las 8 ecuaciones propuestas en clase.',
+            indicaciones='1. Identificar la base común.\n2. Aplicar propiedades de cambio de base y producto.\n3. Verificar que las soluciones pertenezcan al dominio real.',
             puntaje_maximo=100, fecha_publicacion=now - timedelta(days=4),
-            fecha_limite=now + timedelta(days=8), estado='PUBLICADA')
+            fecha_limite=now + timedelta(days=4), estado='PUBLICADA'
+        )
 
-        t_mat1 = Tarea.objects.create(espacio=espacio_mat, docente=docente_roberto,
-            titulo='Cálculo Integral y Aplicaciones Geométricas',
-            descripcion='Calcular áreas entre curvas y volúmenes de revolución.',
-            indicaciones='Resolver las 5 integrales propuestas con procedimiento.',
-            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=8),
-            fecha_limite=now + timedelta(days=5), estado='PUBLICADA')
+        # ── TAREAS EN FÍSICA (FIS602) ──
+        t_fis1 = Tarea.objects.create(
+            espacio=espacio_fis, docente=docente_juan, rubrica=rubrica_secundaria,
+            titulo='Laboratorio: Leyes de Newton y Fuerzas de Rozamiento',
+            descripcion='Analizar los 4 sistemas mecánicos con bloques sobre planos inclinados con fricción estática y cinética.',
+            indicaciones='1. Dibujar el Diagrama de Cuerpo Libre (DCL) para cada masa.\n2. Plantear las sumatorias de fuerzas ΣFx=m*a y ΣFy=0.\n3. Hallar la aceleración y la tensión en las cuerdas.',
+            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=12),
+            fecha_limite=now - timedelta(days=5), estado='PUBLICADA'
+        )
 
-        self.stdout.write("✓ Tareas creadas para todas las materias")
+        t_fis2 = Tarea.objects.create(
+            espacio=espacio_fis, docente=docente_juan, rubrica=rubrica_secundaria,
+            titulo='Problemas de Dinámica y Conservación de Energía',
+            descripcion='Resolver los problemas prácticos de trabajo, energía cinética y energía potencial gravitatoria.',
+            indicaciones='Calcular la velocidad final y la energía disipada por fricción.',
+            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=3),
+            fecha_limite=now + timedelta(days=5), estado='PUBLICADA'
+        )
+
+        # ── TAREA EN QUÍMICA (QMC603) ──
+        t_qmc1 = Tarea.objects.create(
+            espacio=espacio_qmc, docente=docente_roberto,
+            titulo='Taller de Estequiometría y Balanceo de Reacciones',
+            descripcion='Balancear las 6 reacciones químicas por método redox y calcular la masa de producto en gramos a partir de reactivos dados.',
+            indicaciones='1. Asignar números de oxidación.\n2. Igualar por método redox o tanteo.\n3. Calcular reactivo limitante y rendimiento.',
+            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=10),
+            fecha_limite=now - timedelta(days=3), estado='PUBLICADA'
+        )
+
+        # ── TAREA EN BIOLOGÍA (BIO604) ──
+        t_bio1 = Tarea.objects.create(
+            espacio=espacio_bio, docente=docente_roberto,
+            titulo='Informe: Genética Mendeliana y Cuadros de Punnett',
+            descripcion='Resolver los casos de herencia monohíbrida y dihíbrida en plantas y grupos sanguíneos humanos.',
+            indicaciones='1. Representar los genotipos parentales.\n2. Construir el cuadro de Punnett.\n3. Indicar frecuencias genotípicas y fenotípicas en porcentajes.',
+            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=5),
+            fecha_limite=now + timedelta(days=6), estado='PUBLICADA'
+        )
+
+        # ── TAREA EN LENGUAJE Y LITERATURA (LIT605) ──
+        t_lit1 = Tarea.objects.create(
+            espacio=espacio_lit, docente=docente_maria,
+            titulo='Ensayo Crítico sobre Literatura Boliviana del Siglo XX',
+            descripcion='Elaborar un ensayo argumentativo analizando la novela social boliviana y sus personajes principales.',
+            indicaciones='1. Estructura: Introducción con tesis clara, desarrollo con citas y conclusiones.\n2. Extensión: 2 a 3 páginas.\n3. Cuidar ortografía y conectores lógicos.',
+            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=6),
+            fecha_limite=now + timedelta(days=3), estado='PUBLICADA'
+        )
+
+        # ── TAREA EN CIENCIAS SOCIALES (SOC606) ──
+        t_soc1 = Tarea.objects.create(
+            espacio=espacio_soc, docente=docente_maria,
+            titulo='Línea de Tiempo: Proceso de Independencia y Creación de la República',
+            descripcion='Elaborar una línea de tiempo ilustrada con los hitos más relevantes entre 1809 y 1825.',
+            indicaciones='1. Identificar las principales batallas y protagonistas.\n2. Explicar las causas sociales de la revolución.',
+            puntaje_maximo=100, fecha_publicacion=now - timedelta(days=4),
+            fecha_limite=now + timedelta(days=7), estado='PUBLICADA'
+        )
+
+        self.stdout.write("✓ Tareas escolares secundarias creadas")
 
         # =====================================================================
         # 7. ENTREGAS Y CALIFICACIONES PARA LOS 20 ALUMNOS
         # =====================================================================
-        # Calificaciones realistas para los alumnos en T1 y BD1
-        notas_base = [85, 90, 78, 92, 88, 74, 95, 82, 70, 89, 76, 91, 84, 87, 72, 93, 80, 86, 77, 94]
+        notas_base = [90, 85, 78, 92, 88, 74, 95, 82, 72, 89, 76, 91, 84, 87, 75, 93, 80, 86, 79, 94]
 
         for i, est in enumerate(estudiantes_objs):
-            nota = float(notas_base[i])
-            # Entrega en Base de Datos T1
-            e_bd = Entrega.objects.create(
-                tarea=t_bd1, estudiante=est,
-                fecha_entrega=now - timedelta(days=5, hours=i),
-                archivo_url=f'https://edusmart.cloud/storage/entregas/{est.usuario.username.split("@")[0]}_bd1.pdf',
-                archivo_nombre=f'{est.usuario.first_name}_{est.usuario.last_name}_ModeloER.pdf',
-                archivo_tamano='2.4 MB',
-                observaciones='Adjunto modelo entidad-relación y diccionario de datos completo.',
-                estado='RETROALIMENTADA'
-            )
-            c_bd = Calificacion.objects.create(entrega=e_bd, nota=nota, fecha_calificacion=now - timedelta(days=4), docente=docente_juan)
-            Retroalimentacion.objects.create(calificacion=c_bd, comentario='Buen trabajo con la estructura y las relaciones planteadas.', fecha=now - timedelta(days=4))
-
-            # Entrega en Análisis Numérico T1
-            nota_an = max(55.0, min(100.0, nota + (5 if i % 2 == 0 else -5)))
-            e_an = Entrega.objects.create(
-                tarea=t_an1, estudiante=est,
+            nota_mat = float(notas_base[i])
+            # 1. Entrega calificada en Matemáticas (T1)
+            e_mat = Entrega.objects.create(
+                tarea=t_mat1, estudiante=est,
                 fecha_entrega=now - timedelta(days=8, hours=i),
-                archivo_url=f'https://edusmart.cloud/storage/entregas/{est.usuario.username.split("@")[0]}_an1.pdf',
-                archivo_nombre=f'{est.usuario.first_name}_{est.usuario.last_name}_T1_Raices.pdf',
-                archivo_tamano='1.9 MB',
-                observaciones='Procedimiento paso a paso con cálculo de errores.',
+                archivo_url=f'https://edusmart.cloud/storage/entregas/{est.usuario.username.split("@")[0]}_trigonometria.pdf',
+                archivo_nombre=f'{est.usuario.first_name}_{est.usuario.last_name}_Trigonometria.pdf',
+                archivo_tamano='1.5 MB',
+                observaciones='Ejercicios resueltos a mano con procedimiento paso a paso.',
                 estado='RETROALIMENTADA'
             )
-            c_an = Calificacion.objects.create(entrega=e_an, nota=nota_an, fecha_calificacion=now - timedelta(days=7), docente=docente_juan)
-            Retroalimentacion.objects.create(calificacion=c_an, comentario='Procedimiento iterativo correcto y adecuada comprobación de convergencia.', fecha=now - timedelta(days=7))
+            c_mat = Calificacion.objects.create(
+                entrega=e_mat, nota=nota_mat,
+                fecha_calificacion=now - timedelta(days=7),
+                docente=docente_juan
+            )
+            Retroalimentacion.objects.create(
+                calificacion=c_mat,
+                comentario='Excelente resolución de los ejercicios trigonométricos. Procedimiento muy claro y ordenado.',
+                fecha=now - timedelta(days=7)
+            )
 
-        # Entregas pendientes de revisión en T4 de Análisis Numérico para los primeros 3
+            # 2. Entrega calificada en Física (T1)
+            nota_fis = max(60.0, min(100.0, nota_mat + (3 if i % 2 == 0 else -4)))
+            e_fis = Entrega.objects.create(
+                tarea=t_fis1, estudiante=est,
+                fecha_entrega=now - timedelta(days=6, hours=i),
+                archivo_url=f'https://edusmart.cloud/storage/entregas/{est.usuario.username.split("@")[0]}_leyes_newton.pdf',
+                archivo_nombre=f'{est.usuario.first_name}_{est.usuario.last_name}_Leyes_Newton.pdf',
+                archivo_tamano='2.1 MB',
+                observaciones='Diagramas de cuerpo libre y ecuaciones de equilibrio adjuntas.',
+                estado='RETROALIMENTADA'
+            )
+            c_fis = Calificacion.objects.create(
+                entrega=e_fis, nota=nota_fis,
+                fecha_calificacion=now - timedelta(days=5),
+                docente=docente_juan
+            )
+            Retroalimentacion.objects.create(
+                calificacion=c_fis,
+                comentario='Buen planteamiento del diagrama de cuerpo libre y aplicación de la 2da Ley de Newton.',
+                fecha=now - timedelta(days=5)
+            )
+
+        # Entregas pendientes de revisión en Lenguaje para los primeros 3 alumnos (incluido Carlos Gómez)
         for est in estudiantes_objs[:3]:
             Entrega.objects.create(
-                tarea=t_an4, estudiante=est,
-                fecha_entrega=now - timedelta(hours=6),
-                archivo_url=f'https://edusmart.cloud/storage/entregas/{est.usuario.username.split("@")[0]}_an4.pdf',
-                archivo_nombre=f'{est.usuario.first_name}_{est.usuario.last_name}_T4_Trapecio_Simpson.pdf',
-                archivo_tamano='1.8 MB',
-                observaciones='Cálculos de Trapecio y Simpson 1/3 adjuntos.',
+                tarea=t_lit1, estudiante=est,
+                fecha_entrega=now - timedelta(hours=8),
+                archivo_url=f'https://edusmart.cloud/storage/entregas/{est.usuario.username.split("@")[0]}_ensayo_literatura.pdf',
+                archivo_nombre=f'{est.usuario.first_name}_{est.usuario.last_name}_Ensayo_Literatura.pdf',
+                archivo_tamano='1.2 MB',
+                observaciones='Ensayo de análisis literario y contexto histórico.',
                 estado='ENTREGADO'
             )
 
-        self.stdout.write("✓ Entregas, notas y retroalimentaciones generadas para los 20 alumnos")
+        self.stdout.write("✓ Entregas, calificaciones y retroalimentaciones generadas para los 20 alumnos")
 
         # =====================================================================
-        # 8. RECALCULAR PROGRESOS Y NOTIFICACIONES
+        # 8. PROGRESOS Y NOTIFICACIONES
         # =====================================================================
         for est in estudiantes_objs:
             try:
@@ -385,27 +439,35 @@ class Command(BaseCommand):
                 pass
 
         Notificacion.objects.create(
-            usuario=docente_juan.usuario, tipo='ENTREGA_CONFIRMADA',
-            mensaje='3 nuevas entregas pendientes de revisión en "T4: Integración — Trapecio y Simpson 1/3".',
-            espacio_id=espacio_an.id, tarea_id=t_an4.id, fecha=now - timedelta(hours=6)
+            usuario=docente_maria.usuario, tipo='ENTREGA_CONFIRMADA',
+            mensaje='3 nuevas entregas pendientes de revisión en "Ensayo Crítico sobre Literatura Boliviana del Siglo XX".',
+            espacio_id=espacio_lit.id, tarea_id=t_lit1.id, fecha=now - timedelta(hours=8)
         )
         Notificacion.objects.create(
             usuario=estudiantes_objs[0].usuario, tipo='CALIFICADA',
-            mensaje='Tu entrega de "T1: Raíces — Bisección y Newton-Raphson" fue calificada con 85/100.',
-            espacio_id=espacio_an.id, tarea_id=t_an1.id, fecha=now - timedelta(days=7)
+            mensaje='Tu entrega de "Taller: Trigonometría y Resolución de Triángulos" fue calificada con 90/100.',
+            espacio_id=espacio_mat.id, tarea_id=t_mat1.id, fecha=now - timedelta(days=7)
+        )
+        Notificacion.objects.create(
+            usuario=estudiantes_objs[0].usuario, tipo='CALIFICADA',
+            mensaje='Tu entrega de "Laboratorio: Leyes de Newton y Fuerzas de Rozamiento" fue calificada con 85/100.',
+            espacio_id=espacio_fis.id, tarea_id=t_fis1.id, fecha=now - timedelta(days=5)
         )
 
-        self.stdout.write(self.style.SUCCESS("\n" + "="*65))
-        self.stdout.write(self.style.SUCCESS("✅ EDUSMART SEED COMPLETADO SATISFACTORIAMENTE"))
-        self.stdout.write(self.style.SUCCESS("="*65))
-        self.stdout.write("📌 Colegios:    4 (La Paz, Santa Cruz, 2 en Cochabamba)")
-        self.stdout.write("📌 Materias:    6 (BD, Prog, ADS, IO, Mat, Análisis Numérico)")
-        self.stdout.write("📌 Alumnos:     20 alumnos completos inscritos por materia y curso")
-        self.stdout.write("📌 Tareas:      10 tareas con entregas, calificaciones y retroalimentaciones")
+        self.stdout.write(self.style.SUCCESS("\n" + "="*70))
+        self.stdout.write(self.style.SUCCESS("✅ EDUSMART SEED COMPLETADO (100% NIVEL ESCOLAR SECUNDARIA)"))
+        self.stdout.write(self.style.SUCCESS("="*70))
+        self.stdout.write("📌 Colegios:    4 Colegios Escolares (Simón Bolívar, Sta Cruz, San Agustín, La Salle)")
+        self.stdout.write("📌 Materias:    6 materias escolares asignadas a los 20 alumnos de 6to 'A':")
+        self.stdout.write("                - Matemáticas (MAT601)")
+        self.stdout.write("                - Física (FIS602)")
+        self.stdout.write("                - Química (QMC603)")
+        self.stdout.write("                - Biología y Geografía (BIO604)")
+        self.stdout.write("                - Lenguaje y Literatura (LIT605)")
+        self.stdout.write("                - Ciencias Sociales e Historia (SOC606)")
+        self.stdout.write("📌 Alumnos:     20 alumnos en 6to 'A', cada uno con sus 6 materias exclusivas")
         self.stdout.write("\n🔑 Credenciales principales de prueba:")
-        self.stdout.write("   Docente:    prof_juan@edusmart.edu / password123 (supervisa las materias y colegios)")
-        self.stdout.write("   Docente:    prof_maria@edusmart.edu / password123")
-        self.stdout.write("   Docente:    prof_roberto@edusmart.edu / password123")
+        self.stdout.write("   Docente:    prof_juan@edusmart.edu / password123 (Matemáticas y Física)")
+        self.stdout.write("   Docente:    prof_maria@edusmart.edu / password123 (Lenguaje y Sociales)")
+        self.stdout.write("   Docente:    prof_roberto@edusmart.edu / password123 (Química y Biología)")
         self.stdout.write("   Estudiante: carlos.gomez@edusmart.edu / password123")
-        self.stdout.write("   Estudiante: ana.flores@edusmart.edu / password123")
-        self.stdout.write("   Estudiante: elena.gutierrez@edusmart.edu / password123")

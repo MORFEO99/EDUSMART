@@ -312,7 +312,7 @@ def api_espacios(request):
         if user.rol == 'DOCENTE' and hasattr(user, 'perfil_docente'):
             espacios = Espacio.objects.filter(docente=user.perfil_docente)
         elif user.rol == 'ESTUDIANTE' and hasattr(user, 'perfil_estudiante'):
-            espacios_ids = user.perfil_estudiante.espacios_inscritos.values_list('espacio_id', flat=True)
+            espacios_ids = user.perfil_estudiante.get_espacios_ids()
             espacios = Espacio.objects.filter(id__in=espacios_ids)
         else:
             espacios = Espacio.objects.none()

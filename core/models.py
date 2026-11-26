@@ -129,8 +129,8 @@ class Materia(models.Model):
 
 class Estudiante(models.Model):
     usuario = models.OneToOneField(Usuario, on_delete=models.CASCADE, related_name='perfil_estudiante')
-    carrera_o_area = models.CharField(max_length=150, default='Ingenieria de Sistemas')
-    biografia = models.TextField(blank=True, default='Estudiante de sistemas.')
+    carrera_o_area = models.CharField(max_length=150, default='Educación Secundaria')
+    biografia = models.TextField(blank=True, default='Estudiante de nivel secundaria.')
 
     # === Contacto de tutor / padre de familia ===
     nombre_tutor = models.CharField(max_length=200, blank=True,
