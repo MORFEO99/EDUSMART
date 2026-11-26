@@ -498,20 +498,21 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
 
   return (
     <div style={{
-      background: '#1B1A1D',
-      minHeight: '88vh',
+      background: '#FFFFFF',
+      minHeight: '85vh',
       borderRadius: 10,
-      padding: '20px 24px',
-      color: '#FFFFFF',
+      padding: '22px 26px',
+      color: '#0F172A',
+      border: '1px solid #E2E8F0',
       fontFamily: 'Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, sans-serif',
-      boxShadow: '0 4px 18px rgba(0,0,0,0.3)'
+      boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
     }}>
-      {/* Top Header / Tabs (Microsoft Teams Dark Layout) */}
+      {/* Top Header / Tabs (Microsoft Teams Clean Light Layout) */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid #323136',
+        borderBottom: '1px solid #E2E8F0',
         marginBottom: 16,
         paddingBottom: 2
       }}>
@@ -526,7 +527,7 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: isActive ? '#FFFFFF' : '#9E9E9E',
+                  color: isActive ? '#1E3A8A' : '#64748B',
                   fontSize: '13.5px',
                   fontWeight: isActive ? 700 : 500,
                   cursor: 'pointer',
@@ -537,12 +538,12 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
                   gap: 3,
                   transition: 'color 0.15s ease'
                 }}
-                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.color = '#E1DFDD'; }}
-                onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.color = '#9E9E9E'; }}
+                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.color = '#1E3A8A'; }}
+                onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.color = '#64748B'; }}
               >
                 {f.label}
                 {f.id === 'vencidas' && (
-                  <span style={{ color: '#E81123', fontWeight: 800, fontSize: '14px', lineHeight: 1 }}>*</span>
+                  <span style={{ color: '#DC2626', fontWeight: 800, fontSize: '14px', lineHeight: 1 }}>*</span>
                 )}
                 {isActive && (
                   <div style={{
@@ -551,7 +552,7 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
                     left: 0,
                     right: 0,
                     height: 3,
-                    background: '#7B83EB',
+                    background: '#1E3A8A',
                     borderRadius: '3px 3px 0 0'
                   }} />
                 )}
@@ -564,7 +565,7 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           {showSearch ? (
             <div style={{ position: 'relative', width: 220 }}>
-              <Search size={14} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
+              <Search size={14} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#64748B' }} />
               <input
                 autoFocus
                 className="form-control"
@@ -573,9 +574,9 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
                   paddingLeft: 28,
                   paddingRight: 24,
                   fontSize: '12px',
-                  background: '#28282D',
-                  border: '1px solid #3F3F46',
-                  color: '#FFFFFF',
+                  background: '#F8FAFC',
+                  border: '1px solid #CBD5E1',
+                  color: '#0F172A',
                   borderRadius: 4
                 }}
                 placeholder="Filtrar por tarea..."
@@ -584,21 +585,21 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
               />
               <X
                 size={13}
-                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#8A8886', cursor: 'pointer' }}
+                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#64748B', cursor: 'pointer' }}
                 onClick={() => { setSearch(''); setShowSearch(false); }}
               />
             </div>
           ) : (
             <Search
               size={17}
-              color="#A19F9D"
+              color="#64748B"
               style={{ cursor: 'pointer' }}
               title="Buscar tarea"
               onClick={() => setShowSearch(true)}
             />
           )}
-          <Filter size={17} color="#A19F9D" style={{ cursor: 'pointer' }} title="Filtrar" />
-          <Lightbulb size={17} color="#A19F9D" style={{ cursor: 'pointer' }} title="Ideas" />
+          <Filter size={17} color="#64748B" style={{ cursor: 'pointer' }} title="Filtrar" />
+          <Lightbulb size={17} color="#64748B" style={{ cursor: 'pointer' }} title="Ideas" />
         </div>
       </div>
 
@@ -608,9 +609,9 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
           <Loading text="Cargando tareas..." />
         </div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#71717A' }}>
-          <CheckCircle size={32} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
-          <div style={{ fontSize: '14px', fontWeight: 600, color: '#A19F9D' }}>
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748B' }}>
+          <CheckCircle size={32} style={{ margin: '0 auto 10px', color: '#94A3B8' }} />
+          <div style={{ fontSize: '14px', fontWeight: 600, color: '#334155' }}>
             {search ? 'Sin coincidencias' : 'Todo al día'}
           </div>
           <div style={{ fontSize: '12px', marginTop: 4 }}>
@@ -625,7 +626,7 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
               <div style={{
                 fontSize: '12.5px',
                 fontWeight: 700,
-                color: '#C8C6C4',
+                color: '#334155',
                 marginBottom: 6,
                 marginTop: 14,
                 paddingLeft: 2,
@@ -642,7 +643,7 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
                   const isSubmitted = !!t.mi_entrega;
 
                   let subline1 = '';
-                  let subline1Color = '#A19F9D';
+                  let subline1Color = '#64748B';
 
                   if (filter === 'entregadas_calificadas') {
                     if (isSubmitted && !hasCalificacion) {
@@ -652,7 +653,7 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
                     }
                   } else if (filter === 'vencidas') {
                     subline1 = `Venció el ${formatTimelineDate(t.fecha_limite)}`;
-                    subline1Color = '#F87171';
+                    subline1Color = '#DC2626';
                   } else {
                     subline1 = `Vence a las ${formatHour(t.fecha_limite)}`;
                   }
@@ -662,23 +663,26 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
                       key={t.id}
                       onClick={() => setSelectedTaskId(t.id)}
                       style={{
-                        background: '#252427',
+                        background: '#FFFFFF',
                         borderRadius: 6,
                         padding: '12px 16px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         cursor: 'pointer',
-                        border: '1px solid #2B2A2E',
-                        transition: 'background 0.15s ease, border-color 0.15s ease'
+                        border: '1px solid #E2E8F0',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                        transition: 'all 0.15s ease'
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#2B2A2F';
-                        e.currentTarget.style.borderColor = '#3F3E45';
+                        e.currentTarget.style.background = '#F8FAFC';
+                        e.currentTarget.style.borderColor = '#CBD5E1';
+                        e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.05)';
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = '#252427';
-                        e.currentTarget.style.borderColor = '#2B2A2E';
+                        e.currentTarget.style.background = '#FFFFFF';
+                        e.currentTarget.style.borderColor = '#E2E8F0';
+                        e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.02)';
                       }}
                     >
                       {/* Left: Badge + Titles */}
@@ -706,7 +710,7 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
                           <div style={{
                             fontSize: '13px',
                             fontWeight: 700,
-                            color: '#FFFFFF',
+                            color: '#0F172A',
                             textTransform: 'uppercase',
                             letterSpacing: '0.2px',
                             marginBottom: 2,
@@ -721,6 +725,7 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
                             <div style={{
                               fontSize: '11.5px',
                               color: subline1Color,
+                              fontWeight: subline1Color === '#DC2626' ? 600 : 400,
                               marginBottom: 1,
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
@@ -732,7 +737,7 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
 
                           <div style={{
                             fontSize: '11px',
-                            color: '#71717A',
+                            color: '#64748B',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap'
@@ -746,13 +751,14 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
                       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
                         {filter === 'entregadas_calificadas' && (
                           hasCalificacion ? (
-                            <span style={{ fontSize: '12.5px', color: '#D4D4D8', fontWeight: 600 }}>
+                            <span style={{ fontSize: '12.5px', color: '#0F172A', fontWeight: 700 }}>
                               {Math.round(t.mi_entrega.calificacion.nota)}/{t.puntaje_maximo || 100} puntos
                             </span>
                           ) : (
                             <span style={{
-                              background: '#107C41',
-                              color: '#FFFFFF',
+                              background: '#DCFCE7',
+                              color: '#15803D',
+                              border: '1px solid #BBF7D0',
                               padding: '3px 10px',
                               borderRadius: 4,
                               fontSize: '11px',
@@ -768,13 +774,13 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
 
                         {filter === 'pendientes' && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ fontSize: '12px', color: '#A19F9D' }}>
+                            <span style={{ fontSize: '12px', color: '#64748B' }}>
                               {t.puntaje_maximo || 100} puntos
                             </span>
                             <span style={{
-                              background: '#27272A',
-                              border: '1px solid #3F3F46',
-                              color: '#E4E4E7',
+                              background: '#EFF6FF',
+                              border: '1px solid #BFDBFE',
+                              color: '#1D4ED8',
                               padding: '3px 9px',
                               borderRadius: 4,
                               fontSize: '11px',
@@ -786,12 +792,12 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
                         )}
 
                         {filter === 'vencidas' && (
-                          <span style={{ fontSize: '11.5px', color: '#F87171', fontWeight: 600 }}>
+                          <span style={{ fontSize: '11.5px', color: '#DC2626', fontWeight: 600 }}>
                             Sin entregar · {t.puntaje_maximo || 100} pts
                           </span>
                         )}
 
-                        <Info size={15} color="#52525B" style={{ flexShrink: 0 }} />
+                        <Info size={15} color="#94A3B8" style={{ flexShrink: 0 }} />
                       </div>
                     </div>
                   );
