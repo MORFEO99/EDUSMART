@@ -139,7 +139,7 @@ export const studentAPI = {
   progress: () => apiFetch('/api/progreso/'),
   feedbacks: () => apiFetch('/api/student/feedbacks/'),
   calificaciones: () => apiFetch('/api/student/calificaciones/'),
-  boletin: () => apiFetch('/api/student/boletin/'),
+  boletin: (trimestre = 'all') => apiFetch(`/api/student/boletin/?trimestre=${trimestre}`),
 };
 
 export const teacherAPI = {

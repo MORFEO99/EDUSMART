@@ -2183,8 +2183,8 @@ def api_student_calificaciones(request):
 def api_student_boletin(request):
     """
     Retorna el boletín oficial de calificaciones del estudiante organizado por materias,
-    con el desglose de tareas teóricas, prácticas/talleres, evaluaciones (simuladores IA),
-    tareas pendientes, promedio de cada materia y promedio general acumulado.
+    con filtro por trimestre (1, 2, 3 o all) y promedios numéricos para:
+    TAREAS PRESENTADAS, PRÁCTICAS, EVALUACIONES IA, EXÁMENES y PROMEDIO.
     """
     user = request.user
     if not user.is_authenticated or user.rol != 'ESTUDIANTE' or not hasattr(user, 'perfil_estudiante'):
@@ -2192,6 +2192,19 @@ def api_student_boletin(request):
 
     est = user.perfil_estudiante
     now = timezone.now()
+    trimestre = request.GET.get('trimestre', 'all')
+
+    def in_trimestre(dt):
+        if not dt or trimestre == 'all':
+            return True
+        m = dt.month
+        if trimestre == '1':
+            return 1 <= m <= 5
+        elif trimestre == '2':
+            return 6 <= m <= 8
+        elif trimestre == '3':
+            return 9 <= m <= 12
+        return True
 
     inscripcion = EstudianteCurso.objects.filter(estudiante=est, estado='ACTIVO').select_related('curso', 'curso__colegio').first()
     curso = inscripcion.curso if inscripcion else None
@@ -2201,34 +2214,41 @@ def api_student_boletin(request):
 
     materias_data = []
     todas_las_notas = []
-    total_pendientes_global = 0
 
     for esp in espacios:
         mat = esp.materia
         mat_nombre = mat.nombre if mat else esp.nombre
         doc_nombre = esp.docente.usuario.get_full_name() if esp.docente else 'Docente'
-        doc_avatar = getattr(esp.docente.usuario, 'avatar_url', '') if esp.docente else ''
 
         tareas_qs = Tarea.objects.filter(espacio=esp, estado='PUBLICADA').order_by('fecha_limite')
 
         tareas_list = []
         practicas_list = []
-        pendientes_list = []
+        examenes_list = []
+        evaluaciones_ia_list = []
+
+        notas_tareas = []
+        notas_practicas = []
+        notas_examenes = []
+        notas_ia = []
         notas_materia = []
 
         for t in tareas_qs:
+            fecha_ref = t.fecha_limite or t.fecha_publicacion
+            if not in_trimestre(fecha_ref):
+                continue
+
             e = Entrega.objects.filter(tarea=t, estudiante=est).first()
             cal = getattr(e, 'calificacion', None) if e else None
             retro = getattr(cal, 'retroalimentacion', None) if cal else None
 
-            # Clasificar si es Práctica/Taller o Tarea teórica/regular
-            is_practica = any(k in t.titulo.lower() for k in ['práctica', 'practica', 'taller', 'laboratorio', 'guía', 'guia'])
+            titulo_lower = t.titulo.lower()
+            is_examen = any(k in titulo_lower for k in ['examen', 'parcial', 'evaluación', 'evaluacion', 'prueba'])
+            is_practica = not is_examen and any(k in titulo_lower for k in ['práctica', 'practica', 'taller', 'laboratorio', 'guía', 'guia'])
 
             if cal:
                 estado = 'CALIFICADO'
                 nota = float(cal.nota)
-                notas_materia.append(nota)
-                todas_las_notas.append(nota)
             elif e:
                 estado = 'EN_REVISION'
                 nota = None
@@ -2242,120 +2262,109 @@ def api_student_boletin(request):
             item = {
                 'id': t.id,
                 'titulo': t.titulo,
-                'tipo_categoria': 'Práctica' if is_practica else 'Tarea',
                 'estado': estado,
                 'nota': nota,
                 'puntaje_maximo': t.puntaje_maximo or 100,
                 'retroalimentacion': retro.comentario if retro and retro.comentario else (e.observaciones if e else ''),
-                'fecha_limite': t.fecha_limite.strftime('%d/%m/%Y %H:%M') if t.fecha_limite else '',
-                'fecha_entrega': e.fecha_entrega.strftime('%d/%m/%Y %H:%M') if e and e.fecha_entrega else '',
-                'archivo_nombre': e.archivo_nombre if e else '',
-                'archivo_url': e.archivo_url if e else ''
+                'fecha_limite': t.fecha_limite.strftime('%d/%m/%Y') if t.fecha_limite else '',
+                'fecha_entrega': e.fecha_entrega.strftime('%d/%m/%Y') if e and e.fecha_entrega else '',
             }
 
-            if cal or e:
-                if is_practica:
-                    practicas_list.append(item)
-                else:
-                    tareas_list.append(item)
+            if is_examen:
+                examenes_list.append(item)
+                if nota is not None:
+                    notas_examenes.append(nota)
+                    notas_materia.append(nota)
+                    todas_las_notas.append(nota)
+            elif is_practica:
+                practicas_list.append(item)
+                if nota is not None:
+                    notas_practicas.append(nota)
+                    notas_materia.append(nota)
+                    todas_las_notas.append(nota)
             else:
-                pendientes_list.append(item)
-                total_pendientes_global += 1
-                if is_practica:
-                    practicas_list.append(item)
-                else:
-                    tareas_list.append(item)
+                tareas_list.append(item)
+                if nota is not None:
+                    notas_tareas.append(nota)
+                    notas_materia.append(nota)
+                    todas_las_notas.append(nota)
 
         # Evaluaciones y Simuladores IA de la materia
-        evaluaciones_list = []
         intentos_ia = IntentoPracticaEstudiante.objects.filter(estudiante=est, practica__materia=mat).select_related('practica')
         practicas_disponibles = PracticaTema.objects.filter(materia=mat, activo=True)
 
         for p in practicas_disponibles:
             it = intentos_ia.filter(practica=p).first()
+            fecha_ia = it.fecha_intento if it else p.fecha_creacion
+            if not in_trimestre(fecha_ia):
+                continue
+
             if it:
                 nota_ia = float(it.puntaje_obtenido)
+                notas_ia.append(nota_ia)
                 notas_materia.append(nota_ia)
                 todas_las_notas.append(nota_ia)
-                evaluaciones_list.append({
+                evaluaciones_ia_list.append({
                     'id': p.id,
                     'titulo': p.titulo,
-                    'tipo': 'Simulador IA',
                     'estado': 'COMPLETADO',
                     'nota': nota_ia,
-                    'puntaje_maximo': 100,
                     'aciertos': f"{it.respuestas_correctas}/{it.total_preguntas}",
                     'retroalimentacion': it.retroalimentacion_ia,
-                    'fecha': it.fecha_intento.strftime('%d/%m/%Y %H:%M') if it.fecha_intento else ''
+                    'fecha': it.fecha_intento.strftime('%d/%m/%Y') if it.fecha_intento else ''
                 })
             else:
-                evaluaciones_list.append({
+                evaluaciones_ia_list.append({
                     'id': p.id,
                     'titulo': p.titulo,
-                    'tipo': 'Simulador IA',
                     'estado': 'DISPONIBLE',
                     'nota': None,
-                    'puntaje_maximo': 100,
                     'aciertos': 'Pendiente',
-                    'retroalimentacion': 'Simulador IA activo disponible para resolver.',
+                    'retroalimentacion': 'Simulador IA disponible para resolver.',
                     'fecha': ''
                 })
 
-        promedio_mat = round(sum(notas_materia) / len(notas_materia), 1) if notas_materia else None
-
-        if promedio_mat is not None:
-            if promedio_mat >= 85:
-                estado_cualitativo = 'Desarrollo Pleno (DP)'
-            elif promedio_mat >= 69:
-                estado_cualitativo = 'Desarrollo Óptimo (DO)'
-            elif promedio_mat >= 51:
-                estado_cualitativo = 'Desarrollo Aceptable (DA)'
-            else:
-                estado_cualitativo = 'En Desarrollo (ED)'
-        else:
-            estado_cualitativo = 'Sin notas'
+        prom_tareas = round(sum(notas_tareas) / len(notas_tareas)) if notas_tareas else 0
+        prom_practicas = round(sum(notas_practicas) / len(notas_practicas)) if notas_practicas else 0
+        prom_ia = round(sum(notas_ia) / len(notas_ia)) if notas_ia else 0
+        prom_examenes = round(sum(notas_examenes) / len(notas_examenes)) if notas_examenes else 0
+        promedio_mat = round(sum(notas_materia) / len(notas_materia)) if notas_materia else 0
 
         materias_data.append({
             'materia_id': mat.id if mat else esp.id,
             'materia': mat_nombre,
             'docente': doc_nombre,
-            'docente_avatar': doc_avatar,
+            'nota_tareas': prom_tareas,
+            'nota_practicas': prom_practicas,
+            'nota_evaluaciones_ia': prom_ia,
+            'nota_examenes': prom_examenes,
+            'promedio': promedio_mat,
             'tareas': tareas_list,
             'practicas': practicas_list,
-            'evaluaciones': evaluaciones_list,
-            'pendientes': pendientes_list,
-            'total_pendientes': len(pendientes_list),
-            'promedio': promedio_mat,
-            'estado_cualitativo': estado_cualitativo,
-            'total_actividades': len(tareas_list) + len(practicas_list) + len(evaluaciones_list),
-            'total_evaluadas': len(notas_materia)
+            'evaluaciones': evaluaciones_ia_list,
+            'examenes': examenes_list,
         })
 
-    promedio_general = round(sum(todas_las_notas) / len(todas_las_notas), 1) if todas_las_notas else None
+    promedio_general = round(sum(todas_las_notas) / len(todas_las_notas)) if todas_las_notas else 0
 
     return Response({
+        'trimestre': trimestre,
         'estudiante': {
             'id': est.id,
             'nombre_completo': user.nombre_completo,
             'rude': inscripcion.codigo_ru if (inscripcion and inscripcion.codigo_ru) else f"RUDE-{est.id:06d}",
-            'email': user.email,
         },
         'colegio': {
             'nombre': colegio.nombre if colegio else 'Colegio Nacional Simón Bolívar',
-            'ciudad': colegio.ciudad if colegio else 'La Paz',
         },
         'curso': {
             'nombre': curso.nombre if curso else '6to de Secundaria "A"',
-            'grado': curso.grado if curso else '6to de Secundaria',
-            'paralelo': curso.paralelo if curso else 'A',
             'anio_lectivo': curso.anio_lectivo if curso else 2026,
         },
         'materias': materias_data,
         'resumen': {
             'promedio_general': promedio_general,
-            'total_pendientes': total_pendientes_global,
             'total_materias': len(materias_data),
-            'estado_general': 'Aprobado' if (promedio_general and promedio_general >= 51) else ('En Desarrollo' if promedio_general else 'En Curso')
         }
     })
 
