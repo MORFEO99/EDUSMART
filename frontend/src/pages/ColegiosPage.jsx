@@ -7,7 +7,6 @@ import {
 import { Loading, EmptyState, Modal } from '../components';
 import apiFetch, { commonAPI, espaciosAPI } from '../api';
 import PanelInvitacion from '../components/PanelInvitacion';
-import ListaExcelDocente from './ListaExcelDocente';
 import EspacioDetallePage from './EspacioDetallePage';
 
 function getTeamsSubjectBadge(materia) {
@@ -514,11 +513,6 @@ export default function ColegiosPage({ user, onNavigate }) {
 
   useEffect(() => { loadColegios(); }, []);
 
-  const TABS = [
-    { id: 'colegios', label: 'Mis Colegios y Materias (Teams)', icon: BookOpen },
-    { id: 'reportes', label: 'Lista de Estudiantes y Reportes', icon: FileSpreadsheet },
-  ];
-
   // Buscar colegio original completo para abrir CursosPanel
   const openCursosOf = (colegioId, nombreFallback) => {
     const found = colegios.find(c => c.id === colegioId) || { id: colegioId, nombre: nombreFallback };
@@ -536,42 +530,18 @@ export default function ColegiosPage({ user, onNavigate }) {
           <h2 style={{ fontSize: 17, fontWeight: 800, color: '#0F172A', margin: 0 }}>
             Mis Colegios y Cursos
           </h2>
-          <div style={{ display: 'inline-flex', background: '#F1F5F9', borderRadius: 8, padding: 3, gap: 2 }}>
-            {TABS.map(tab => {
-              const Icon = tab.icon;
-              const active = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  id={`tab-${tab.id}`}
-                  onClick={() => setActiveTab(tab.id)}
-                  style={{
-                    padding: '6px 12px', borderRadius: 6, border: 'none', fontSize: 12,
-                    fontWeight: active ? 700 : 500, cursor: 'pointer',
-                    background: active ? '#FFFFFF' : 'transparent',
-                    color: active ? '#1E3A8A' : '#64748B',
-                    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                    display: 'inline-flex', alignItems: 'center', gap: 6
-                  }}
-                >
-                  <Icon size={13} />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          <span style={{ fontSize: 12, color: '#64748B' }}>
+            Gestiona contenidos, temas avanzados y tareas por colegio y materia
+          </span>
         </div>
 
-        {activeTab === 'colegios' && (
-          <button className="btn btn-primary btn-sm" onClick={() => setShowAddModal(true)} style={{ background: '#1E3A8A', height: 32 }}>
-            <Plus size={14} /> Añadir colegio
-          </button>
-        )}
+        <button className="btn btn-primary btn-sm" onClick={() => setShowAddModal(true)} style={{ background: '#1E3A8A', height: 32 }}>
+          <Plus size={14} /> Añadir colegio
+        </button>
       </div>
 
-      {/* ══ TAB 1: VISTA ESTILO MICROSOFT TEAMS (PANEL IZQUIERDO COLEGIOS/MATERIAS + PANEL DERECHO ESPACIO) ══ */}
-      {activeTab === 'colegios' && (
-        loading ? (
+      {/* ══ VISTA ESTILO MICROSOFT TEAMS (PANEL IZQUIERDO COLEGIOS/MATERIAS + PANEL DERECHO ESPACIO) ══ */}
+      {loading ? (
           <div className="page-container"><Loading text="Cargando tus colegios y materias..." /></div>
         ) : estructura.length === 0 && colegios.length === 0 ? (
           <div className="page-container">
@@ -723,29 +693,7 @@ export default function ColegiosPage({ user, onNavigate }) {
               )}
             </div>
           </div>
-        )
-      )}
-
-      {/* ══ TAB 2: Lista de Estudiantes y Reportes ══ */}
-      {activeTab === 'reportes' && (
-        <div className="page-container">
-          <div style={{
-            padding: '12px 16px', marginBottom: 16,
-            background: 'linear-gradient(135deg, #EFF6FF 0%, #F0F4FF 100%)',
-            borderRadius: 10, border: '1px solid #BFDBFE',
-            display: 'flex', alignItems: 'center', gap: 10, fontSize: 13
-          }}>
-            <FileSpreadsheet size={20} color="#1E3A8A" />
-            <div>
-              <div style={{ fontWeight: 700, color: '#1E3A8A' }}>Lista de Estudiantes por Colegio, Curso y Materia</div>
-              <div style={{ color: '#475569', fontSize: 12 }}>
-                Selecciona el colegio, luego el curso y la materia para ver las calificaciones y enviar reportes individuales o grupales.
-              </div>
-            </div>
-          </div>
-          <ListaExcelDocente onNavigate={onNavigate} />
-        </div>
-      )}
+        )}
 
       {/* Modal: Agregar colegio */}
       <Modal

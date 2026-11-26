@@ -102,7 +102,10 @@ export const avisosAPI = {
 
 export const recursosAPI = {
   list: (espacioId) => apiFetch(`/api/espacios/${espacioId}/recursos/`),
-  create: (espacioId, data) => apiFetch(`/api/espacios/${espacioId}/recursos/`, { method: 'POST', body: JSON.stringify(data) }),
+  create: (espacioId, data) => apiFetch(`/api/espacios/${espacioId}/recursos/`, {
+    method: 'POST',
+    body: data instanceof FormData ? data : JSON.stringify(data)
+  }),
   delete: (id) => apiFetch(`/api/recursos/${id}/`, { method: 'DELETE' }),
 };
 
@@ -218,7 +221,10 @@ export const topicTrackerAPI = {
   temas: (materiaId) => apiFetch(`/api/v2/materias/${materiaId}/temas/`),
   // Create a new topic in a materia
   crearTema: (materiaId, data) =>
-    apiFetch(`/api/v2/materias/${materiaId}/temas/`, { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch(`/api/v2/materias/${materiaId}/temas/`, {
+      method: 'POST',
+      body: data instanceof FormData ? data : JSON.stringify(data)
+    }),
   // Update topic (state toggle, edit fields)
   actualizarTema: (materiaId, temaId, data) =>
     apiFetch(`/api/v2/materias/${materiaId}/temas/${temaId}/`, { method: 'PATCH', body: JSON.stringify(data) }),

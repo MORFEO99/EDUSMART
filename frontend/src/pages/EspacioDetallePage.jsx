@@ -300,8 +300,10 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
   const [reportStudent, setReportStudent] = useState(null);
   const [showAddTema, setShowAddTema] = useState(false);
   const [formTema, setFormTema] = useState({ titulo: '', unidad: '', descripcion: '', estado: 'COMPLETADO' });
+  const [archivoTema, setArchivoTema] = useState(null);
   const [showAddRecurso, setShowAddRecurso] = useState(false);
-  const [formRecurso, setFormRecurso] = useState({ titulo: '', descripcion: '', enlace_url: '', tipo: 'ENLACE' });
+  const [formRecurso, setFormRecurso] = useState({ titulo: '', descripcion: '', enlace_url: '', tipo: 'PDF', terminado: true });
+  const [archivoRecurso, setArchivoRecurso] = useState(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -1029,13 +1031,25 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
 
       {/* Teacher: Agregar Tema Avanzado Modal */}
       {showAddTema && (
-        <Modal open={true} onClose={() => setShowAddTema(false)} title="Registrar Tema Avanzado">
+        <Modal open={true} onClose={() => setShowAddTema(false)} title="Registrar Tema y Generar Evaluación IA">
           <form onSubmit={async (e) => {
             e.preventDefault();
             if (!formTema.titulo.trim() || !espacio?.materia_id) return;
-            await topicTrackerAPI.crearTema(espacio.materia_id, formTema);
+            let payload = { ...formTema, auto_generar_ia: formTema.estado === 'COMPLETADO' };
+            if (archivoTema) {
+              const fd = new FormData();
+              fd.append('titulo', formTema.titulo);
+              fd.append('unidad', formTema.unidad);
+              fd.append('descripcion', formTema.descripcion);
+              fd.append('estado', formTema.estado);
+              fd.append('auto_generar_ia', formTema.estado === 'COMPLETADO' ? 'true' : 'false');
+              fd.append('archivo', archivoTema);
+              payload = fd;
+            }
+            await topicTrackerAPI.crearTema(espacio.materia_id, payload);
             setShowAddTema(false);
             setFormTema({ titulo: '', unidad: '', descripcion: '', estado: 'COMPLETADO' });
+            setArchivoTema(null);
             loadData();
           }}>
             <div className="form-group">
@@ -1047,13 +1061,17 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
               <input className="form-control" placeholder="Ej: Leyes de Newton y Fricción" value={formTema.titulo} onChange={e => setFormTema(p => ({ ...p, titulo: e.target.value }))} required />
             </div>
             <div className="form-group">
+              <label className="form-label">Documento del Tema (Word o PDF)</label>
+              <input type="file" accept=".pdf,.doc,.docx,.txt" className="form-control" onChange={e => setArchivoTema(e.target.files?.[0] || null)} style={{ padding: '6px 10px', fontSize: 12 }} />
+            </div>
+            <div className="form-group">
               <label className="form-label">Descripción / Resumen</label>
               <textarea className="form-control" rows={3} placeholder="Contenidos abordados en clase..." value={formTema.descripcion} onChange={e => setFormTema(p => ({ ...p, descripcion: e.target.value }))} />
             </div>
             <div className="form-group">
               <label className="form-label">Estado</label>
               <select className="form-control" value={formTema.estado} onChange={e => setFormTema(p => ({ ...p, estado: e.target.value }))}>
-                <option value="COMPLETADO">Tema Avanzado (Completado)</option>
+                <option value="COMPLETADO">Terminado (Generar Evaluación IA automáticamente)</option>
                 <option value="EN_PROGRESO">En Progreso</option>
                 <option value="PENDIENTE">Pendiente</option>
               </select>
@@ -1068,27 +1086,56 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
 
       {/* Teacher: Subir Contenido / Material Modal */}
       {showAddRecurso && (
-        <Modal open={true} onClose={() => setShowAddRecurso(false)} title="Subir Contenido / Material de Apoyo">
+        <Modal open={true} onClose={() => setShowAddRecurso(false)} title="Subir Contenido (Word / PDF) y Generar Evaluación IA">
           <form onSubmit={async (e) => {
             e.preventDefault();
             if (!formRecurso.titulo.trim()) return;
-            await recursosAPI.create(espacioId, formRecurso);
+            let payload = formRecurso;
+            if (archivoRecurso) {
+              const fd = new FormData();
+              fd.append('titulo', formRecurso.titulo);
+              fd.append('descripcion', formRecurso.descripcion);
+              fd.append('enlace_url', formRecurso.enlace_url);
+              fd.append('tipo', formRecurso.tipo);
+              fd.append('terminado', formRecurso.terminado ? 'true' : 'false');
+              fd.append('archivo', archivoRecurso);
+              payload = fd;
+            }
+            await recursosAPI.create(espacioId, payload);
             setShowAddRecurso(false);
-            setFormRecurso({ titulo: '', descripcion: '', enlace_url: '', tipo: 'ENLACE' });
+            setFormRecurso({ titulo: '', descripcion: '', enlace_url: '', tipo: 'PDF', terminado: true });
+            setArchivoRecurso(null);
             loadData();
           }}>
             <div className="form-group">
               <label className="form-label">Título del Contenido <span className="required">*</span></label>
-              <input className="form-control" placeholder="Ej: Guía de Ejercicios Resueltos PDF" value={formRecurso.titulo} onChange={e => setFormRecurso(p => ({ ...p, titulo: e.target.value }))} required />
+              <input className="form-control" placeholder="Ej: Guía de Ejercicios Resueltos" value={formRecurso.titulo} onChange={e => setFormRecurso(p => ({ ...p, titulo: e.target.value }))} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Subir Archivo Word (.docx) o PDF (.pdf)</label>
+              <input type="file" accept=".pdf,.doc,.docx,.txt" className="form-control" onChange={e => setArchivoRecurso(e.target.files?.[0] || null)} style={{ padding: '6px 10px', fontSize: 12 }} />
+              {archivoRecurso && (
+                <div style={{ fontSize: 11, color: '#059669', marginTop: 4, fontWeight: 600 }}>
+                  ✓ Documento seleccionado: {archivoRecurso.name}
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Descripción</label>
               <textarea className="form-control" rows={2} placeholder="Indicaciones o contenido de estudio..." value={formRecurso.descripcion} onChange={e => setFormRecurso(p => ({ ...p, descripcion: e.target.value }))} />
             </div>
             <div className="form-group">
-              <label className="form-label">Enlace o URL del Documento / Video</label>
+              <label className="form-label">O Enlace / URL externo (opcional)</label>
               <input className="form-control" placeholder="https://..." value={formRecurso.enlace_url} onChange={e => setFormRecurso(p => ({ ...p, enlace_url: e.target.value }))} />
             </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 600, color: '#1E3A8A', cursor: 'pointer', marginBottom: 12 }}>
+              <input
+                type="checkbox"
+                checked={formRecurso.terminado}
+                onChange={e => setFormRecurso(p => ({ ...p, terminado: e.target.checked }))}
+              />
+              Marcar como terminado y generar evaluación IA automáticamente para el estudiante
+            </label>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
               <button type="button" className="btn btn-secondary" onClick={() => setShowAddRecurso(false)}>Cancelar</button>
               <button type="submit" className="btn btn-primary" style={{ background: '#059669' }}>Publicar Contenido</button>

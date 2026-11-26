@@ -1887,25 +1887,51 @@ def api_temas_avance(request, materia_id):
             }
         })
 
-    titulo = request.data.get('titulo', '').strip()
+    titulo = (request.data.get('titulo') or '').strip()
     if not titulo:
         return Response({'error': 'El titulo del tema es obligatorio.'}, status=400)
     if TemaAvance.objects.filter(materia=materia, docente=docente, titulo__iexact=titulo).exists():
         return Response({'error': 'Ya existe un tema con ese titulo en esta materia.'}, status=400)
+
+    descripcion = (request.data.get('descripcion') or '').strip()
+    archivo = request.FILES.get('archivo')
+    texto_documento = ''
+    if archivo:
+        from .ai_practice_service import extract_text_from_uploaded_file
+        texto_documento = extract_text_from_uploaded_file(archivo)
+        if texto_documento and not descripcion:
+            descripcion = texto_documento[:450] + ('...' if len(texto_documento) > 450 else '')
+
+    estado_val = request.data.get('estado', 'COMPLETADO')
+    try:
+        orden_val = int(request.data.get('orden', 0) or 0)
+    except (ValueError, TypeError):
+        orden_val = 0
+
     t = TemaAvance.objects.create(
         materia=materia,
         docente=docente,
         titulo=titulo,
-        descripcion=request.data.get('descripcion', ''),
+        descripcion=descripcion,
         unidad=request.data.get('unidad', ''),
-        orden=request.data.get('orden', 0),
-        estado=request.data.get('estado', 'COMPLETADO'),
+        orden=orden_val,
+        estado=estado_val,
         fecha_inicio=request.data.get('fecha_inicio') or None,
         fecha_fin=request.data.get('fecha_fin') or None,
-        observaciones=request.data.get('observaciones', ''),
+        observaciones=texto_documento[:2000] if texto_documento else request.data.get('observaciones', ''),
     )
-    auto_ia = request.data.get('auto_generar_ia', True)
-    practica = _auto_generar_evaluacion_ia(t, docente) if auto_ia else None
+
+    # Si se subió documento, enriquecer temporalmente la descripción para que la IA genere preguntas del PDF/Word
+    if texto_documento:
+        desc_original = t.descripcion
+        t.descripcion = f"{desc_original}\n\nContenido del documento ({archivo.name}):\n{texto_documento}".strip()
+
+    auto_raw = request.data.get('auto_generar_ia', True)
+    auto_ia = str(auto_raw).lower() not in ('false', '0', 'no')
+    practica = _auto_generar_evaluacion_ia(t, docente) if (estado_val == 'COMPLETADO' or auto_ia) else None
+
+    if texto_documento:
+        t.descripcion = desc_original
 
     return Response({
         'id': t.id, 'titulo': t.titulo, 'estado': t.estado, 'unidad': t.unidad,

@@ -518,7 +518,8 @@ const NEXT_STATE = {
 };
 
 function AddTemaModal({ materiaId, onClose, onCreated }) {
-  const [form, setForm] = useState({ titulo: '', descripcion: '', unidad: '', orden: 0 });
+  const [form, setForm] = useState({ titulo: '', descripcion: '', unidad: '', orden: 0, estado: 'COMPLETADO' });
+  const [archivo, setArchivo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -527,7 +528,21 @@ function AddTemaModal({ materiaId, onClose, onCreated }) {
     if (!form.titulo.trim()) { setError('El Título es obligatorio.'); return; }
     setLoading(true); setError('');
     try {
-      const created = await topicTrackerAPI.crearTema(materiaId, form);
+      let payload = form;
+      if (archivo) {
+        const fd = new FormData();
+        fd.append('titulo', form.titulo);
+        fd.append('descripcion', form.descripcion);
+        fd.append('unidad', form.unidad);
+        fd.append('orden', form.orden);
+        fd.append('estado', form.estado);
+        fd.append('auto_generar_ia', form.estado === 'COMPLETADO' ? 'true' : 'false');
+        fd.append('archivo', archivo);
+        payload = fd;
+      } else {
+        payload = { ...form, auto_generar_ia: form.estado === 'COMPLETADO' };
+      }
+      const created = await topicTrackerAPI.crearTema(materiaId, payload);
       onCreated(created);
       onClose();
     } catch (err) {
@@ -547,7 +562,7 @@ function AddTemaModal({ materiaId, onClose, onCreated }) {
         }}>
           <Sparkles size={15} style={{ flexShrink: 0, marginTop: 2 }} />
           <span>
-            Al guardar este tema o contenido, la <strong>IA generará y publicará automáticamente</strong> un cuestionario de evaluación en el perfil de tus estudiantes.
+            Sube un documento <strong>Word (.docx) o PDF</strong> o describe tu tema. Al marcarlo como <strong>Terminado</strong>, la IA generará y publicará automáticamente el cuestionario en el perfil del estudiante.
           </span>
         </div>
         {error && <Alert type="error" onClose={() => setError('')}>{error}</Alert>}
@@ -571,16 +586,35 @@ function AddTemaModal({ materiaId, onClose, onCreated }) {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Orden / N° de tema</label>
-            <input
-              className="form-control" type="number" min="0"
-              value={form.orden}
-              onChange={e => setForm(p => ({ ...p, orden: parseInt(e.target.value) || 0 }))}
-            />
+            <label className="form-label">Estado del Tema</label>
+            <select
+              className="form-control"
+              value={form.estado}
+              onChange={e => setForm(p => ({ ...p, estado: e.target.value }))}
+            >
+              <option value="COMPLETADO">Terminado (Generar Evaluación IA)</option>
+              <option value="EN_PROGRESO">En Progreso</option>
+              <option value="PENDIENTE">Pendiente</option>
+            </select>
           </div>
         </div>
         <div className="form-group">
-          <label className="form-label">Descripción / Objetivos (opcional)</label>
+          <label className="form-label">Documento del Tema (Word o PDF)</label>
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx,.txt"
+            className="form-control"
+            onChange={e => setArchivo(e.target.files?.[0] || null)}
+            style={{ padding: '6px 10px', fontSize: 12 }}
+          />
+          {archivo && (
+            <div style={{ fontSize: 11, color: '#059669', marginTop: 4, fontWeight: 600 }}>
+              ✓ Archivo listo para analizar con IA: {archivo.name}
+            </div>
+          )}
+        </div>
+        <div className="form-group">
+          <label className="form-label">Descripción / Contenido adicional (opcional)</label>
           <textarea
             className="form-control" rows={3}
             placeholder="Describe qué abarca este tema, competencias esperadas..."
@@ -590,8 +624,8 @@ function AddTemaModal({ materiaId, onClose, onCreated }) {
         </div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
           <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            <Plus size={14} /> {loading ? 'Guardando...' : 'Agregar Tema'}
+          <button type="submit" className="btn btn-primary" disabled={loading} style={{ background: '#4338CA' }}>
+            <Sparkles size={14} /> {loading ? 'Generando...' : 'Guardar y Generar IA'}
           </button>
         </div>
       </form>

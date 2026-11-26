@@ -11,6 +11,49 @@ def get_openai_api_key():
     return getattr(settings, 'OPENAI_API_KEY', '') or os.environ.get('OPENAI_API_KEY', '')
 
 
+def extract_text_from_uploaded_file(uploaded_file, max_chars=5000):
+    """
+    Extrae texto limpio de un archivo Word (.docx) o PDF (.pdf) o texto plano
+    para alimentar el generador de cuestionarios con IA.
+    """
+    if not uploaded_file:
+        return ''
+    name = (getattr(uploaded_file, 'name', '') or '').lower()
+    extracted = []
+    try:
+        if hasattr(uploaded_file, 'seek'):
+            uploaded_file.seek(0)
+        if name.endswith('.pdf'):
+            from pypdf import PdfReader
+            reader = PdfReader(uploaded_file)
+            for page in reader.pages[:15]:
+                txt = page.extract_text() or ''
+                if txt.strip():
+                    extracted.append(txt.strip())
+        elif name.endswith('.docx'):
+            from docx import Document
+            doc = Document(uploaded_file)
+            for p in doc.paragraphs:
+                if p.text.strip():
+                    extracted.append(p.text.strip())
+            for table in doc.tables:
+                for row in table.rows:
+                    row_txt = ' | '.join(c.text.strip() for c in row.cells if c.text.strip())
+                    if row_txt:
+                        extracted.append(row_txt)
+        elif name.endswith('.txt') or name.endswith('.md'):
+            raw = uploaded_file.read()
+            if isinstance(raw, bytes):
+                raw = raw.decode('utf-8', errors='ignore')
+            extracted.append(raw)
+        if hasattr(uploaded_file, 'seek'):
+            uploaded_file.seek(0)
+    except Exception as e:
+        print(f"[Doc Extractor] Error leyendo '{name}': {e}")
+    full_text = '\n'.join(extracted).strip()
+    return full_text[:max_chars]
+
+
 def generate_exam_practice(materia_nombre, tema_titulo, tema_descripcion='', nivel_educativo='', cantidad=5, dificultad='INTERMEDIO'):
     """
     Genera un simulador de examen / batería de ejercicios didácticos para estudiantes

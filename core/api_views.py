@@ -1451,36 +1451,63 @@ def api_espacio_recursos(request, espacio_id):
         archivo_url = data.get('archivo_url') or ''
         enlace_url = data.get('enlace_url') or ''
         tamano = data.get('tamano') or '1.5 MB'
+        archivo = request.FILES.get('archivo')
 
         if not titulo:
             return Response({'error': 'El título del recurso es obligatorio.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        texto_documento = ''
+        if archivo:
+            from .ai_practice_service import extract_text_from_uploaded_file
+            texto_documento = extract_text_from_uploaded_file(archivo)
+            fname = (archivo.name or '').lower()
+            if fname.endswith('.docx') or fname.endswith('.doc'):
+                tipo = 'DOC'
+            elif fname.endswith('.pdf'):
+                tipo = 'PDF'
+            if hasattr(archivo, 'size') and archivo.size:
+                tamano = f"{max(1, round(archivo.size / 1024))} KB" if archivo.size < 1024 * 1024 else f"{round(archivo.size / (1024 * 1024), 1)} MB"
 
         recurso = RecursoEspacio.objects.create(
             espacio=espacio,
             docente=user.perfil_docente,
             titulo=titulo,
-            descripcion=descripcion,
+            descripcion=descripcion or (texto_documento[:300] + '...' if len(texto_documento) > 300 else texto_documento),
             tipo=tipo,
+            archivo=archivo,
             archivo_url=archivo_url,
             enlace_url=enlace_url,
             tamano=tamano
         )
 
-        # Generar y publicar automáticamente evaluación con IA para el contenido subido
+        # Generar y publicar automáticamente evaluación con IA si se marcó como terminado o auto_generar_ia
         practica_generada = None
-        if espacio.materia and data.get('auto_generar_ia', True):
+        terminado_raw = data.get('terminado', data.get('auto_generar_ia', True))
+        es_terminado = str(terminado_raw).lower() not in ('false', '0', 'no')
+        estado_tema = 'COMPLETADO' if es_terminado else (data.get('estado') or 'EN_PROGRESO')
+
+        if espacio.materia:
             from .api_v2 import _auto_generar_evaluacion_ia
-            tema_auto, _ = TemaAvance.objects.get_or_create(
+            desc_completa = f"{descripcion}\n\n{texto_documento}".strip() if texto_documento else (descripcion or f"Contenido de estudio: {titulo}")
+            tema_auto, created = TemaAvance.objects.get_or_create(
                 materia=espacio.materia,
                 docente=user.perfil_docente,
                 titulo=titulo,
                 defaults={
-                    'descripcion': descripcion or f"Contenido de estudio: {titulo}",
+                    'descripcion': desc_completa[:500],
                     'unidad': 'Contenido Subido',
-                    'estado': 'COMPLETADO'
+                    'estado': estado_tema
                 }
             )
-            practica_generada = _auto_generar_evaluacion_ia(tema_auto, user.perfil_docente, espacio=espacio)
+            if not created and estado_tema == 'COMPLETADO' and tema_auto.estado != 'COMPLETADO':
+                tema_auto.estado = 'COMPLETADO'
+                tema_auto.save(update_fields=['estado'])
+
+            if estado_tema == 'COMPLETADO':
+                desc_prev = tema_auto.descripcion
+                tema_auto.descripcion = desc_completa
+                practica_generada = _auto_generar_evaluacion_ia(tema_auto, user.perfil_docente, espacio=espacio)
+                tema_auto.descripcion = desc_prev
 
         res_data = RecursoEspacioSerializer(recurso).data
         res_data['practica_generada'] = bool(practica_generada)
