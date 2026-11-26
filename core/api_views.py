@@ -29,7 +29,8 @@ from .models import (
     Usuario, Docente, Estudiante, Espacio, MiembroEspacio,
     Tarea, Material, Entrega, VersionEntrega, Calificacion, Retroalimentacion,
     ProgresoAcademico, Notificacion, AvisoEspacio, RecursoEspacio,
-    ExtensionFechaTarea, PlantillaTarea, TareaVisualizacion
+    ExtensionFechaTarea, PlantillaTarea, TareaVisualizacion,
+    IntentoPracticaEstudiante
 )
 from .serializers import (
     UsuarioSerializer, DocenteSerializer, EstudianteSerializer,
@@ -2063,3 +2064,117 @@ def api_student_feedbacks(request):
             'archivo_url': c.entrega.archivo_url,
         })
     return Response(feedbacks)
+
+
+@api_view(['GET'])
+def api_student_calificaciones(request):
+    """
+    Retorna la tabla completa de calificaciones de todas las actividades
+    (tareas escolares y simuladores IA) del estudiante autenticado.
+    """
+    user = request.user
+    if not user.is_authenticated or user.rol != 'ESTUDIANTE' or not hasattr(user, 'perfil_estudiante'):
+        return Response({'error': 'Acceso exclusivo para estudiantes.'}, status=status.HTTP_403_FORBIDDEN)
+
+    estudiante = user.perfil_estudiante
+    now = timezone.now()
+    espacios_ids = estudiante.get_espacios_ids()
+
+    tareas = Tarea.objects.filter(
+        espacio_id__in=espacios_ids,
+        estado='PUBLICADA'
+    ).select_related('espacio', 'espacio__materia', 'espacio__curso', 'docente__usuario').order_by('espacio__materia__nombre', '-fecha_limite')
+
+    actividades = []
+
+    for t in tareas:
+        entrega = Entrega.objects.filter(tarea=t, estudiante=estudiante).first()
+        cal = getattr(entrega, 'calificacion', None) if entrega else None
+        retro = getattr(cal, 'retroalimentacion', None) if cal else None
+
+        if cal:
+            estado = 'CALIFICADO'
+            nota = float(cal.nota)
+        elif entrega:
+            estado = 'EN_REVISION'
+            nota = None
+        elif t.fecha_limite and t.fecha_limite < now:
+            estado = 'VENCIDO'
+            nota = None
+        else:
+            estado = 'PENDIENTE'
+            nota = None
+
+        materia_nombre = ''
+        if t.espacio and t.espacio.materia:
+            materia_nombre = t.espacio.materia.nombre
+        elif t.espacio:
+            materia_nombre = t.espacio.nombre
+        else:
+            materia_nombre = 'General'
+
+        comentario = ''
+        if retro and retro.comentario:
+            comentario = retro.comentario
+        elif cal:
+            comentario = 'Actividad evaluada y calificada por el docente.'
+        elif entrega and entrega.observaciones:
+            comentario = f"Entrega del estudiante: {entrega.observaciones}"
+        elif estado == 'EN_REVISION':
+            comentario = 'Entrega recibida, en espera de revisión del profesor.'
+        elif estado == 'VENCIDO':
+            comentario = 'Fecha límite vencida sin entrega registrada.'
+        else:
+            comentario = 'Actividad asignada pendiente de entrega.'
+
+        actividades.append({
+            'id': f"tarea_{t.id}",
+            'tipo': 'Tarea Escolar',
+            'tarea_id': t.id,
+            'titulo': t.titulo,
+            'materia': materia_nombre,
+            'curso': t.espacio.curso.nombre if t.espacio and t.espacio.curso else '',
+            'docente': t.docente.usuario.get_full_name() if t.docente else 'Docente',
+            'docente_avatar': getattr(t.docente.usuario, 'avatar_url', '') if t.docente else '',
+            'estado': estado,
+            'nota': nota,
+            'puntaje_maximo': t.puntaje_maximo or 100,
+            'retroalimentacion': comentario,
+            'fecha_entrega': entrega.fecha_entrega.strftime('%d/%m/%Y %H:%M') if entrega and entrega.fecha_entrega else None,
+            'fecha_calificacion': cal.fecha_calificacion.strftime('%d/%m/%Y %H:%M') if cal and cal.fecha_calificacion else None,
+            'fecha_limite': t.fecha_limite.strftime('%d/%m/%Y %H:%M') if t.fecha_limite else None,
+            'archivo_nombre': entrega.archivo_nombre if entrega else None,
+            'archivo_url': entrega.archivo_url if entrega else None,
+        })
+
+    # Evaluaciones / Simuladores IA
+    intentos = IntentoPracticaEstudiante.objects.filter(
+        estudiante=estudiante
+    ).select_related('practica', 'practica__materia', 'practica__docente__usuario').order_by('-fecha_intento')
+
+    for it in intentos:
+        materia_nombre = it.practica.materia.nombre if it.practica.materia else 'General'
+        docente_nombre = it.practica.docente.usuario.get_full_name() if it.practica.docente else 'IA Pedagógica'
+        actividades.append({
+            'id': f"ia_{it.id}",
+            'tipo': 'Simulador IA',
+            'tarea_id': None,
+            'practica_id': it.practica.id,
+            'titulo': it.practica.titulo,
+            'materia': materia_nombre,
+            'curso': '',
+            'docente': f"{docente_nombre} (IA)",
+            'docente_avatar': '',
+            'estado': 'CALIFICADO',
+            'nota': float(it.puntaje_obtenido),
+            'puntaje_maximo': 100,
+            'retroalimentacion': it.retroalimentacion_ia or f"Aciertos: {it.respuestas_correctas} de {it.total_preguntas} preguntas.",
+            'fecha_entrega': it.fecha_intento.strftime('%d/%m/%Y %H:%M') if it.fecha_intento else None,
+            'fecha_calificacion': it.fecha_intento.strftime('%d/%m/%Y %H:%M') if it.fecha_intento else None,
+            'fecha_limite': None,
+            'archivo_nombre': None,
+            'archivo_url': None,
+        })
+
+    return Response(actividades)
+

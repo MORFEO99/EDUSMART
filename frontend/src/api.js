@@ -138,6 +138,7 @@ export const studentAPI = {
   resubmitTask: (id, data) => apiFetch(`/api/tareas/${id}/reentregar/`, { method: 'POST', body: JSON.stringify(data) }),
   progress: () => apiFetch('/api/progreso/'),
   feedbacks: () => apiFetch('/api/student/feedbacks/'),
+  calificaciones: () => apiFetch('/api/student/calificaciones/'),
 };
 
 export const teacherAPI = {
