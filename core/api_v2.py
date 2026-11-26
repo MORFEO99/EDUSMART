@@ -1517,11 +1517,9 @@ def api_lista_excel_docente(request):
             seen_cursos.add(c_key)
             materias_data = []
             materias = Materia.objects.filter(curso=curso, docente=docente)
-            if not materias.exists():
-                materias = Materia.objects.filter(curso=curso)
 
             if not materias.exists():
-                espacios = Espacio.objects.filter(curso=curso)
+                espacios = Espacio.objects.filter(curso=curso, docente=docente)
                 for espacio in espacios:
                     tareas = list(Tarea.objects.filter(espacio=espacio, estado='PUBLICADA'))
                     estudiantes_list = _build_student_list_excel(espacio, tareas)
@@ -1535,9 +1533,9 @@ def api_lista_excel_docente(request):
                     })
             else:
                 for materia in materias:
-                    espacio = Espacio.objects.filter(materia=materia).first()
+                    espacio = Espacio.objects.filter(materia=materia, docente=docente).first() or Espacio.objects.filter(materia=materia).first()
                     if not espacio:
-                        espacio = Espacio.objects.filter(curso=curso).first()
+                        espacio = Espacio.objects.filter(curso=curso, docente=docente).first()
                     tareas = list(Tarea.objects.filter(espacio=espacio, estado='PUBLICADA')) if espacio else []
                     estudiantes_list = _build_student_list_excel(espacio, tareas) if espacio else []
                     materias_data.append({
