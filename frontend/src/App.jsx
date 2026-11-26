@@ -167,7 +167,7 @@ export default function App() {
           return <StudentAcademicProgressView defaultTab={extraData?.tab || 'notas_retro'} onNavigate={handleNavigate} />;
         case 'espacios':
         case 'mis-espacios':
-          return <StudentEspaciosView onNavigate={handleNavigate} />;
+          return <StudentEspaciosView user={user} onNavigate={handleNavigate} />;
         case 'espacio_detail':
         case 'espacio-detalle':
           return <EspacioDetallePage user={user} espacioId={extraData?.espacioId} defaultTab={extraData?.defaultTab} onBack={() => handleNavigate('mis-espacios')} />;

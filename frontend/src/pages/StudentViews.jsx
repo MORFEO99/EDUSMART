@@ -3,6 +3,20 @@ import { Award, MessageSquare, BookOpen, Clock, Calendar, CheckCircle, ChevronRi
 import { studentAPI, dashboardAPI, progresoAPI } from '../api';
 import { Loading, EmptyState, Modal, ProgressBar } from '../components';
 import { formatDate, formatDateTime, getNoteColor } from '../utils';
+import EspacioDetallePage from './EspacioDetallePage';
+
+function getTeamsSubjectBadge(materia) {
+  const m = (materia || '').toLowerCase();
+  if (m.includes('matemática') || m.includes('algebra') || m.includes('calculo')) return { initials: 'MAT', bg: '#D83B01' };
+  if (m.includes('física') || m.includes('fisica')) return { initials: 'FIS', bg: '#4F46E5' };
+  if (m.includes('química') || m.includes('quimica')) return { initials: 'QMC', bg: '#059669' };
+  if (m.includes('biología') || m.includes('biologia')) return { initials: 'BIO', bg: '#0D9488' };
+  if (m.includes('lenguaje') || m.includes('literatura')) return { initials: 'LIT', bg: '#7C3AED' };
+  if (m.includes('social') || m.includes('historia')) return { initials: 'SOC', bg: '#D97706' };
+  const words = (materia || 'M').trim().split(/\s+/);
+  const initials = words.length > 1 ? (words[0][0] + words[1][0]).toUpperCase() : words[0].slice(0, 3).toUpperCase();
+  return { initials, bg: '#1E3A8A' };
+}
 
 // ============================================================
 // STUDENT GRADES VIEW (LIBRO DE CALIFICACIONES DEL ESTUDIANTE)
@@ -233,128 +247,155 @@ export function StudentFeedbackView({ onNavigate }) {
 }
 
 // ============================================================
-// STUDENT ESPACIOS VIEW (CURSOS Y MATERIAS)
+// STUDENT ESPACIOS VIEW (VISTA ESTILO MICROSOFT TEAMS POR MATERIAS)
 // ============================================================
-export function StudentEspaciosView({ onNavigate }) {
+export function StudentEspaciosView({ user, onNavigate }) {
   const [espacios, setEspacios] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     dashboardAPI.student()
-      .then(res => setEspacios(res.mis_espacios || []))
+      .then(res => {
+        const list = res.mis_espacios || [];
+        setEspacios(list);
+        if (list.length > 0 && !selectedId) {
+          setSelectedId(list[0].id);
+        }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
-  return (
-    <div className="page-container">
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#242424', marginBottom: 4 }}>
-          Mis Cursos y Materias
-        </h2>
-        <p style={{ fontSize: '12.5px', color: '#616161' }}>
-          Listado de los colegios, cursos y materias en las que estás inscrito.
-        </p>
+  if (loading) {
+    return (
+      <div className="page-container">
+        <Loading text="Cargando tus materias..." />
       </div>
+    );
+  }
 
-      {loading ? (
-        <Loading text="Cargando tus espacios académicos..." />
-      ) : espacios.length === 0 ? (
+  if (espacios.length === 0) {
+    return (
+      <div className="page-container">
         <EmptyState
           icon={BookOpen}
           title="Sin espacios académicos"
           description="No estás inscrito en ningún curso o materia actualmente."
         />
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-          {espacios.map(esp => (
-            <div
-              key={esp.id}
-              style={{
-                background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 10,
-                padding: 0, transition: 'all 0.15s', display: 'flex', flexDirection: 'column',
-                overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = '#1E3A8A'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(30,58,138,0.12)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)' }}
-            >
-              {/* Card header accent */}
-              <div style={{ height: 4, background: 'linear-gradient(90deg, #1E3A8A, #4F46E5, #7C3AED)' }} />
+      </div>
+    );
+  }
 
-              <div style={{ padding: 16, flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                  <span style={{
-                    fontSize: 10, fontWeight: 800, color: '#1E3A8A', background: '#EFF6FF',
-                    padding: '4px 8px', borderRadius: 4, letterSpacing: '0.03em'
-                  }}>
-                    {esp.codigo}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    📋 {esp.total_tareas} tareas
-                  </span>
+  return (
+    <div style={{
+      display: 'flex',
+      minHeight: 'calc(100vh - 64px)',
+      background: '#F8FAFC',
+      flexWrap: 'wrap'
+    }}>
+      {/* Panel izquierdo estilo Microsoft Teams: Lista de Materias / Equipos */}
+      <div style={{
+        width: 270,
+        flexShrink: 0,
+        background: '#FFFFFF',
+        borderRight: '1px solid #E2E8F0',
+        display: 'flex',
+        flexDirection: 'column',
+        flexGrow: 0
+      }}>
+        <div style={{
+          padding: '16px 16px 12px',
+          borderBottom: '1px solid #F1F5F9'
+        }}>
+          <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', margin: 0 }}>
+            Mis Materias
+          </h2>
+          <p style={{ fontSize: 11.5, color: '#64748B', margin: '3px 0 0' }}>
+            Selecciona una materia para ver contenidos, temas y actividades
+          </p>
+        </div>
+
+        <div style={{ padding: '8px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {espacios.map(esp => {
+            const isSelected = esp.id === selectedId;
+            const badge = getTeamsSubjectBadge(esp.materia_nombre || esp.nombre);
+            return (
+              <button
+                key={esp.id}
+                onClick={() => setSelectedId(esp.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 10px',
+                  borderRadius: 8,
+                  border: 'none',
+                  borderLeft: isSelected ? '3px solid #1E3A8A' : '3px solid transparent',
+                  background: isSelected ? '#EFF6FF' : 'transparent',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  width: '100%',
+                  transition: 'all 0.12s ease'
+                }}
+                onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#F8FAFC'; }}
+                onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 6,
+                  background: badge.bg,
+                  color: '#FFFFFF',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  {badge.initials}
                 </div>
-
-                <h4 style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', marginBottom: 10, lineHeight: 1.3 }}>
-                  {esp.nombre}
-                </h4>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-                  {(esp.colegio_nombre || esp.curso_nombre) && (
-                    <div style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Building size={13} color="#64748B" />
-                      <span>
-                        <span style={{ fontWeight: 600 }}>{esp.colegio_nombre}</span>
-                        {esp.colegio_nombre && esp.curso_nombre ? ' · ' : ''}
-                        <span>{esp.curso_nombre}</span>
-                      </span>
-                    </div>
-                  )}
-
-                  {esp.materia_nombre && (
-                    <div style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <BookOpen size={13} color="#64748B" />
-                      <span>Materia: <span style={{ fontWeight: 600 }}>{esp.materia_nombre}</span></span>
-                    </div>
-                  )}
-
-                  <div style={{ fontSize: 12, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <User size={13} color="#64748B" />
-                    <span>Docente: {esp.docente_nombre}</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{
+                    fontSize: 13,
+                    fontWeight: isSelected ? 700 : 600,
+                    color: isSelected ? '#1E3A8A' : '#1E293B',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {esp.materia_nombre || esp.nombre}
+                  </div>
+                  <div style={{
+                    fontSize: 11,
+                    color: '#64748B',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {esp.docente_nombre}
                   </div>
                 </div>
-
-                {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: 8, marginTop: 14, paddingTop: 12, borderTop: '1px solid #F1F5F9' }}>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onNavigate('espacio_detail', { espacioId: esp.id, defaultTab: 'contenidos' }); }}
-                    style={{
-                      flex: 1, padding: '7px 0', background: '#EFF6FF', color: '#1E3A8A',
-                      border: '1px solid #BFDBFE', borderRadius: 6, cursor: 'pointer',
-                      fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5
-                    }}
-                  >
-                    <BookOpen size={12} /> Ver Contenidos
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onNavigate('espacio_detail', { espacioId: esp.id, defaultTab: 'retos' }); }}
-                    style={{
-                      flex: 1, padding: '7px 0',
-                      background: 'linear-gradient(135deg, #EEF2FF, #F5F3FF)',
-                      color: '#4F46E5',
-                      border: '1px solid #C7D2FE', borderRadius: 6, cursor: 'pointer',
-                      fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5
-                    }}
-                    onMouseOver={e => e.currentTarget.style.background = '#E0E7FF'}
-                    onMouseOut={e => e.currentTarget.style.background = 'linear-gradient(135deg, #EEF2FF, #F5F3FF)'}
-                  >
-                    <Target size={12} /> Retos IA
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+              </button>
+            );
+          })}
         </div>
-      )}
+      </div>
+
+      {/* Área principal derecha estilo Teams: Espacio de la Materia seleccionada */}
+      <div style={{ flex: 1, minWidth: 320, background: '#F8FAFC' }}>
+        {selectedId && (
+          <EspacioDetallePage
+            key={selectedId}
+            espacioId={selectedId}
+            user={user}
+            defaultTab="contenidos"
+            embedded={true}
+            onBack={() => {}}
+          />
+        )}
+      </div>
     </div>
   );
 }

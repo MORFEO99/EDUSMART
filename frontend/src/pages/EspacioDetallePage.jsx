@@ -287,7 +287,7 @@ function getEstadoBadge(estado, esta_vencida) {
 // ─────────────────────────────────────────────────────────────
 // Main page
 // ─────────────────────────────────────────────────────────────
-export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab }) {
+export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab, embedded = false }) {
   const isEstudiante = user?.rol === 'ESTUDIANTE';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -296,7 +296,7 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
   const [vistaExpandida, setVistaExpandida] = useState({});
   const [gradingEntrega, setGradingEntrega] = useState(null);
   const [showCrearTarea, setShowCrearTarea] = useState(false);
-  const [activeTab, setActiveTab] = useState(defaultTab || 'tareas');
+  const [activeTab, setActiveTab] = useState(defaultTab || (isEstudiante ? 'contenidos' : 'tareas'));
   const [submitTarea, setSubmitTarea] = useState(null);  // tarea to submit for student
   const [reportStudent, setReportStudent] = useState(null);
 
@@ -372,12 +372,14 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
     (espacio?.nombre && espacio.nombre.toLowerCase().includes('numér'));
 
   return (
-    <div className="page-container">
+    <div className={embedded ? '' : 'page-container'} style={embedded ? { padding: '16px 20px' } : undefined}>
       {/* Back + Breadcrumb */}
-      <div style={{ marginBottom: 20 }}>
-        <button className="btn btn-outline btn-sm" onClick={onBack} style={{ marginBottom: 14 }}>
-          <ArrowLeft size={14} /> {isEstudiante ? 'Volver a mis materias' : 'Volver a mis colegios'}
-        </button>
+      <div style={{ marginBottom: 16 }}>
+        {!embedded && (
+          <button className="btn btn-outline btn-sm" onClick={onBack} style={{ marginBottom: 14 }}>
+            <ArrowLeft size={14} /> {isEstudiante ? 'Volver a mis materias' : 'Volver a mis colegios'}
+          </button>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748B', marginBottom: 10 }}>
           <span style={{ fontWeight: 600 }}>{espacio?.colegio || 'Institución'}</span>
