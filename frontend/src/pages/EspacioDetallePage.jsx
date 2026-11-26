@@ -352,10 +352,12 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
   if (loading) return <div className="page-container"><Loading text="Cargando espacio académico..." /></div>;
 
   if (error) return (
-    <div className="page-container">
-      <button className="btn btn-outline btn-sm" onClick={onBack} style={{ marginBottom: 16 }}>
-        <ArrowLeft size={14} /> Volver
-      </button>
+    <div className={embedded ? '' : 'page-container'} style={embedded ? { padding: '16px 20px' } : undefined}>
+      {!embedded && (
+        <button className="btn btn-outline btn-sm" onClick={onBack} style={{ marginBottom: 16 }}>
+          <ArrowLeft size={14} /> Volver
+        </button>
+      )}
       <div style={{ padding: 20, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, color: '#DC2626' }}>
         <AlertCircle size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} /> {error}
       </div>

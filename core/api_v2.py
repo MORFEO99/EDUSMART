@@ -877,11 +877,13 @@ def api_tareas_espacio(request, espacio_id):
 
                 if hasattr(entrega, 'calificacion'):
 
+                    retro_obj = getattr(entrega.calificacion, 'retroalimentacion', None)
+
                     cal = {
 
                         'nota': entrega.calificacion.nota,
 
-                        'retroalimentacion': entrega.calificacion.retroalimentacion,
+                        'retroalimentacion': retro_obj.comentario if retro_obj else '',
 
                     }
 
