@@ -10,7 +10,6 @@ import { getNoteColor } from '../utils';
 import { GradeSubmissionModal } from './TeacherViews';
 import { SubmitTaskForm } from './MyTasks';
 import SendReportModal from '../components/SendReportModal';
-import ChallengeBoard from '../components/ChallengeBoard';
 import MuroMateria from '../components/MuroMateria';
 
 import apiFetch from '../api';
@@ -382,11 +381,11 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748B', marginBottom: 10 }}>
-          <span style={{ fontWeight: 600 }}>{espacio?.colegio || 'Institución'}</span>
+          <span style={{ fontWeight: 600 }}>{espacio?.colegio_nombre || espacio?.colegio || 'Institución'}</span>
           <ChevronRight size={12} />
-          <span style={{ fontWeight: 600 }}>{espacio?.curso || 'Curso'}</span>
+          <span style={{ fontWeight: 600 }}>{espacio?.curso_nombre || espacio?.curso || 'Curso'}</span>
           <ChevronRight size={12} />
-          <span style={{ color: '#1E3A8A', fontWeight: 700 }}>{espacio?.materia || espacio?.nombre || 'Espacio'}</span>
+          <span style={{ color: '#1E3A8A', fontWeight: 700 }}>{espacio?.materia_nombre || espacio?.materia || espacio?.nombre || 'Espacio'}</span>
         </div>
 
         {/* Header card */}
@@ -467,14 +466,6 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
             <Users size={13} /> Estudiantes ({estudiantes.length})
           </button>
         )}
-        <button
-          className={`teams-tab ${activeTab === 'retos' ? 'active' : ''}`}
-          onClick={() => setActiveTab('retos')}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-        >
-          <Target size={13} color={activeTab === 'retos' ? '#4F46E5' : '#64748B'} />
-          <span>Retos con IA</span>
-        </button>
         <button
           className={`teams-tab ${activeTab === 'muro' ? 'active' : ''}`}
           onClick={() => setActiveTab('muro')}
@@ -935,17 +926,6 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
             </div>
           )}
         </div>
-      )}
-
-      {/* ── Retos de Aprendizaje con IA para este Espacio/Materia ── */}
-      {activeTab === 'retos' && (
-        <ChallengeBoard
-          userRole={user?.rol}
-          espacioId={espacioId}
-          espacioNombre={espacio?.materia || espacio?.nombre}
-          cursoNombre={espacio?.curso}
-          tareas={tareas}
-        />
       )}
 
       {/* ── Muro de Avisos y Consultas por Materia (Alternativa a WhatsApp) ── */}
