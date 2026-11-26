@@ -56,6 +56,7 @@ urlpatterns = [
     path('api/progreso/', api_views.api_progreso_academico, name='api_progreso'),
     path('api/student/feedbacks/', api_views.api_student_feedbacks, name='api_student_feedbacks'),
     path('api/student/calificaciones/', api_views.api_student_calificaciones, name='api_student_calificaciones'),
+    path('api/student/boletin/', api_views.api_student_boletin, name='api_student_boletin'),
 
     # 7. Actividad y Notificaciones
     path('api/actividad/', api_views.api_actividad_academica, name='api_actividad'),

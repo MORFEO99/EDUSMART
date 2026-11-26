@@ -30,7 +30,7 @@ from .models import (
     Tarea, Material, Entrega, VersionEntrega, Calificacion, Retroalimentacion,
     ProgresoAcademico, Notificacion, AvisoEspacio, RecursoEspacio,
     ExtensionFechaTarea, PlantillaTarea, TareaVisualizacion,
-    IntentoPracticaEstudiante
+    IntentoPracticaEstudiante, EstudianteCurso, PracticaTema
 )
 from .serializers import (
     UsuarioSerializer, DocenteSerializer, EstudianteSerializer,
@@ -2177,4 +2177,186 @@ def api_student_calificaciones(request):
         })
 
     return Response(actividades)
+
+
+@api_view(['GET'])
+def api_student_boletin(request):
+    """
+    Retorna el boletín oficial de calificaciones del estudiante organizado por materias,
+    con el desglose de tareas teóricas, prácticas/talleres, evaluaciones (simuladores IA),
+    tareas pendientes, promedio de cada materia y promedio general acumulado.
+    """
+    user = request.user
+    if not user.is_authenticated or user.rol != 'ESTUDIANTE' or not hasattr(user, 'perfil_estudiante'):
+        return Response({'error': 'Acceso exclusivo para estudiantes.'}, status=status.HTTP_403_FORBIDDEN)
+
+    est = user.perfil_estudiante
+    now = timezone.now()
+
+    inscripcion = EstudianteCurso.objects.filter(estudiante=est, estado='ACTIVO').select_related('curso', 'curso__colegio').first()
+    curso = inscripcion.curso if inscripcion else None
+    colegio = curso.colegio if curso else None
+
+    espacios = Espacio.objects.filter(id__in=est.get_espacios_ids()).select_related('materia', 'docente__usuario').order_by('materia__nombre')
+
+    materias_data = []
+    todas_las_notas = []
+    total_pendientes_global = 0
+
+    for esp in espacios:
+        mat = esp.materia
+        mat_nombre = mat.nombre if mat else esp.nombre
+        doc_nombre = esp.docente.usuario.get_full_name() if esp.docente else 'Docente'
+        doc_avatar = getattr(esp.docente.usuario, 'avatar_url', '') if esp.docente else ''
+
+        tareas_qs = Tarea.objects.filter(espacio=esp, estado='PUBLICADA').order_by('fecha_limite')
+
+        tareas_list = []
+        practicas_list = []
+        pendientes_list = []
+        notas_materia = []
+
+        for t in tareas_qs:
+            e = Entrega.objects.filter(tarea=t, estudiante=est).first()
+            cal = getattr(e, 'calificacion', None) if e else None
+            retro = getattr(cal, 'retroalimentacion', None) if cal else None
+
+            # Clasificar si es Práctica/Taller o Tarea teórica/regular
+            is_practica = any(k in t.titulo.lower() for k in ['práctica', 'practica', 'taller', 'laboratorio', 'guía', 'guia'])
+
+            if cal:
+                estado = 'CALIFICADO'
+                nota = float(cal.nota)
+                notas_materia.append(nota)
+                todas_las_notas.append(nota)
+            elif e:
+                estado = 'EN_REVISION'
+                nota = None
+            elif t.fecha_limite and t.fecha_limite < now:
+                estado = 'VENCIDA'
+                nota = None
+            else:
+                estado = 'PENDIENTE'
+                nota = None
+
+            item = {
+                'id': t.id,
+                'titulo': t.titulo,
+                'tipo_categoria': 'Práctica' if is_practica else 'Tarea',
+                'estado': estado,
+                'nota': nota,
+                'puntaje_maximo': t.puntaje_maximo or 100,
+                'retroalimentacion': retro.comentario if retro and retro.comentario else (e.observaciones if e else ''),
+                'fecha_limite': t.fecha_limite.strftime('%d/%m/%Y %H:%M') if t.fecha_limite else '',
+                'fecha_entrega': e.fecha_entrega.strftime('%d/%m/%Y %H:%M') if e and e.fecha_entrega else '',
+                'archivo_nombre': e.archivo_nombre if e else '',
+                'archivo_url': e.archivo_url if e else ''
+            }
+
+            if cal or e:
+                if is_practica:
+                    practicas_list.append(item)
+                else:
+                    tareas_list.append(item)
+            else:
+                pendientes_list.append(item)
+                total_pendientes_global += 1
+                if is_practica:
+                    practicas_list.append(item)
+                else:
+                    tareas_list.append(item)
+
+        # Evaluaciones y Simuladores IA de la materia
+        evaluaciones_list = []
+        intentos_ia = IntentoPracticaEstudiante.objects.filter(estudiante=est, practica__materia=mat).select_related('practica')
+        practicas_disponibles = PracticaTema.objects.filter(materia=mat, activo=True)
+
+        for p in practicas_disponibles:
+            it = intentos_ia.filter(practica=p).first()
+            if it:
+                nota_ia = float(it.puntaje_obtenido)
+                notas_materia.append(nota_ia)
+                todas_las_notas.append(nota_ia)
+                evaluaciones_list.append({
+                    'id': p.id,
+                    'titulo': p.titulo,
+                    'tipo': 'Simulador IA',
+                    'estado': 'COMPLETADO',
+                    'nota': nota_ia,
+                    'puntaje_maximo': 100,
+                    'aciertos': f"{it.respuestas_correctas}/{it.total_preguntas}",
+                    'retroalimentacion': it.retroalimentacion_ia,
+                    'fecha': it.fecha_intento.strftime('%d/%m/%Y %H:%M') if it.fecha_intento else ''
+                })
+            else:
+                evaluaciones_list.append({
+                    'id': p.id,
+                    'titulo': p.titulo,
+                    'tipo': 'Simulador IA',
+                    'estado': 'DISPONIBLE',
+                    'nota': None,
+                    'puntaje_maximo': 100,
+                    'aciertos': 'Pendiente',
+                    'retroalimentacion': 'Simulador IA activo disponible para resolver.',
+                    'fecha': ''
+                })
+
+        promedio_mat = round(sum(notas_materia) / len(notas_materia), 1) if notas_materia else None
+
+        if promedio_mat is not None:
+            if promedio_mat >= 85:
+                estado_cualitativo = 'Desarrollo Pleno (DP)'
+            elif promedio_mat >= 69:
+                estado_cualitativo = 'Desarrollo Óptimo (DO)'
+            elif promedio_mat >= 51:
+                estado_cualitativo = 'Desarrollo Aceptable (DA)'
+            else:
+                estado_cualitativo = 'En Desarrollo (ED)'
+        else:
+            estado_cualitativo = 'Sin notas'
+
+        materias_data.append({
+            'materia_id': mat.id if mat else esp.id,
+            'materia': mat_nombre,
+            'docente': doc_nombre,
+            'docente_avatar': doc_avatar,
+            'tareas': tareas_list,
+            'practicas': practicas_list,
+            'evaluaciones': evaluaciones_list,
+            'pendientes': pendientes_list,
+            'total_pendientes': len(pendientes_list),
+            'promedio': promedio_mat,
+            'estado_cualitativo': estado_cualitativo,
+            'total_actividades': len(tareas_list) + len(practicas_list) + len(evaluaciones_list),
+            'total_evaluadas': len(notas_materia)
+        })
+
+    promedio_general = round(sum(todas_las_notas) / len(todas_las_notas), 1) if todas_las_notas else None
+
+    return Response({
+        'estudiante': {
+            'id': est.id,
+            'nombre_completo': user.nombre_completo,
+            'rude': inscripcion.codigo_ru if (inscripcion and inscripcion.codigo_ru) else f"RUDE-{est.id:06d}",
+            'email': user.email,
+        },
+        'colegio': {
+            'nombre': colegio.nombre if colegio else 'Colegio Nacional Simón Bolívar',
+            'ciudad': colegio.ciudad if colegio else 'La Paz',
+        },
+        'curso': {
+            'nombre': curso.nombre if curso else '6to de Secundaria "A"',
+            'grado': curso.grado if curso else '6to de Secundaria',
+            'paralelo': curso.paralelo if curso else 'A',
+            'anio_lectivo': curso.anio_lectivo if curso else 2026,
+        },
+        'materias': materias_data,
+        'resumen': {
+            'promedio_general': promedio_general,
+            'total_pendientes': total_pendientes_global,
+            'total_materias': len(materias_data),
+            'estado_general': 'Aprobado' if (promedio_general and promedio_general >= 51) else ('En Desarrollo' if promedio_general else 'En Curso')
+        }
+    })
+
 
