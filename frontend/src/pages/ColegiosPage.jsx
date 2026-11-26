@@ -5,9 +5,23 @@ import {
   GraduationCap, FolderOpen, AlertCircle, FileSpreadsheet
 } from 'lucide-react';
 import { Loading, EmptyState, Modal } from '../components';
-import { commonAPI, espaciosAPI } from '../api';
+import apiFetch, { commonAPI, espaciosAPI } from '../api';
 import PanelInvitacion from '../components/PanelInvitacion';
 import ListaExcelDocente from './ListaExcelDocente';
+import EspacioDetallePage from './EspacioDetallePage';
+
+function getTeamsSubjectBadge(materia) {
+  const m = (materia || '').toLowerCase();
+  if (m.includes('matemática') || m.includes('algebra') || m.includes('calculo')) return { initials: 'MAT', bg: '#D83B01' };
+  if (m.includes('física') || m.includes('fisica')) return { initials: 'FIS', bg: '#4F46E5' };
+  if (m.includes('química') || m.includes('quimica')) return { initials: 'QMC', bg: '#059669' };
+  if (m.includes('biología') || m.includes('biologia')) return { initials: 'BIO', bg: '#0D9488' };
+  if (m.includes('lenguaje') || m.includes('literatura')) return { initials: 'LIT', bg: '#7C3AED' };
+  if (m.includes('social') || m.includes('historia')) return { initials: 'SOC', bg: '#D97706' };
+  const words = (materia || 'M').trim().split(/\s+/);
+  const initials = words.length > 1 ? (words[0][0] + words[1][0]).toUpperCase() : words[0].slice(0, 3).toUpperCase();
+  return { initials, bg: '#1E3A8A' };
+}
 
 // ─────────────────────────────────────────────────────────────
 // Sub-panel: cursos de un colegio específico
@@ -462,9 +476,11 @@ function AddColegioModal({ onClose, onSaved }) {
 // ─────────────────────────────────────────────────────────────
 // Main: ColegiosPage con Tabs integrados (Mis Colegios + Reportes)
 // ─────────────────────────────────────────────────────────────
-export default function ColegiosPage({ onNavigate }) {
+export default function ColegiosPage({ user, onNavigate }) {
   const [activeTab, setActiveTab] = useState('colegios');
   const [colegios, setColegios] = useState([]);
+  const [estructura, setEstructura] = useState([]);
+  const [selectedEspacioId, setSelectedEspacioId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -472,188 +488,247 @@ export default function ColegiosPage({ onNavigate }) {
 
   const loadColegios = () => {
     setLoading(true);
-    commonAPI.colegios()
-      .then(setColegios)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    Promise.all([
+      commonAPI.colegios().catch(() => []),
+      apiFetch('/api/v2/docente/lista-excel/').catch(() => ({ colegios: [] }))
+    ]).then(([colsList, excelData]) => {
+      setColegios(Array.isArray(colsList) ? colsList : []);
+      const tree = excelData?.colegios || [];
+      setEstructura(tree);
+      if (tree.length > 0 && !selectedEspacioId) {
+        const prefCol = tree.find(c => (c.colegio_nombre || '').includes('Simón Bolívar')) || tree[0];
+        const firstMat = prefCol?.cursos?.[0]?.materias?.find(m => m.espacio_id);
+        if (firstMat?.espacio_id) {
+          setSelectedEspacioId(firstMat.espacio_id);
+        } else {
+          for (const col of tree) {
+            for (const cur of (col.cursos || [])) {
+              const m = (cur.materias || []).find(x => x.espacio_id);
+              if (m) { setSelectedEspacioId(m.espacio_id); break; }
+            }
+          }
+        }
+      }
+    }).finally(() => setLoading(false));
   };
 
   useEffect(() => { loadColegios(); }, []);
 
-  const filtered = colegios.filter(c =>
-    c.nombre.toLowerCase().includes(search.toLowerCase())
-  );
-
   const TABS = [
-    { id: 'colegios', label: 'Mis Colegios y Cursos', emoji: '\u{1F3EB}' },
-    { id: 'reportes', label: 'Lista de Estudiantes y Reportes', emoji: '\u{1F4CA}' },
+    { id: 'colegios', label: 'Mis Colegios y Materias (Teams)', icon: BookOpen },
+    { id: 'reportes', label: 'Lista de Estudiantes y Reportes', icon: FileSpreadsheet },
   ];
 
+  // Buscar colegio original completo para abrir CursosPanel
+  const openCursosOf = (colegioId, nombreFallback) => {
+    const found = colegios.find(c => c.id === colegioId) || { id: colegioId, nombre: nombreFallback };
+    setColegioSeleccionado(found);
+  };
+
   return (
-    <div className="page-container">
-      {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>
-            Mis Espacios
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 64px)', background: '#F8FAFC' }}>
+      {/* Barra superior compacta */}
+      <div style={{
+        background: '#FFFFFF', borderBottom: '1px solid #E2E8F0',
+        padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <h2 style={{ fontSize: 17, fontWeight: 800, color: '#0F172A', margin: 0 }}>
+            Mis Colegios y Cursos
           </h2>
-          <p style={{ color: '#64748B', fontSize: 13 }}>
-            Gestiona colegios, cursos y materias. Envía reportes de rendimiento académico a tus estudiantes.
-          </p>
+          <div style={{ display: 'inline-flex', background: '#F1F5F9', borderRadius: 8, padding: 3, gap: 2 }}>
+            {TABS.map(tab => {
+              const Icon = tab.icon;
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  id={`tab-${tab.id}`}
+                  onClick={() => setActiveTab(tab.id)}
+                  style={{
+                    padding: '6px 12px', borderRadius: 6, border: 'none', fontSize: 12,
+                    fontWeight: active ? 700 : 500, cursor: 'pointer',
+                    background: active ? '#FFFFFF' : 'transparent',
+                    color: active ? '#1E3A8A' : '#64748B',
+                    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                    display: 'inline-flex', alignItems: 'center', gap: 6
+                  }}
+                >
+                  <Icon size={13} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
+
         {activeTab === 'colegios' && (
-          <button className="btn btn-primary" onClick={() => setShowAddModal(true)} style={{ background: '#1E3A8A', flexShrink: 0 }}>
-            <Plus size={16} /> Añadir colegio
+          <button className="btn btn-primary btn-sm" onClick={() => setShowAddModal(true)} style={{ background: '#1E3A8A', height: 32 }}>
+            <Plus size={14} /> Añadir colegio
           </button>
         )}
       </div>
 
-      {/* ── Tab Selector ── */}
-      <div style={{
-        display: 'flex', gap: 4, marginBottom: 24,
-        background: '#F1F5F9', borderRadius: 12, padding: 5,
-        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)'
-      }}>
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            id={`tab-${tab.id}`}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              flex: 1, padding: '11px 16px', borderRadius: 9, border: 'none',
-              fontSize: 13.5, fontWeight: activeTab === tab.id ? 700 : 500,
-              cursor: 'pointer', transition: 'all 0.18s',
-              background: activeTab === tab.id ? '#FFFFFF' : 'transparent',
-              color: activeTab === tab.id ? '#1E3A8A' : '#64748B',
-              boxShadow: activeTab === tab.id ? '0 2px 8px rgba(30,58,138,0.12)' : 'none',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}
-          >
-            <span style={{ fontSize: 16 }}>{tab.emoji}</span>
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* ══ TAB 1: Mis Colegios y Cursos ══ */}
+      {/* ══ TAB 1: VISTA ESTILO MICROSOFT TEAMS (PANEL IZQUIERDO COLEGIOS/MATERIAS + PANEL DERECHO ESPACIO) ══ */}
       {activeTab === 'colegios' && (
-        <>
-          {/* Search */}
-          <div style={{ marginBottom: 20, position: 'relative', width: 320 }}>
-            <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
-            <input
-              className="form-control"
-              placeholder="Buscar colegio..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ paddingLeft: 36 }}
-            />
-          </div>
-
-          {/* Grid de colegios */}
-          {loading ? (
-            <Loading text="Cargando tus colegios..." />
-          ) : filtered.length === 0 ? (
+        loading ? (
+          <div className="page-container"><Loading text="Cargando tus colegios y materias..." /></div>
+        ) : estructura.length === 0 && colegios.length === 0 ? (
+          <div className="page-container">
             <EmptyState
               icon={Building}
               title="No se encontraron colegios"
-              description={search
-                ? `No hay resultados para "${search}".`
-                : 'Aún no estás asignado a ningún colegio. Agrega uno para comenzar.'}
-              action={
-                <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-                  <Plus size={14} /> Añadir colegio
-                </button>
-              }
+              description="Aún no estás asignado a ningún colegio. Agrega uno para comenzar."
+              action={<button className="btn btn-primary" onClick={() => setShowAddModal(true)}><Plus size={14} /> Añadir colegio</button>}
             />
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 18 }}>
-              {filtered.map(colegio => (
-                <div
-                  key={colegio.id}
-                  style={{
-                    border: '1px solid #E2E8F0', borderRadius: 12,
-                    background: '#FFFFFF', overflow: 'hidden',
-                    display: 'flex', flexDirection: 'column',
-                    transition: 'box-shadow 0.15s, border-color 0.15s'
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(30,58,138,0.12)';
-                    e.currentTarget.style.borderColor = '#BFDBFE';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.boxShadow = 'none';
-                    e.currentTarget.style.borderColor = '#E2E8F0';
-                  }}
-                >
-                  {/* Card Header */}
-                  <div style={{ padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{
-                      width: 52, height: 52, borderRadius: 10,
-                      background: 'linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)',
-                      color: 'white', display: 'flex', alignItems: 'center',
-                      justifyContent: 'center', fontSize: 22, fontWeight: 700, flexShrink: 0
-                    }}>
-                      {colegio.nombre.charAt(0)}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', margin: '0 0 4px 0', lineHeight: 1.3 }}>
-                        {colegio.nombre}
-                      </h3>
-                      <div style={{ fontSize: 12, color: '#64748B' }}>
-                        {[colegio.ciudad, colegio.pais].filter(Boolean).join(', ') || 'Bolivia'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Stats row */}
-                  <div style={{
-                    padding: '10px 20px', borderTop: '1px solid #F1F5F9',
-                    borderBottom: '1px solid #F1F5F9',
-                    display: 'flex', gap: 20, background: '#F8FAFC'
-                  }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748B' }}>
-                      <Layers size={14} color="#6366F1" />
-                      <strong style={{ color: '#1E293B' }}>{colegio.total_cursos ?? '\u2014'}</strong> cursos
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748B' }}>
-                      <Users size={14} color="#10B981" />
-                      <strong style={{ color: '#1E293B' }}>{colegio.total_estudiantes ?? '\u2014'}</strong> estudiantes
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748B' }}>
-                      <BookOpen size={14} color="#F59E0B" />
-                      <strong style={{ color: '#1E293B' }}>{colegio.total_materias ?? '\u2014'}</strong> materias
-                    </span>
-                  </div>
-
-                  {/* Action buttons */}
-                  <div style={{ padding: '12px 16px', display: 'flex', gap: 8 }}>
-                    <button
-                      className="btn btn-primary"
-                      style={{ flex: 1, background: '#1E3A8A', fontSize: 13 }}
-                      onClick={() => onNavigate('colegio-detalle', { colegio })}
-                    >
-                      <GraduationCap size={15} /> Entrar al colegio
-                    </button>
-                    <button
-                      className="btn btn-secondary"
-                      style={{ fontSize: 12, padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                      onClick={() => setColegioSeleccionado(colegio)}
-                      title="Ver cursos y materias"
-                    >
-                      <FileSpreadsheet size={13} /> Cursos
-                    </button>
-                  </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flex: 1, flexWrap: 'wrap' }}>
+            {/* Panel Izquierdo Teams: Colegios -> Materias */}
+            <div style={{
+              width: 290, flexShrink: 0, background: '#FFFFFF', borderRight: '1px solid #E2E8F0',
+              display: 'flex', flexDirection: 'column'
+            }}>
+              <div style={{ padding: '12px 12px 10px', borderBottom: '1px solid #F1F5F9' }}>
+                <div style={{ position: 'relative' }}>
+                  <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+                  <input
+                    className="form-control"
+                    placeholder="Buscar colegio o materia..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    style={{ paddingLeft: 30, height: 32, fontSize: 12, background: '#F8FAFC' }}
+                  />
                 </div>
-              ))}
+              </div>
+
+              <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
+                {estructura.map(col => {
+                  const q = search.trim().toLowerCase();
+                  const colMatches = !q || (col.colegio_nombre || '').toLowerCase().includes(q);
+                  const allMats = [];
+                  (col.cursos || []).forEach(cur => {
+                    (cur.materias || []).forEach(mat => {
+                      if (colMatches || (mat.materia_nombre || '').toLowerCase().includes(q) || (cur.curso_nombre || '').toLowerCase().includes(q)) {
+                        allMats.push({ ...mat, curso_nombre: cur.curso_nombre, curso_id: cur.curso_id });
+                      }
+                    });
+                  });
+
+                  if (q && !colMatches && allMats.length === 0) return null;
+
+                  return (
+                    <div key={col.colegio_id} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      {/* Header del Colegio */}
+                      <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '4px 8px', gap: 6
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                          <Building size={12} color="#1E3A8A" style={{ flexShrink: 0 }} />
+                          <span style={{
+                            fontSize: 11, fontWeight: 800, color: '#1E3A8A', textTransform: 'uppercase',
+                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                          }} title={col.colegio_nombre}>
+                            {col.colegio_nombre}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => openCursosOf(col.colegio_id, col.colegio_nombre)}
+                          title="Gestionar cursos y materias de este colegio"
+                          style={{
+                            border: 'none', background: '#EFF6FF', color: '#1E3A8A',
+                            borderRadius: 4, padding: '2px 6px', fontSize: 10, fontWeight: 700, cursor: 'pointer', flexShrink: 0
+                          }}
+                        >
+                          + Cursos
+                        </button>
+                      </div>
+
+                      {/* Lista de Materias estilo Teams */}
+                      {allMats.length === 0 ? (
+                        <div style={{ fontSize: 11, color: '#94A3B8', padding: '4px 10px', fontStyle: 'italic' }}>
+                          Sin materias asignadas aún
+                        </div>
+                      ) : (
+                        allMats.map((mat, idx) => {
+                          const isSelected = mat.espacio_id && mat.espacio_id === selectedEspacioId;
+                          const badge = getTeamsSubjectBadge(mat.materia_nombre);
+                          return (
+                            <button
+                              key={`${mat.materia_id}-${idx}`}
+                              onClick={() => mat.espacio_id && setSelectedEspacioId(mat.espacio_id)}
+                              disabled={!mat.espacio_id}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+                                borderRadius: 8, border: 'none',
+                                borderLeft: isSelected ? '3px solid #1E3A8A' : '3px solid transparent',
+                                background: isSelected ? '#EFF6FF' : 'transparent',
+                                cursor: mat.espacio_id ? 'pointer' : 'not-allowed',
+                                textAlign: 'left', width: '100%', transition: 'all 0.12s ease',
+                                opacity: mat.espacio_id ? 1 : 0.6
+                              }}
+                              onMouseEnter={e => { if (!isSelected && mat.espacio_id) e.currentTarget.style.background = '#F8FAFC'; }}
+                              onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+                            >
+                              <div style={{
+                                width: 32, height: 32, borderRadius: 6, background: badge.bg,
+                                color: '#FFFFFF', fontSize: 10.5, fontWeight: 800,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                              }}>
+                                {badge.initials}
+                              </div>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{
+                                  fontSize: 12.5, fontWeight: isSelected ? 700 : 600,
+                                  color: isSelected ? '#1E3A8A' : '#1E293B',
+                                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                                }}>
+                                  {mat.materia_nombre}
+                                </div>
+                                <div style={{
+                                  fontSize: 10.5, color: '#64748B',
+                                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                                }}>
+                                  {mat.curso_nombre} · {mat.total_estudiantes || 0} est.
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          )}
-        </>
+
+            {/* Panel Derecho Teams: Detalle completo del Espacio seleccionado */}
+            <div style={{ flex: 1, minWidth: 320, background: '#F8FAFC' }}>
+              {selectedEspacioId ? (
+                <EspacioDetallePage
+                  key={selectedEspacioId}
+                  espacioId={selectedEspacioId}
+                  user={user}
+                  defaultTab="contenidos"
+                  embedded={true}
+                  onBack={() => {}}
+                />
+              ) : (
+                <div style={{ padding: 40, textAlign: 'center', color: '#64748B' }}>
+                  <BookOpen size={36} color="#94A3B8" style={{ marginBottom: 10 }} />
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>Selecciona una materia</div>
+                  <p style={{ fontSize: 12.5 }}>Haz clic en cualquier materia del panel izquierdo para gestionar contenidos, temas avanzados, tareas y alumnos.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )
       )}
 
       {/* ══ TAB 2: Lista de Estudiantes y Reportes ══ */}
       {activeTab === 'reportes' && (
-        <div>
+        <div className="page-container">
           <div style={{
             padding: '12px 16px', marginBottom: 16,
             background: 'linear-gradient(135deg, #EFF6FF 0%, #F0F4FF 100%)',

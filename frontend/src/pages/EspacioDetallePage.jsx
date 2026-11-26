@@ -12,7 +12,7 @@ import { SubmitTaskForm } from './MyTasks';
 import SendReportModal from '../components/SendReportModal';
 import MuroMateria from '../components/MuroMateria';
 
-import apiFetch from '../api';
+import apiFetch, { recursosAPI, topicTrackerAPI } from '../api';
 
 function getBadgeStyle(estado, vencida) {
   if (estado === 'CALIFICADO' || estado === 'CALIFICADA') return { background: '#DCFCE7', color: '#166534' };
@@ -298,6 +298,10 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
   const [activeTab, setActiveTab] = useState(defaultTab || (isEstudiante ? 'contenidos' : 'tareas'));
   const [submitTarea, setSubmitTarea] = useState(null);  // tarea to submit for student
   const [reportStudent, setReportStudent] = useState(null);
+  const [showAddTema, setShowAddTema] = useState(false);
+  const [formTema, setFormTema] = useState({ titulo: '', unidad: '', descripcion: '', estado: 'COMPLETADO' });
+  const [showAddRecurso, setShowAddRecurso] = useState(false);
+  const [formRecurso, setFormRecurso] = useState({ titulo: '', descripcion: '', enlace_url: '', tipo: 'ENLACE' });
 
   const loadData = async () => {
     setLoading(true);
@@ -322,6 +326,7 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
         ]);
         setData({
           ...res,
+          espacio: espInfo?.espacio ? { ...res.espacio, ...espInfo.espacio } : res.espacio,
           temas_avance: espInfo?.temas_avance || [],
           recursos: espInfo?.recursos || []
         });
@@ -499,9 +504,20 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
                   Plan de unidades y contenidos curriculares avanzados en la materia
                 </p>
               </div>
-              <span style={{ fontSize: 11, fontWeight: 700, background: '#EFF6FF', color: '#1E3A8A', padding: '4px 10px', borderRadius: 12 }}>
-                {temasAvance.length} {temasAvance.length === 1 ? 'tema' : 'temas'}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, background: '#EFF6FF', color: '#1E3A8A', padding: '4px 10px', borderRadius: 12 }}>
+                  {temasAvance.length} {temasAvance.length === 1 ? 'tema' : 'temas'}
+                </span>
+                {!isEstudiante && espacio?.materia_id && (
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setShowAddTema(true)}
+                    style={{ background: '#1E3A8A', fontSize: 11.5, padding: '4px 10px' }}
+                  >
+                    <Plus size={12} /> Agregar Tema
+                  </button>
+                )}
+              </div>
             </div>
 
             {temasAvance.length === 0 ? (
@@ -537,17 +553,32 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
                             {tema.titulo}
                           </div>
                         </div>
-                        <span style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          padding: '3px 9px',
-                          borderRadius: 12,
-                          background: isCompletado ? '#ECFDF5' : (isEnProgreso ? '#EFF6FF' : '#F1F5F9'),
-                          color: isCompletado ? '#065F46' : (isEnProgreso ? '#1E40AF' : '#475569'),
-                          border: `1px solid ${isCompletado ? '#A7F3D0' : (isEnProgreso ? '#BFDBFE' : '#E2E8F0')}`
-                        }}>
-                          {isCompletado ? '✓ Tema Avanzado' : (isEnProgreso ? 'En Progreso' : 'Pendiente')}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: '3px 9px',
+                            borderRadius: 12,
+                            background: isCompletado ? '#ECFDF5' : (isEnProgreso ? '#EFF6FF' : '#F1F5F9'),
+                            color: isCompletado ? '#065F46' : (isEnProgreso ? '#1E40AF' : '#475569'),
+                            border: `1px solid ${isCompletado ? '#A7F3D0' : (isEnProgreso ? '#BFDBFE' : '#E2E8F0')}`
+                          }}>
+                            {isCompletado ? '✓ Tema Avanzado' : (isEnProgreso ? 'En Progreso' : 'Pendiente')}
+                          </span>
+                          {!isEstudiante && espacio?.materia_id && (
+                            <button
+                              className="btn btn-outline btn-sm"
+                              style={{ fontSize: 10.5, padding: '2px 8px' }}
+                              onClick={async () => {
+                                const next = isCompletado ? 'EN_PROGRESO' : 'COMPLETADO';
+                                await topicTrackerAPI.actualizarTema(espacio.materia_id, tema.id, { estado: next });
+                                loadData();
+                              }}
+                            >
+                              {isCompletado ? 'Reabrir' : 'Marcar Avanzado'}
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {tema.descripcion && (
@@ -584,9 +615,20 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
                   Documentos, guías de estudio y enlaces compartidos por el docente
                 </p>
               </div>
-              <span style={{ fontSize: 11, fontWeight: 700, background: '#ECFDF5', color: '#065F46', padding: '4px 10px', borderRadius: 12 }}>
-                {recursos.length} {recursos.length === 1 ? 'material' : 'materiales'}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, background: '#ECFDF5', color: '#065F46', padding: '4px 10px', borderRadius: 12 }}>
+                  {recursos.length} {recursos.length === 1 ? 'material' : 'materiales'}
+                </span>
+                {!isEstudiante && (
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setShowAddRecurso(true)}
+                    style={{ background: '#059669', fontSize: 11.5, padding: '4px 10px' }}
+                  >
+                    <Plus size={12} /> Subir Contenido
+                  </button>
+                )}
+              </div>
             </div>
 
             {recursos.length === 0 ? (
@@ -980,6 +1022,76 @@ export default function EspacioDetallePage({ espacioId, onBack, user, defaultTab
             student={reportStudent}
             onClose={() => setReportStudent(null)}
           />
+        </Modal>
+      )}
+
+      {/* Teacher: Agregar Tema Avanzado Modal */}
+      {showAddTema && (
+        <Modal open={true} onClose={() => setShowAddTema(false)} title="Registrar Tema Avanzado">
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            if (!formTema.titulo.trim() || !espacio?.materia_id) return;
+            await topicTrackerAPI.crearTema(espacio.materia_id, formTema);
+            setShowAddTema(false);
+            setFormTema({ titulo: '', unidad: '', descripcion: '', estado: 'COMPLETADO' });
+            loadData();
+          }}>
+            <div className="form-group">
+              <label className="form-label">Unidad / Bloque</label>
+              <input className="form-control" placeholder="Ej: Unidad 3: Dinámica" value={formTema.unidad} onChange={e => setFormTema(p => ({ ...p, unidad: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Título del Tema <span className="required">*</span></label>
+              <input className="form-control" placeholder="Ej: Leyes de Newton y Fricción" value={formTema.titulo} onChange={e => setFormTema(p => ({ ...p, titulo: e.target.value }))} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Descripción / Resumen</label>
+              <textarea className="form-control" rows={3} placeholder="Contenidos abordados en clase..." value={formTema.descripcion} onChange={e => setFormTema(p => ({ ...p, descripcion: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Estado</label>
+              <select className="form-control" value={formTema.estado} onChange={e => setFormTema(p => ({ ...p, estado: e.target.value }))}>
+                <option value="COMPLETADO">Tema Avanzado (Completado)</option>
+                <option value="EN_PROGRESO">En Progreso</option>
+                <option value="PENDIENTE">Pendiente</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowAddTema(false)}>Cancelar</button>
+              <button type="submit" className="btn btn-primary" style={{ background: '#1E3A8A' }}>Guardar Tema</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Teacher: Subir Contenido / Material Modal */}
+      {showAddRecurso && (
+        <Modal open={true} onClose={() => setShowAddRecurso(false)} title="Subir Contenido / Material de Apoyo">
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            if (!formRecurso.titulo.trim()) return;
+            await recursosAPI.create(espacioId, formRecurso);
+            setShowAddRecurso(false);
+            setFormRecurso({ titulo: '', descripcion: '', enlace_url: '', tipo: 'ENLACE' });
+            loadData();
+          }}>
+            <div className="form-group">
+              <label className="form-label">Título del Contenido <span className="required">*</span></label>
+              <input className="form-control" placeholder="Ej: Guía de Ejercicios Resueltos PDF" value={formRecurso.titulo} onChange={e => setFormRecurso(p => ({ ...p, titulo: e.target.value }))} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Descripción</label>
+              <textarea className="form-control" rows={2} placeholder="Indicaciones o contenido de estudio..." value={formRecurso.descripcion} onChange={e => setFormRecurso(p => ({ ...p, descripcion: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Enlace o URL del Documento / Video</label>
+              <input className="form-control" placeholder="https://..." value={formRecurso.enlace_url} onChange={e => setFormRecurso(p => ({ ...p, enlace_url: e.target.value }))} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowAddRecurso(false)}>Cancelar</button>
+              <button type="submit" className="btn btn-primary" style={{ background: '#059669' }}>Publicar Contenido</button>
+            </div>
+          </form>
         </Modal>
       )}
     </div>

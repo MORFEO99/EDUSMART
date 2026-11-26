@@ -2719,6 +2719,12 @@ function useDocenteEstructura({ allowAllMaterias = false } = {}) {
     setSelectedMateriaId(val);
   };
 
+  const selectCombo = (colId, curId, matId) => {
+    setSelectedColegioId(String(colId));
+    setSelectedCursoId(String(curId));
+    setSelectedMateriaId(String(matId));
+  };
+
   const mapStudent = useCallback((est, cur, matNombre = '') => ({
     id: est.estudiante_id,
     nombre_completo: est.nombre || 'Estudiante',
@@ -2765,9 +2771,109 @@ function useDocenteEstructura({ allowAllMaterias = false } = {}) {
     onSelectColegio,
     onSelectCurso,
     onSelectMateria,
+    selectCombo,
     students,
     loading
   };
+}
+
+function getTeacherSubjectBadge(materia) {
+  const m = (materia || '').toLowerCase();
+  if (m.includes('matemática') || m.includes('algebra') || m.includes('calculo')) return { initials: 'MAT', bg: '#D83B01' };
+  if (m.includes('física') || m.includes('fisica')) return { initials: 'FIS', bg: '#4F46E5' };
+  if (m.includes('química') || m.includes('quimica')) return { initials: 'QMC', bg: '#059669' };
+  if (m.includes('biología') || m.includes('biologia')) return { initials: 'BIO', bg: '#0D9488' };
+  if (m.includes('lenguaje') || m.includes('literatura')) return { initials: 'LIT', bg: '#7C3AED' };
+  if (m.includes('social') || m.includes('historia')) return { initials: 'SOC', bg: '#D97706' };
+  const words = (materia || 'M').trim().split(/\s+/);
+  const initials = words.length > 1 ? (words[0][0] + words[1][0]).toUpperCase() : words[0].slice(0, 3).toUpperCase();
+  return { initials, bg: '#1E3A8A' };
+}
+
+function TeamsHierarchyLeftRail({ colegios, selectedMateriaId, selectCombo }) {
+  if (!colegios || colegios.length === 0) return null;
+  return (
+    <div style={{
+      width: 260,
+      flexShrink: 0,
+      background: '#FFFFFF',
+      borderRight: '1px solid #E2E8F0',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid #F1F5F9' }}>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A' }}>
+          Colegios y Materias
+        </div>
+        <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+          Selecciona una materia
+        </div>
+      </div>
+
+      <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
+        {colegios.map(col => (
+          <div key={col.colegio_id} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '4px 8px', fontSize: 10.5, fontWeight: 800,
+              color: '#1E3A8A', textTransform: 'uppercase'
+            }}>
+              <School size={12} style={{ flexShrink: 0 }} />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={col.colegio_nombre}>
+                {col.colegio_nombre}
+              </span>
+            </div>
+
+            {(col.cursos || []).flatMap(cur =>
+              (cur.materias || []).map(mat => {
+                const isSelected = String(mat.materia_id) === String(selectedMateriaId);
+                const badge = getTeacherSubjectBadge(mat.materia_nombre);
+                return (
+                  <button
+                    key={`${cur.curso_id}-${mat.materia_id}`}
+                    onClick={() => selectCombo(col.colegio_id, cur.curso_id, mat.materia_id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 9, padding: '8px 9px',
+                      borderRadius: 8, border: 'none',
+                      borderLeft: isSelected ? '3px solid #1E3A8A' : '3px solid transparent',
+                      background: isSelected ? '#EFF6FF' : 'transparent',
+                      cursor: 'pointer', textAlign: 'left', width: '100%',
+                      transition: 'all 0.12s ease'
+                    }}
+                    onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#F8FAFC'; }}
+                    onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <div style={{
+                      width: 30, height: 30, borderRadius: 6, background: badge.bg,
+                      color: '#FFFFFF', fontSize: 10, fontWeight: 800,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                    }}>
+                      {badge.initials}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{
+                        fontSize: 12.5, fontWeight: isSelected ? 700 : 600,
+                        color: isSelected ? '#1E3A8A' : '#1E293B',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                      }}>
+                        {mat.materia_nombre}
+                      </div>
+                      <div style={{
+                        fontSize: 10.5, color: '#64748B',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                      }}>
+                        {cur.curso_nombre} · {mat.total_estudiantes || 0} est.
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function DocenteHierarchySelectorBar({
@@ -2837,10 +2943,8 @@ function DocenteHierarchySelectorBar({
 
 export function TeacherGradebookView({ onNavigate }) {
   const {
-    colegios, cursosDisponibles, materiasDisponibles,
-    colegioActual, cursoActual, materiaActual,
-    selectedColegioId, selectedCursoId, selectedMateriaId,
-    onSelectColegio, onSelectCurso, onSelectMateria,
+    colegios, colegioActual, cursoActual, materiaActual,
+    selectedMateriaId, selectCombo,
     students, loading
   } = useDocenteEstructura();
 
@@ -2883,74 +2987,68 @@ export function TeacherGradebookView({ onNavigate }) {
   );
 
   return (
-    <div className="page-container">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: '0 0 3px' }}>
-            Resultados y Notas por Materia
-          </h2>
-          <p style={{ fontSize: '12.5px', color: '#64748B', margin: 0 }}>
-            Selecciona colegio, curso y materia para revisar promedios, entregas y proyección numérica.
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', width: 210 }}>
-            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
-            <input
-              className="form-control"
-              style={{ paddingLeft: 30, height: 34, fontSize: '12.5px' }}
-              placeholder="Buscar estudiante..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+    <div style={{ display: 'flex', minHeight: 'calc(100vh - 64px)', background: '#F8FAFC', flexWrap: 'wrap' }}>
+      <TeamsHierarchyLeftRail
+        colegios={colegios}
+        selectedMateriaId={selectedMateriaId}
+        selectCombo={selectCombo}
+      />
+      <div className="page-container" style={{ flex: 1, minWidth: 320 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: '0 0 3px' }}>
+              {materiaActual ? `${materiaActual.materia_nombre} — Notas` : 'Resultados y Notas'}
+            </h2>
+            <p style={{ fontSize: '12.5px', color: '#64748B', margin: 0 }}>
+              {colegioActual?.colegio_nombre} · {cursoActual?.curso_nombre}
+            </p>
           </div>
 
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={exportToCSV}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, height: 34 }}
-            title="Descargar tabla de esta materia en formato CSV compatible con Excel"
-          >
-            <Download size={13} /> Exportar Excel
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', width: 200 }}>
+              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
+              <input
+                className="form-control"
+                style={{ paddingLeft: 30, height: 34, fontSize: '12.5px' }}
+                placeholder="Buscar estudiante..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
 
-          {cursoActual?.curso_id && (
             <button
               className="btn btn-secondary btn-sm"
-              onClick={() => window.open(`/api/v2/cursos/${cursoActual.curso_id}/boletin-pdf/`, '_blank')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, height: 34, color: '#059669', borderColor: '#A7F3D0', background: '#ECFDF5' }}
-              title="Descargar cuadro oficial del curso en PDF"
+              onClick={exportToCSV}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, height: 34 }}
+              title="Descargar tabla de esta materia en formato CSV compatible con Excel"
             >
-              <FileText size={13} /> Boletín PDF
+              <Download size={13} /> Excel
             </button>
-          )}
 
-          {onNavigate && (
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={() => onNavigate('lista-excel')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, height: 34, background: '#1E3A8A' }}
-            >
-              <FileSpreadsheet size={13} /> Lista Excel
-            </button>
-          )}
+            {cursoActual?.curso_id && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => window.open(`/api/v2/cursos/${cursoActual.curso_id}/boletin-pdf/`, '_blank')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, height: 34, color: '#059669', borderColor: '#A7F3D0', background: '#ECFDF5' }}
+                title="Descargar cuadro oficial del curso en PDF"
+              >
+                <FileText size={13} /> PDF Curso
+              </button>
+            )}
+
+            {onNavigate && (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => onNavigate('lista-excel')}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, height: 34, background: '#1E3A8A' }}
+              >
+                <FileSpreadsheet size={13} /> Lista Excel
+              </button>
+            )}
+          </div>
         </div>
-      </div>
 
-      <DocenteHierarchySelectorBar
-        colegios={colegios}
-        cursosDisponibles={cursosDisponibles}
-        materiasDisponibles={materiasDisponibles}
-        selectedColegioId={selectedColegioId}
-        selectedCursoId={selectedCursoId}
-        selectedMateriaId={selectedMateriaId}
-        onSelectColegio={onSelectColegio}
-        onSelectCurso={onSelectCurso}
-        onSelectMateria={onSelectMateria}
-      />
-
-      {loading ? (
+        {loading ? (
         <Loading text="Cargando calificaciones de la materia..." />
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -3054,6 +3152,7 @@ export function TeacherGradebookView({ onNavigate }) {
           />
         </Modal>
       )}
+      </div>
     </div>
   );
 }
@@ -3231,10 +3330,8 @@ function SendReportModal({ student, onClose }) {
 // ============================================================
 export function TeacherStudentsView() {
   const {
-    colegios, cursosDisponibles, materiasDisponibles,
-    colegioActual, cursoActual, materiaActual,
-    selectedColegioId, selectedCursoId, selectedMateriaId,
-    onSelectColegio, onSelectCurso, onSelectMateria,
+    colegios, colegioActual, cursoActual, materiaActual,
+    selectedMateriaId, selectCombo,
     students, loading
   } = useDocenteEstructura();
 
@@ -3256,39 +3353,33 @@ export function TeacherStudentsView() {
   const alDiaCount = students.length - enRiesgoCount;
 
   return (
-    <div className="page-container">
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: '0 0 4px' }}>
-            Seguimiento Académico por Materia
-          </h2>
-          <p style={{ color: '#64748B', fontSize: '12.5px', margin: 0 }}>
-            Monitoreo individual de entregas, promedios y alertas de riesgo por colegio, curso y materia.
-          </p>
-        </div>
-        <div style={{ position: 'relative', width: 240 }}>
-          <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
-          <input
-            className="form-control"
-            style={{ paddingLeft: 28, height: 34, fontSize: '12.5px' }}
-            placeholder="Buscar estudiante..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <DocenteHierarchySelectorBar
+    <div style={{ display: 'flex', minHeight: 'calc(100vh - 64px)', background: '#F8FAFC', flexWrap: 'wrap' }}>
+      <TeamsHierarchyLeftRail
         colegios={colegios}
-        cursosDisponibles={cursosDisponibles}
-        materiasDisponibles={materiasDisponibles}
-        selectedColegioId={selectedColegioId}
-        selectedCursoId={selectedCursoId}
         selectedMateriaId={selectedMateriaId}
-        onSelectColegio={onSelectColegio}
-        onSelectCurso={onSelectCurso}
-        onSelectMateria={onSelectMateria}
+        selectCombo={selectCombo}
       />
+      <div className="page-container" style={{ flex: 1, minWidth: 320 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: '0 0 4px' }}>
+              {materiaActual ? `${materiaActual.materia_nombre} — Seguimiento` : 'Seguimiento Académico'}
+            </h2>
+            <p style={{ color: '#64748B', fontSize: '12.5px', margin: 0 }}>
+              {colegioActual?.colegio_nombre} · {cursoActual?.curso_nombre}
+            </p>
+          </div>
+          <div style={{ position: 'relative', width: 220 }}>
+            <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
+            <input
+              className="form-control"
+              style={{ paddingLeft: 28, height: 34, fontSize: '12.5px' }}
+              placeholder="Buscar estudiante..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
 
       {/* Filtros rápidos de seguimiento */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -3402,6 +3493,7 @@ export function TeacherStudentsView() {
           />
         )}
       </Modal>
+      </div>
     </div>
   );
 }

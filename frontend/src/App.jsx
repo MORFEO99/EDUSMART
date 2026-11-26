@@ -185,10 +185,10 @@ export default function App() {
           return <TeacherDashboard user={user} onNavigate={handleNavigate} onOpenCreateTask={() => setShowTeacherCreate(true)} />;
 
         case 'colegios':
-          return <ColegiosPage onNavigate={handleNavigate} />;
+          return <ColegiosPage user={user} onNavigate={handleNavigate} />;
 
         case 'espacios':
-          return <ColegiosPage onNavigate={handleNavigate} />; // Mis Espacios muestra lista de colegios → espacios
+          return <ColegiosPage user={user} onNavigate={handleNavigate} />; // Mis Espacios muestra vista Teams por colegios y materias
 
         // ── SUBPÁGINAS de Colegios/Espacios (no en sidebar) ─
         case 'colegio-detalle':
