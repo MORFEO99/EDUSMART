@@ -159,11 +159,11 @@ export default function App() {
           );
         case 'mis-tareas':
         case 'tareas':
-          return <MyTasks initialTaskId={extraData?.taskId} initialFilter={extraData?.filtro || 'todos'} onNavigate={handleNavigate} />;
+          return <MyTasks initialTaskId={extraData?.taskId} initialFilter={extraData?.filtro || 'pendientes'} onNavigate={handleNavigate} />;
         case 'presentar-tarea':
           return <MyTasks initialTaskId={extraData?.taskId} initialFilter="pendientes" onNavigate={handleNavigate} />;
         case 'entregas':
-          return <MyTasks initialTaskId={extraData?.taskId} initialFilter="entregadas" onNavigate={handleNavigate} />;
+          return <MyTasks initialTaskId={extraData?.taskId} initialFilter="entregadas_calificadas" onNavigate={handleNavigate} />;
         case 'resultados':
         case 'calificaciones':
           return <StudentResultsView onNavigate={handleNavigate} />;

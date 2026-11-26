@@ -210,7 +210,7 @@ export default function StudentDashboard({ user, onNavigate }) {
         </div>
 
         {/* 2. Tareas Entregadas */}
-        <div className="kpi-card" onClick={() => onNavigate('tareas', { filtro: 'entregadas' })} style={{ cursor: 'pointer' }}>
+        <div className="kpi-card" onClick={() => onNavigate('tareas', { filtro: 'entregadas_calificadas' })} style={{ cursor: 'pointer' }}>
           <div className="kpi-icon-box kpi-icon-blue">
             <Inbox size={22} />
           </div>
@@ -222,7 +222,7 @@ export default function StudentDashboard({ user, onNavigate }) {
         </div>
 
         {/* 3. Tareas por Calificar */}
-        <div className="kpi-card">
+        <div className="kpi-card" onClick={() => onNavigate('tareas', { filtro: 'entregadas_calificadas' })} style={{ cursor: 'pointer' }}>
           <div className="kpi-icon-box kpi-icon-cyan">
             <AlertCircle size={22} />
           </div>

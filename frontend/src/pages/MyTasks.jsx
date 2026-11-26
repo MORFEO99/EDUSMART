@@ -378,22 +378,32 @@ export function TaskDetailModal({ taskId, onClose, defaultMode = 'detail' }) {
 // ============================================================
 // MAIN PAGE: MY TASKS (MICROSOFT TEAMS STYLE)
 // ============================================================
-export default function MyTasks({ initialTaskId, initialFilter = 'todos' }) {
+export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState(initialFilter);
+
+  const normalizeFilter = (f) => {
+    if (!f || f === 'todos' || f === 'en_proceso') return 'pendientes';
+    if (f === 'entregadas' || f === 'calificadas') return 'entregadas_calificadas';
+    return f;
+  };
+
+  const [filter, setFilter] = useState(normalizeFilter(initialFilter));
   const [search, setSearch] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState(initialTaskId || null);
   const [submitDirectTaskId, setSubmitDirectTaskId] = useState(null);
 
   const FILTERS = [
-    { id: 'todos', label: 'Todas las tareas' },
     { id: 'pendientes', label: 'Pendientes' },
-    { id: 'en_proceso', label: 'En proceso' },
-    { id: 'entregadas', label: 'Entregadas' },
-    { id: 'calificadas', label: 'Calificadas' },
+    { id: 'entregadas_calificadas', label: 'Entregadas y Calificadas' },
     { id: 'vencidas', label: 'Vencidas' },
   ];
+
+  useEffect(() => {
+    if (initialFilter) {
+      setFilter(normalizeFilter(initialFilter));
+    }
+  }, [initialFilter]);
 
   useEffect(() => {
     setLoading(true);

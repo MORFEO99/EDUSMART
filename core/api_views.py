@@ -491,7 +491,7 @@ def api_tareas(request):
 
     if request.method == 'GET':
         espacio_id = request.query_params.get('espacio_id')
-        filtro = request.query_params.get('filtro', 'todas').lower()
+        filtro = request.query_params.get('filtro', 'pendientes').lower()
 
         if user.rol == 'ESTUDIANTE' and hasattr(user, 'perfil_estudiante'):
             estudiante = user.perfil_estudiante
@@ -501,7 +501,7 @@ def api_tareas(request):
             if espacio_id:
                 tareas = tareas.filter(espacio_id=espacio_id)
 
-            # Apply filters: todas, pendientes, en_proceso, entregadas, calificadas, vencidas
+            # Apply filters: pendientes, entregadas_calificadas, vencidas, todas
             now = timezone.now()
             entregas_map = {e.tarea_id: e for e in Entrega.objects.filter(estudiante=estudiante)}
 
@@ -524,15 +524,11 @@ def api_tareas(request):
                 elif t.fecha_limite < now:
                     estado_ciclo = 'VENCIDA'
 
-                if filtro == 'todas':
+                if filtro in ['todas', 'todos']:
                     filtered_tareas.append(t)
                 elif filtro == 'pendientes' and estado_ciclo in ['ASIGNADA', 'EN_PROCESO']:
                     filtered_tareas.append(t)
-                elif filtro == 'en_proceso' and estado_ciclo == 'EN_PROCESO':
-                    filtered_tareas.append(t)
-                elif filtro == 'entregadas' and estado_ciclo in ['ENTREGADA', 'EN_REVISION']:
-                    filtered_tareas.append(t)
-                elif filtro == 'calificadas' and estado_ciclo in ['CALIFICADA', 'RETROALIMENTADA']:
+                elif filtro in ['entregadas', 'calificadas', 'entregadas_calificadas', 'entregadas_y_calificadas'] and estado_ciclo in ['ENTREGADA', 'EN_REVISION', 'CALIFICADA', 'RETROALIMENTADA']:
                     filtered_tareas.append(t)
                 elif filtro == 'vencidas' and estado_ciclo == 'VENCIDA':
                     filtered_tareas.append(t)
