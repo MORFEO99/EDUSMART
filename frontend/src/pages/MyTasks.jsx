@@ -2,11 +2,60 @@ import { useState, useEffect, useRef } from 'react';
 import {
   ClipboardList, Search, BookOpen, Clock, FileText, CheckCircle,
   AlertTriangle, ChevronRight, X, Upload, Send, Download, Eye,
-  Paperclip, Calendar, User, Award, Check
+  Paperclip, Calendar, User, Award, Check, Filter, Lightbulb, Info
 } from 'lucide-react';
 import { studentAPI } from '../api';
 import { Loading, EmptyState, Modal, Alert, ProgressBar } from '../components';
 import { formatDate, formatDateTime, getTaskBadge, getPriorityBadge, getSubjectColor, getNoteColor, daysUntil, getFileLabel } from '../utils';
+
+// Helper for Teams Timeline date grouping (e.g. "22 nov domingo")
+function formatTimelineDate(dateStr) {
+  if (!dateStr) return 'Sin fecha';
+  const d = new Date(dateStr);
+  const day = d.getDate();
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const daysOfWeek = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  return `${day} ${months[d.getMonth()]} ${daysOfWeek[d.getDay()]}`;
+}
+
+function formatHour(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function getSubjectBadgeInfo(materia) {
+  const m = (materia || '').toLowerCase();
+  if (m.includes('matemática') || m.includes('algebra') || m.includes('calculo')) {
+    return { initials: 'MAT', bg: '#D83B01' }; // Coral / Red
+  }
+  if (m.includes('física')) {
+    return { initials: 'FIS', bg: '#0078D4' }; // Blue
+  }
+  if (m.includes('química')) {
+    return { initials: 'QMC', bg: '#CA5010' }; // Orange
+  }
+  if (m.includes('biología') || m.includes('geografía')) {
+    return { initials: 'BIO', bg: '#107C41' }; // Green
+  }
+  if (m.includes('lenguaje') || m.includes('literatura')) {
+    return { initials: 'LIT', bg: '#8764B8' }; // Purple
+  }
+  if (m.includes('sociales') || m.includes('historia')) {
+    return { initials: 'SOC', bg: '#D13438' }; // Crimson
+  }
+  if (m.includes('sistema') || m.includes('operativo')) {
+    return { initials: 'SO', bg: '#CA5010' };
+  }
+  if (m.includes('numérico')) {
+    return { initials: 'AN', bg: '#D83B01' };
+  }
+  const words = (materia || 'Tarea').trim().split(/\s+/);
+  const initials = words.length > 1 ? (words[0][0] + words[1][0]).toUpperCase() : words[0].slice(0, 2).toUpperCase();
+  return { initials, bg: '#5B5FC7' };
+}
 
 // ============================================================
 // SUBMIT TASK FORM (MICROSOFT TEAMS STYLE)
@@ -381,22 +430,23 @@ export function TaskDetailModal({ taskId, onClose, defaultMode = 'detail' }) {
 export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState(initialTaskId || null);
 
   const normalizeFilter = (f) => {
-    if (!f || f === 'todos' || f === 'en_proceso') return 'pendientes';
-    if (f === 'entregadas' || f === 'calificadas') return 'entregadas_calificadas';
+    if (!f || f === 'todos' || f === 'en_proceso' || f === 'proximamente' || f === 'pendientes') return 'pendientes';
+    if (f === 'vencida' || f === 'vencidas') return 'vencidas';
+    if (f === 'completado' || f === 'entregadas' || f === 'calificadas' || f === 'entregadas_calificadas') return 'entregadas_calificadas';
     return f;
   };
 
   const [filter, setFilter] = useState(normalizeFilter(initialFilter));
-  const [search, setSearch] = useState('');
-  const [selectedTaskId, setSelectedTaskId] = useState(initialTaskId || null);
-  const [submitDirectTaskId, setSubmitDirectTaskId] = useState(null);
 
   const FILTERS = [
-    { id: 'pendientes', label: 'Pendientes' },
-    { id: 'entregadas_calificadas', label: 'Entregadas y Calificadas' },
-    { id: 'vencidas', label: 'Vencidas' },
+    { id: 'pendientes', label: 'Próximamente' },
+    { id: 'vencidas', label: 'Vencida' },
+    { id: 'entregadas_calificadas', label: 'Completado' },
   ];
 
   useEffect(() => {
@@ -416,134 +466,339 @@ export default function MyTasks({ initialTaskId, initialFilter = 'pendientes' })
   const filtered = tasks.filter(t =>
     !search ||
     t.titulo.toLowerCase().includes(search.toLowerCase()) ||
-    t.materia.toLowerCase().includes(search.toLowerCase())
+    (t.materia || '').toLowerCase().includes(search.toLowerCase())
   );
 
+  // Group tasks by date
+  const groupsMap = {};
+  filtered.forEach(task => {
+    let dateToUse;
+    if (filter === 'entregadas_calificadas') {
+      dateToUse = task.mi_entrega?.fecha_entrega || task.mi_entrega?.calificacion?.fecha_calificacion || task.fecha_limite;
+    } else {
+      dateToUse = task.fecha_limite;
+    }
+    const label = formatTimelineDate(dateToUse);
+    if (!groupsMap[label]) {
+      groupsMap[label] = {
+        label,
+        rawDate: dateToUse ? new Date(dateToUse).getTime() : 0,
+        tasks: []
+      };
+    }
+    groupsMap[label].tasks.push(task);
+  });
+
+  const sortedGroups = Object.keys(groupsMap).map(k => groupsMap[k]).sort((a, b) => {
+    if (filter === 'pendientes') {
+      return a.rawDate - b.rawDate; // Closest deadline first
+    }
+    return b.rawDate - a.rawDate; // Most recent first for completed & overdue
+  });
+
   return (
-    <div className="page-container">
-      {/* Top Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#242424' }}>Mis Tareas Académicas</h2>
-          <p style={{ fontSize: '12.5px', color: '#616161' }}>
-            Consulta, presenta y revisa el estado de tus tareas asignadas.
-          </p>
-        </div>
-
-        <div style={{ position: 'relative', width: 260 }}>
-          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
-          <input
-            className="form-control"
-            style={{ paddingLeft: 30, height: 32, fontSize: '12.5px' }}
-            placeholder="Filtrar por tarea o materia..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {/* Fluent Tabs */}
-      <div className="teams-tabs">
-        {FILTERS.map(f => (
-          <button
-            key={f.id}
-            className={`teams-tab ${filter === f.id ? 'active' : ''}`}
-            onClick={() => setFilter(f.id)}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <Loading text="Cargando listado de tareas..." />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={CheckCircle}
-          title={search ? 'Sin coincidencias' : 'Sin tareas en esta vista'}
-          description={search ? `No se encontraron resultados para "${search}".` : 'No tienes tareas registradas en esta sección.'}
-        />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filtered.map((t) => {
-            const badge = getTaskBadge(t.codigo || t.estado);
-            const priBadge = getPriorityBadge(t.prioridad);
-            const dias = daysUntil(t.fecha_limite);
-            const urgent = dias !== null && dias <= 1 && !['Calificada', 'Entregada', 'Vencida'].includes(t.estado);
-
+    <div style={{
+      background: '#1B1A1D',
+      minHeight: '88vh',
+      borderRadius: 10,
+      padding: '20px 24px',
+      color: '#FFFFFF',
+      fontFamily: 'Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, sans-serif',
+      boxShadow: '0 4px 18px rgba(0,0,0,0.3)'
+    }}>
+      {/* Top Header / Tabs (Microsoft Teams Dark Layout) */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderBottom: '1px solid #323136',
+        marginBottom: 16,
+        paddingBottom: 2
+      }}>
+        {/* Left Tabs */}
+        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+          {FILTERS.map(f => {
+            const isActive = filter === f.id;
             return (
-              <div
-                key={t.id}
-                className="task-card"
-                style={{ borderLeft: urgent ? '3px solid #A80000' : '1px solid #EDEBE9' }}
-                onClick={() => setSelectedTaskId(t.id)}
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: isActive ? '#FFFFFF' : '#9E9E9E',
+                  fontSize: '13.5px',
+                  fontWeight: isActive ? 700 : 500,
+                  cursor: 'pointer',
+                  padding: '8px 2px 12px 2px',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  transition: 'color 0.15s ease'
+                }}
+                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.color = '#E1DFDD'; }}
+                onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.color = '#9E9E9E'; }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontWeight: 600, fontSize: '14px', color: '#242424' }}>{t.titulo}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <span className={`badge ${priBadge.cls}`}>{priBadge.label}</span>
-                    <span className={`badge ${badge.cls}`}>{badge.label}</span>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: 18, fontSize: '12px', color: '#616161', marginTop: 4, flexWrap: 'wrap' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <BookOpen size={12} /> {t.materia}
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <User size={12} /> Prof. {t.docente}
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Clock size={12} /> Fecha límite: {formatDate(t.fecha_limite)}
-                  </span>
-                  {dias !== null && (
-                    <span style={{ color: dias < 0 ? '#A80000' : dias <= 1 ? '#CA5010' : '#616161', fontWeight: 600 }}>
-                      {dias < 0 ? `Vencida (${Math.abs(dias)}d)` : dias === 0 ? 'Vence hoy' : `${dias}d restantes`}
-                    </span>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 8, borderTop: '1px solid #EDEBE9' }}>
-                  <div style={{ fontSize: '11.5px', color: '#616161' }}>
-                    {t.entrega?.archivo_nombre ? (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#107C41', fontWeight: 600 }}>
-                        <Paperclip size={12} /> Entregado: {t.entrega.archivo_nombre}
-                      </span>
-                    ) : (
-                      <span>Puntaje asignado: {t.puntaje_maximo} pts</span>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {t.nota && (
-                      <span style={{ fontWeight: 700, fontSize: '13.5px', color: getNoteColor(t.nota) }}>
-                        {t.nota}/100
-                      </span>
-                    )}
-                    <button
-                      className="btn btn-outline btn-sm"
-                      onClick={(e) => { e.stopPropagation(); setSelectedTaskId(t.id); }}
-                    >
-                      Ver detalle <ChevronRight size={12} />
-                    </button>
-                    {!t.esta_vencida && !['Calificada', 'Entregada'].includes(t.estado) && (
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedTaskId(t.id);
-                        }}
-                      >
-                        <Upload size={12} /> Presentar
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
+                {f.label}
+                {f.id === 'vencidas' && (
+                  <span style={{ color: '#E81123', fontWeight: 800, fontSize: '14px', lineHeight: 1 }}>*</span>
+                )}
+                {isActive && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: -1,
+                    left: 0,
+                    right: 0,
+                    height: 3,
+                    background: '#7B83EB',
+                    borderRadius: '3px 3px 0 0'
+                  }} />
+                )}
+              </button>
             );
           })}
+        </div>
+
+        {/* Right Action Icons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {showSearch ? (
+            <div style={{ position: 'relative', width: 220 }}>
+              <Search size={14} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
+              <input
+                autoFocus
+                className="form-control"
+                style={{
+                  height: 28,
+                  paddingLeft: 28,
+                  paddingRight: 24,
+                  fontSize: '12px',
+                  background: '#28282D',
+                  border: '1px solid #3F3F46',
+                  color: '#FFFFFF',
+                  borderRadius: 4
+                }}
+                placeholder="Filtrar por tarea..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <X
+                size={13}
+                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: '#8A8886', cursor: 'pointer' }}
+                onClick={() => { setSearch(''); setShowSearch(false); }}
+              />
+            </div>
+          ) : (
+            <Search
+              size={17}
+              color="#A19F9D"
+              style={{ cursor: 'pointer' }}
+              title="Buscar tarea"
+              onClick={() => setShowSearch(true)}
+            />
+          )}
+          <Filter size={17} color="#A19F9D" style={{ cursor: 'pointer' }} title="Filtrar" />
+          <Lightbulb size={17} color="#A19F9D" style={{ cursor: 'pointer' }} title="Ideas" />
+        </div>
+      </div>
+
+      {/* Body / List Content */}
+      {loading ? (
+        <div style={{ padding: '60px 0', textAlign: 'center' }}>
+          <Loading text="Cargando tareas..." />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#71717A' }}>
+          <CheckCircle size={32} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
+          <div style={{ fontSize: '14px', fontWeight: 600, color: '#A19F9D' }}>
+            {search ? 'Sin coincidencias' : 'Todo al día'}
+          </div>
+          <div style={{ fontSize: '12px', marginTop: 4 }}>
+            {search ? `No se encontraron resultados para "${search}".` : 'No tienes tareas en esta sección.'}
+          </div>
+        </div>
+      ) : (
+        <div>
+          {sortedGroups.map(group => (
+            <div key={group.label} style={{ marginBottom: 18 }}>
+              {/* Timeline date header */}
+              <div style={{
+                fontSize: '12.5px',
+                fontWeight: 700,
+                color: '#C8C6C4',
+                marginBottom: 6,
+                marginTop: 14,
+                paddingLeft: 2,
+                letterSpacing: '0.2px'
+              }}>
+                {group.label}
+              </div>
+
+              {/* Task Cards */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {group.tasks.map(t => {
+                  const badgeInfo = getSubjectBadgeInfo(t.materia);
+                  const hasCalificacion = t.mi_entrega?.calificacion?.nota !== undefined && t.mi_entrega?.calificacion?.nota !== null;
+                  const isSubmitted = !!t.mi_entrega;
+
+                  let subline1 = '';
+                  let subline1Color = '#A19F9D';
+
+                  if (filter === 'entregadas_calificadas') {
+                    if (isSubmitted && !hasCalificacion) {
+                      subline1 = `Enviado a las ${formatHour(t.mi_entrega?.fecha_entrega)}`;
+                    } else if (hasCalificacion) {
+                      subline1 = `Evaluado por Prof. ${t.docente_nombre || 'Docente'}`;
+                    }
+                  } else if (filter === 'vencidas') {
+                    subline1 = `Venció el ${formatTimelineDate(t.fecha_limite)}`;
+                    subline1Color = '#F87171';
+                  } else {
+                    subline1 = `Vence a las ${formatHour(t.fecha_limite)}`;
+                  }
+
+                  return (
+                    <div
+                      key={t.id}
+                      onClick={() => setSelectedTaskId(t.id)}
+                      style={{
+                        background: '#252427',
+                        borderRadius: 6,
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        cursor: 'pointer',
+                        border: '1px solid #2B2A2E',
+                        transition: 'background 0.15s ease, border-color 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#2B2A2F';
+                        e.currentTarget.style.borderColor = '#3F3E45';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#252427';
+                        e.currentTarget.style.borderColor = '#2B2A2E';
+                      }}
+                    >
+                      {/* Left: Badge + Titles */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0, flex: 1 }}>
+                        {/* Squircle Badge */}
+                        <div style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 6,
+                          background: badgeInfo.bg,
+                          color: '#FFFFFF',
+                          fontSize: '12px',
+                          fontWeight: 800,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          letterSpacing: '0.5px'
+                        }}>
+                          {badgeInfo.initials}
+                        </div>
+
+                        {/* Title & Subtitles */}
+                        <div style={{ minWidth: 0, flex: 1, paddingRight: 12 }}>
+                          <div style={{
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            color: '#FFFFFF',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.2px',
+                            marginBottom: 2,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {t.titulo}
+                          </div>
+
+                          {subline1 && (
+                            <div style={{
+                              fontSize: '11.5px',
+                              color: subline1Color,
+                              marginBottom: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {subline1}
+                            </div>
+                          )}
+
+                          <div style={{
+                            fontSize: '11px',
+                            color: '#71717A',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {t.materia} · {t.curso_nombre || t.espacio_nombre || 'Secundaria'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Score, Status pill or Points + Info icon */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+                        {filter === 'entregadas_calificadas' && (
+                          hasCalificacion ? (
+                            <span style={{ fontSize: '12.5px', color: '#D4D4D8', fontWeight: 600 }}>
+                              {Math.round(t.mi_entrega.calificacion.nota)}/{t.puntaje_maximo || 100} puntos
+                            </span>
+                          ) : (
+                            <span style={{
+                              background: '#107C41',
+                              color: '#FFFFFF',
+                              padding: '3px 10px',
+                              borderRadius: 4,
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3
+                            }}>
+                              ✓ Entregado
+                            </span>
+                          )
+                        )}
+
+                        {filter === 'pendientes' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: '12px', color: '#A19F9D' }}>
+                              {t.puntaje_maximo || 100} puntos
+                            </span>
+                            <span style={{
+                              background: '#27272A',
+                              border: '1px solid #3F3F46',
+                              color: '#E4E4E7',
+                              padding: '3px 9px',
+                              borderRadius: 4,
+                              fontSize: '11px',
+                              fontWeight: 600
+                            }}>
+                              Presentar
+                            </span>
+                          </div>
+                        )}
+
+                        {filter === 'vencidas' && (
+                          <span style={{ fontSize: '11.5px', color: '#F87171', fontWeight: 600 }}>
+                            Sin entregar · {t.puntaje_maximo || 100} pts
+                          </span>
+                        )}
+
+                        <Info size={15} color="#52525B" style={{ flexShrink: 0 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
