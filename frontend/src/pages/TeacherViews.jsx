@@ -8,7 +8,7 @@ import {
   Check, FileText, School, GraduationCap, Sparkles, Calculator, Target, Activity,
   ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
-import { teacherAPI, commonAPI, topicTrackerAPI, aiPracticeAPI, analisisNumericoAPI } from '../api';
+import apiFetch, { teacherAPI, commonAPI, topicTrackerAPI, aiPracticeAPI, analisisNumericoAPI } from '../api';
 import { Loading, EmptyState, Modal, Alert, ProgressBar, StatCard, MiniBarChart } from '../components';
 import { formatDate, formatDateTime, getNoteColor, getPriorityBadge, getTaskBadge } from '../utils';
 import RubricaEditor from '../components/RubricaEditor';
@@ -1015,71 +1015,94 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
               action={<button className="btn btn-primary" onClick={onOpenCreate} style={{ background: '#1E3A8A' }}><Plus size={14} /> Publicar primera tarea</button>}
             />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {filteredTasks.map(t => {
-                const priBadge = getPriorityBadge(t.prioridad);
-                return (
-                  <div key={t.id} className="task-card" style={{ background: '#FFFFFF', borderRadius: 10, border: '1px solid #E2E8F0', padding: 16 }}>
-                    {/* Header: título + badges */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
-                      <span style={{ fontWeight: 700, fontSize: '14.5px', color: '#0F172A' }}>{t.titulo}</span>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <span className={`badge ${priBadge.cls}`}>{priBadge.label}</span>
-                        <span className={`badge ${t.esta_vencida ? 'badge-vencida' : 'badge-calificada'}`}>
-                          {t.esta_vencida ? 'Vencida' : 'Activa'}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {(() => {
+                const groups = {};
+                filteredTasks.forEach(t => {
+                  const key = `${t.colegio_nombre || 'Colegio'}|||${t.curso_nombre || 'Curso'}|||${t.materia || 'Materia'}`;
+                  if (!groups[key]) {
+                    groups[key] = {
+                      colegio: t.colegio_nombre || 'Colegio',
+                      curso: t.curso_nombre || 'Curso',
+                      materia: t.materia || 'Materia',
+                      items: []
+                    };
+                  }
+                  groups[key].items.push(t);
+                });
+                return Object.entries(groups).map(([gKey, grp]) => (
+                  <div key={gKey} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8,
+                      padding: '8px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0',
+                      borderLeft: '4px solid #1E3A8A', borderRadius: 8
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 12.5 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#1E3A8A', fontWeight: 700 }}>
+                          <School size={14} /> {grp.colegio}
+                        </span>
+                        <span style={{ color: '#94A3B8' }}>›</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#0369A1', fontWeight: 700 }}>
+                          <GraduationCap size={14} /> {grp.curso}
+                        </span>
+                        <span style={{ color: '#94A3B8' }}>›</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#059669', fontWeight: 700 }}>
+                          <BookOpen size={14} /> {grp.materia}
                         </span>
                       </div>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', background: '#FFFFFF', border: '1px solid #CBD5E1', padding: '2px 8px', borderRadius: 12 }}>
+                        {grp.items.length} {grp.items.length === 1 ? 'tarea' : 'tareas'}
+                      </span>
                     </div>
 
-                    {/* Jerarquía académica: Colegio | Curso | Materia */}
-                    <div style={{ display: 'flex', gap: 14, fontSize: '12px', flexWrap: 'wrap', marginBottom: 8 }}>
-                      {t.colegio_nombre && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#1E3A8A', fontWeight: 600 }}>
-                          <School size={12} /> {t.colegio_nombre}
-                        </span>
-                      )}
-                      {t.curso_nombre && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#0284C7', fontWeight: 600 }}>
-                          <GraduationCap size={12} /> {t.curso_nombre}
-                        </span>
-                      )}
-                      {t.materia && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#059669', fontWeight: 600 }}>
-                          <BookOpen size={12} /> {t.materia}
-                        </span>
-                      )}
-                    </div>
+                    {grp.items.map(t => {
+                      const priBadge = getPriorityBadge(t.prioridad);
+                      return (
+                        <div key={t.id} className="task-card" style={{ background: '#FFFFFF', borderRadius: 10, border: '1px solid #E2E8F0', padding: 16 }}>
+                          {/* Header: título + badges */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+                            <span style={{ fontWeight: 700, fontSize: '14.5px', color: '#0F172A' }}>{t.titulo}</span>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <span className={`badge ${priBadge.cls}`}>{priBadge.label}</span>
+                              <span className={`badge ${t.esta_vencida ? 'badge-vencida' : 'badge-calificada'}`}>
+                                {t.esta_vencida ? 'Vencida' : 'Activa'}
+                              </span>
+                            </div>
+                          </div>
 
-                    {/* Detalles: fecha + puntaje */}
-                    <div style={{ display: 'flex', gap: 16, fontSize: '12px', color: '#64748B', flexWrap: 'wrap' }}>
-                      <span><strong>Fecha límite:</strong> {formatDate(t.fecha_limite)}</span>
-                      <span><strong>Puntaje:</strong> {t.puntaje_maximo} pts</span>
-                    </div>
+                          {/* Detalles: fecha + puntaje */}
+                          <div style={{ display: 'flex', gap: 16, fontSize: '12px', color: '#64748B', flexWrap: 'wrap' }}>
+                            <span><strong>Fecha límite:</strong> {formatDate(t.fecha_limite)}</span>
+                            <span><strong>Puntaje:</strong> {t.puntaje_maximo} pts</span>
+                          </div>
 
-                    {/* Footer: stats + acción */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTop: '1px solid #F1F5F9', flexWrap: 'wrap', gap: 10 }}>
-                      <div style={{ display: 'flex', gap: 16, fontSize: '12.5px', flexWrap: 'wrap' }}>
-                        <span style={{ color: '#0F172A', fontWeight: 600 }}>
-                          Entregadas: <strong>{t.entregadas || t.total_entregas || 0}</strong>
-                        </span>
-                        <span style={{ color: (t.pendientes_calificacion || 0) > 0 ? '#D97706' : '#059669', fontWeight: 700 }}>
-                          Por calificar: {t.pendientes_calificacion || 0}
-                        </span>
-                        <span style={{ color: '#64748B' }}>
-                          Calificadas: {t.calificadas || 0}
-                        </span>
-                      </div>
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => onNavigate('entregas', { filterTaskId: t.id })}
-                        style={{ height: 32, fontSize: 12, background: '#1E3A8A' }}
-                      >
-                        Ver entregas
-                      </button>
-                    </div>
+                          {/* Footer: stats + acción */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTop: '1px solid #F1F5F9', flexWrap: 'wrap', gap: 10 }}>
+                            <div style={{ display: 'flex', gap: 16, fontSize: '12.5px', flexWrap: 'wrap' }}>
+                              <span style={{ color: '#0F172A', fontWeight: 600 }}>
+                                Entregadas: <strong>{t.entregadas || t.total_entregas || 0}</strong>
+                              </span>
+                              <span style={{ color: (t.pendientes_calificacion || 0) > 0 ? '#D97706' : '#059669', fontWeight: 700 }}>
+                                Por calificar: {t.pendientes_calificacion || 0}
+                              </span>
+                              <span style={{ color: '#64748B' }}>
+                                Calificadas: {t.calificadas || 0}
+                              </span>
+                            </div>
+                            <button
+                              className="btn btn-primary btn-sm"
+                              onClick={() => onNavigate('entregas', { filterTaskId: t.id })}
+                              style={{ height: 32, fontSize: 12, background: '#1E3A8A' }}
+                            >
+                              Ver entregas
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                ));
+              })()}
             </div>
           )}
         </div>
@@ -2132,8 +2155,33 @@ export function TeacherSubmissionsView({ initialTaskId }) {
           description={search ? `No se encontraron resultados para "${search}".` : 'No hay entregas registradas en los filtros seleccionados.'}
         />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {filtered.map(ent => {
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {Object.entries(
+            filtered.reduce((acc, ent) => {
+              const key = `${ent.colegio_nombre || 'Colegio'}|||${ent.curso_nombre || 'Curso'}|||${ent.materia_nombre || 'Materia'}`;
+              if (!acc[key]) acc[key] = { colegio: ent.colegio_nombre || 'Colegio', curso: ent.curso_nombre || 'Curso', materia: ent.materia_nombre || 'Materia', items: [] };
+              acc[key].items.push(ent);
+              return acc;
+            }, {})
+          ).map(([gKey, grp]) => (
+            <div key={gKey} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8,
+                padding: '8px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0',
+                borderLeft: '4px solid #1E3A8A', borderRadius: 8
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 12.5 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#1E3A8A', fontWeight: 700 }}><School size={14} /> {grp.colegio}</span>
+                  <span style={{ color: '#94A3B8' }}>›</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#0369A1', fontWeight: 700 }}><GraduationCap size={14} /> {grp.curso}</span>
+                  <span style={{ color: '#94A3B8' }}>›</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#3730A3', fontWeight: 700 }}><BookOpen size={14} /> {grp.materia}</span>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', background: '#FFFFFF', border: '1px solid #CBD5E1', padding: '2px 8px', borderRadius: 12 }}>
+                  {grp.items.length} {grp.items.length === 1 ? 'entrega' : 'entregas'}
+                </span>
+              </div>
+              {grp.items.map(ent => {
             const isLate = ent.es_tardia || ent.estado === 'ATRASADO';
             const isGraded = !!ent.calificacion || (ent.nota !== null && ent.nota !== undefined);
             const notaVal = ent.calificacion?.nota !== undefined ? ent.calificacion.nota : ent.nota;
@@ -2320,7 +2368,9 @@ export function TeacherSubmissionsView({ initialTaskId }) {
                 </div>
               </div>
             );
-          })}
+              })}
+            </div>
+          ))}
         </div>
       )}
 
@@ -2588,28 +2638,225 @@ function ModalAnaliticaEstudiante({ student, onClose }) {
   );
 }
 
-export function TeacherGradebookView({ onNavigate }) {
-  const [students, setStudents] = useState([]);
+// ============================================================
+// SHARED HIERARCHY HOOK & BAR: COLEGIO -> CURSO -> MATERIA
+// ============================================================
+function useDocenteEstructura({ allowAllMaterias = false } = {}) {
+  const [colegios, setColegios] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedColegioId, setSelectedColegioId] = useState('');
+  const [selectedCursoId, setSelectedCursoId] = useState('');
+  const [selectedMateriaId, setSelectedMateriaId] = useState('');
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch('/api/v2/docente/lista-excel/')
+      .then(res => {
+        const cols = res?.colegios || [];
+        setColegios(cols);
+        if (cols.length > 0) {
+          const pref = cols.find(c => (c.colegio_nombre || '').includes('Simón Bolívar')) || cols[0];
+          setSelectedColegioId(String(pref.colegio_id));
+          if (pref.cursos?.length > 0) {
+            const firstCur = pref.cursos[0];
+            setSelectedCursoId(String(firstCur.curso_id));
+            if (allowAllMaterias) {
+              setSelectedMateriaId('TODAS');
+            } else if (firstCur.materias?.length > 0) {
+              setSelectedMateriaId(String(firstCur.materias[0].materia_id));
+            }
+          }
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [allowAllMaterias]);
+
+  const colegioActual = useMemo(
+    () => colegios.find(c => String(c.colegio_id) === String(selectedColegioId)) || colegios[0] || null,
+    [colegios, selectedColegioId]
+  );
+
+  const cursosDisponibles = useMemo(() => colegioActual?.cursos || [], [colegioActual]);
+
+  const cursoActual = useMemo(
+    () => cursosDisponibles.find(c => String(c.curso_id) === String(selectedCursoId)) || cursosDisponibles[0] || null,
+    [cursosDisponibles, selectedCursoId]
+  );
+
+  const materiasDisponibles = useMemo(() => cursoActual?.materias || [], [cursoActual]);
+
+  const materiaActual = useMemo(() => {
+    if (allowAllMaterias && selectedMateriaId === 'TODAS') return null;
+    return materiasDisponibles.find(m => String(m.materia_id) === String(selectedMateriaId)) || materiasDisponibles[0] || null;
+  }, [materiasDisponibles, selectedMateriaId, allowAllMaterias]);
+
+  const onSelectColegio = (val) => {
+    setSelectedColegioId(val);
+    const col = colegios.find(c => String(c.colegio_id) === String(val));
+    const firstCur = col?.cursos?.[0];
+    setSelectedCursoId(firstCur ? String(firstCur.curso_id) : '');
+    if (allowAllMaterias) {
+      setSelectedMateriaId('TODAS');
+    } else {
+      const firstMat = firstCur?.materias?.[0];
+      setSelectedMateriaId(firstMat ? String(firstMat.materia_id) : '');
+    }
+  };
+
+  const onSelectCurso = (val) => {
+    setSelectedCursoId(val);
+    const cur = cursosDisponibles.find(c => String(c.curso_id) === String(val));
+    if (allowAllMaterias) {
+      setSelectedMateriaId('TODAS');
+    } else {
+      const firstMat = cur?.materias?.[0];
+      setSelectedMateriaId(firstMat ? String(firstMat.materia_id) : '');
+    }
+  };
+
+  const onSelectMateria = (val) => {
+    setSelectedMateriaId(val);
+  };
+
+  const mapStudent = useCallback((est, cur, matNombre = '') => ({
+    id: est.estudiante_id,
+    nombre_completo: est.nombre || 'Estudiante',
+    matricula: est.ru || `RU-${est.estudiante_id}`,
+    email: est.email || '',
+    grado: cur?.grado || cur?.curso_nombre || '',
+    paralelo: cur?.paralelo || '',
+    materia_nombre: matNombre,
+    tareas_entregadas: est.tareas_entregadas || 0,
+    tareas_asignadas: est.total_tareas || 0,
+    tareas_pendientes: est.tareas_pendientes || 0,
+    porcentaje_cumplimiento: est.porcentaje_cumplimiento || 0,
+    promedio: est.promedio ?? 0,
+    estado_academico: est.estado_academico || 'En Curso',
+    riesgo_academico: Boolean(est.en_riesgo),
+    nivel_riesgo: est.nivel_riesgo,
+    factores_riesgo: est.factores_riesgo || [],
+    calificaciones: est.calificaciones || []
+  }), []);
+
+  const students = useMemo(() => {
+    if (!cursoActual) return [];
+    if (materiaActual) {
+      return (materiaActual.estudiantes || []).map(est => mapStudent(est, cursoActual, materiaActual.materia_nombre));
+    }
+    if (allowAllMaterias && selectedMateriaId === 'TODAS') {
+      return materiasDisponibles.flatMap(mat =>
+        (mat.estudiantes || []).map(est => mapStudent(est, cursoActual, mat.materia_nombre))
+      );
+    }
+    return [];
+  }, [cursoActual, materiaActual, materiasDisponibles, selectedMateriaId, allowAllMaterias, mapStudent]);
+
+  return {
+    colegios,
+    cursosDisponibles,
+    materiasDisponibles,
+    colegioActual,
+    cursoActual,
+    materiaActual,
+    selectedColegioId,
+    selectedCursoId,
+    selectedMateriaId,
+    onSelectColegio,
+    onSelectCurso,
+    onSelectMateria,
+    students,
+    loading
+  };
+}
+
+function DocenteHierarchySelectorBar({
+  colegios, cursosDisponibles, materiasDisponibles,
+  selectedColegioId, selectedCursoId, selectedMateriaId,
+  onSelectColegio, onSelectCurso, onSelectMateria,
+  allowAllMaterias = false
+}) {
+  if (!colegios || colegios.length === 0) return null;
+  return (
+    <div style={{
+      background: '#FFFFFF', borderRadius: 10, border: '1.5px solid #E2E8F0',
+      padding: '14px 18px', marginBottom: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+      display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12
+    }}>
+      <div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: '#1E3A8A', marginBottom: 5 }}>
+          <School size={13} /> Colegio
+        </label>
+        <select
+          className="form-control"
+          style={{ height: 36, fontSize: 12.5, fontWeight: 600, background: '#F8FAFC', border: '1px solid #CBD5E1' }}
+          value={selectedColegioId}
+          onChange={e => onSelectColegio(e.target.value)}
+        >
+          {colegios.map(c => (
+            <option key={c.colegio_id} value={String(c.colegio_id)}>{c.colegio_nombre}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: '#0369A1', marginBottom: 5 }}>
+          <GraduationCap size={13} /> Curso / Paralelo
+        </label>
+        <select
+          className="form-control"
+          style={{ height: 36, fontSize: 12.5, fontWeight: 600, background: '#F8FAFC', border: '1px solid #CBD5E1' }}
+          value={selectedCursoId}
+          onChange={e => onSelectCurso(e.target.value)}
+        >
+          {cursosDisponibles.map(cur => (
+            <option key={cur.curso_id} value={String(cur.curso_id)}>{cur.curso_nombre}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: '#059669', marginBottom: 5 }}>
+          <BookOpen size={13} /> Materia
+        </label>
+        <select
+          className="form-control"
+          style={{ height: 36, fontSize: 12.5, fontWeight: 600, background: '#F8FAFC', border: '1px solid #CBD5E1' }}
+          value={selectedMateriaId}
+          onChange={e => onSelectMateria(e.target.value)}
+        >
+          {allowAllMaterias && <option value="TODAS">— Todas las materias del curso —</option>}
+          {materiasDisponibles.map(m => (
+            <option key={m.materia_id} value={String(m.materia_id)}>{m.materia_nombre}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
+export function TeacherGradebookView({ onNavigate }) {
+  const {
+    colegios, cursosDisponibles, materiasDisponibles,
+    colegioActual, cursoActual, materiaActual,
+    selectedColegioId, selectedCursoId, selectedMateriaId,
+    onSelectColegio, onSelectCurso, onSelectMateria,
+    students, loading
+  } = useDocenteEstructura();
+
   const [search, setSearch] = useState('');
   const [reportStudent, setReportStudent] = useState(null);
   const [analisisStudent, setAnalisisStudent] = useState(null);
 
-  useEffect(() => {
-    teacherAPI.studentsList()
-      .then(setStudents)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
   const exportToCSV = () => {
     if (!students || students.length === 0) return;
-    const headers = ['Estudiante', 'Matricula', 'Grado', 'Paralelo', 'Tareas Entregadas', 'Tareas Asignadas', 'Tareas Pendientes', 'Cumplimiento %', 'Promedio', 'Estado'];
+    const headers = ['Estudiante', 'RUDE / Matricula', 'Colegio', 'Curso', 'Materia', 'Tareas Entregadas', 'Tareas Asignadas', 'Tareas Pendientes', 'Cumplimiento %', 'Promedio', 'Estado'];
     const rows = students.map(s => [
       `"${s.nombre_completo || ''}"`,
       `"${s.matricula || ''}"`,
-      `"${s.grado || ''}"`,
-      `"${s.paralelo || ''}"`,
+      `"${colegioActual?.colegio_nombre || ''}"`,
+      `"${cursoActual?.curso_nombre || ''}"`,
+      `"${materiaActual?.materia_nombre || ''}"`,
       s.tareas_entregadas || 0,
       s.tareas_asignadas || 0,
       s.tareas_pendientes || 0,
@@ -2622,32 +2869,37 @@ export function TeacherGradebookView({ onNavigate }) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `Libro_Calificaciones_${new Date().toISOString().slice(0, 10)}.csv`);
+    const matSlug = (materiaActual?.materia_nombre || 'Materia').replace(/\s+/g, '_');
+    link.setAttribute('download', `Notas_${matSlug}_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   const filtered = students.filter(s =>
-    !search || s.nombre_completo.toLowerCase().includes(search.toLowerCase()) || s.matricula.includes(search)
+    !search ||
+    s.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
+    s.matricula.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
     <div className="page-container">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#242424' }}>Libro de Calificaciones</h2>
-          <p style={{ fontSize: '12.5px', color: '#616161' }}>
-            Consolidado academico general por estudiante y rendimiento ponderado.
+          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: '0 0 3px' }}>
+            Resultados y Notas por Materia
+          </h2>
+          <p style={{ fontSize: '12.5px', color: '#64748B', margin: 0 }}>
+            Selecciona colegio, curso y materia para revisar promedios, entregas y proyección numérica.
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', width: 220 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', width: 210 }}>
             <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
             <input
               className="form-control"
-              style={{ paddingLeft: 30, height: 32, fontSize: '12.5px' }}
+              style={{ paddingLeft: 30, height: 34, fontSize: '12.5px' }}
               placeholder="Buscar estudiante..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -2657,32 +2909,54 @@ export function TeacherGradebookView({ onNavigate }) {
           <button
             className="btn btn-secondary btn-sm"
             onClick={exportToCSV}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, height: 32 }}
-            title="Descargar tabla en formato CSV compatible con Excel"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, height: 34 }}
+            title="Descargar tabla de esta materia en formato CSV compatible con Excel"
           >
-            <Download size={13} /> Exportar Excel (CSV)
+            <Download size={13} /> Exportar Excel
           </button>
+
+          {cursoActual?.curso_id && (
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => window.open(`/api/v2/cursos/${cursoActual.curso_id}/boletin-pdf/`, '_blank')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, height: 34, color: '#059669', borderColor: '#A7F3D0', background: '#ECFDF5' }}
+              title="Descargar cuadro oficial del curso en PDF"
+            >
+              <FileText size={13} /> Boletín PDF
+            </button>
+          )}
 
           {onNavigate && (
             <button
               className="btn btn-primary btn-sm"
               onClick={() => onNavigate('lista-excel')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, height: 32, background: '#1E3A8A' }}
-              title="Ver desglose completo de notas por colegio, curso y materia"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, height: 34, background: '#1E3A8A' }}
             >
-              <FileSpreadsheet size={13} /> Vista Completa por Colegio
+              <FileSpreadsheet size={13} /> Lista Excel
             </button>
           )}
         </div>
       </div>
 
+      <DocenteHierarchySelectorBar
+        colegios={colegios}
+        cursosDisponibles={cursosDisponibles}
+        materiasDisponibles={materiasDisponibles}
+        selectedColegioId={selectedColegioId}
+        selectedCursoId={selectedCursoId}
+        selectedMateriaId={selectedMateriaId}
+        onSelectColegio={onSelectColegio}
+        onSelectCurso={onSelectCurso}
+        onSelectMateria={onSelectMateria}
+      />
+
       {loading ? (
-        <Loading text="Cargando libro de calificaciones..." />
+        <Loading text="Cargando calificaciones de la materia..." />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={Award}
-          title="Sin datos disponibles"
-          description="Los datos se reflejaran cuando se registren calificaciones."
+          title="Sin estudiantes en esta materia"
+          description="Selecciona otro colegio, curso o materia para visualizar los resultados."
         />
       ) : (
         <div className="teams-table-container">
@@ -2707,7 +2981,7 @@ export function TeacherGradebookView({ onNavigate }) {
                   <tr key={s.id}>
                     <td style={{ fontWeight: 600, color: '#242424' }}>{s.nombre_completo}</td>
                     <td>{s.matricula}</td>
-                    <td>{s.grado} "{s.paralelo}"</td>
+                    <td>{s.paralelo ? `${s.grado} "${s.paralelo}"` : s.grado}</td>
                     <td>{s.tareas_entregadas} de {s.tareas_asignadas}</td>
                     <td style={{ color: s.tareas_pendientes > 0 ? '#CA5010' : '#616161' }}>
                       {s.tareas_pendientes}
@@ -2721,7 +2995,7 @@ export function TeacherGradebookView({ onNavigate }) {
                       </span>
                     </td>
                     <td>
-                      <span className={`badge ${s.estado_academico === 'Excelente' ? 'badge-calificada' : s.estado_academico === 'Regular' ? 'badge-pendiente' : 'badge-vencida'}`}>
+                      <span className={`badge ${s.estado_academico === 'Excelente' || s.estado_academico === 'Aprobado' ? 'badge-calificada' : s.estado_academico === 'Regular' || s.estado_academico === 'Sin notas' ? 'badge-pendiente' : 'badge-vencida'}`}>
                         {s.estado_academico}
                       </span>
                     </td>
@@ -2953,43 +3227,50 @@ function SendReportModal({ student, onClose }) {
 }
 
 // ============================================================
-// 5. TEACHER STUDENTS VIEW (SEGUIMIENTO ACADMICO)
+// 5. TEACHER STUDENTS VIEW (SEGUIMIENTO ACADEMICO POR MATERIA)
 // ============================================================
 export function TeacherStudentsView() {
-  const [students, setStudents] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    colegios, cursosDisponibles, materiasDisponibles,
+    colegioActual, cursoActual, materiaActual,
+    selectedColegioId, selectedCursoId, selectedMateriaId,
+    onSelectColegio, onSelectCurso, onSelectMateria,
+    students, loading
+  } = useDocenteEstructura();
+
   const [reportStudent, setReportStudent] = useState(null);
   const [search, setSearch] = useState('');
+  const [estadoFiltro, setEstadoFiltro] = useState('TODOS'); // TODOS | RIESGO | AL_DIA
 
-  useEffect(() => {
-    teacherAPI.studentsList()
-      .then(setStudents)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+  const filtered = students.filter(s => {
+    if (estadoFiltro === 'RIESGO' && !s.riesgo_academico) return false;
+    if (estadoFiltro === 'AL_DIA' && s.riesgo_academico) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return s.nombre_completo.toLowerCase().includes(q) || s.matricula.toLowerCase().includes(q);
+    }
+    return true;
+  });
 
-  const filtered = students.filter(s =>
-    !search ||
-    s.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
-    s.matricula.includes(search)
-  );
+  const enRiesgoCount = students.filter(s => s.riesgo_academico).length;
+  const alDiaCount = students.length - enRiesgoCount;
 
   return (
     <div className="page-container">
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#242424', marginBottom: 4 }}>
-            Seguimiento Academico de Estudiantes
+          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: '0 0 4px' }}>
+            Seguimiento Académico por Materia
           </h2>
-          <p style={{ color: '#616161', fontSize: '12.5px' }}>
-            Monitoreo del desempeno, ritmo de entrega y estado de riesgo academico. Envia reportes personalizados directamente al correo del estudiante.
+          <p style={{ color: '#64748B', fontSize: '12.5px', margin: 0 }}>
+            Monitoreo individual de entregas, promedios y alertas de riesgo por colegio, curso y materia.
           </p>
         </div>
         <div style={{ position: 'relative', width: 240 }}>
           <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#8A8886' }} />
           <input
             className="form-control"
-            style={{ paddingLeft: 28, height: 32, fontSize: '12.5px' }}
+            style={{ paddingLeft: 28, height: 34, fontSize: '12.5px' }}
             placeholder="Buscar estudiante..."
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -2997,10 +3278,48 @@ export function TeacherStudentsView() {
         </div>
       </div>
 
+      <DocenteHierarchySelectorBar
+        colegios={colegios}
+        cursosDisponibles={cursosDisponibles}
+        materiasDisponibles={materiasDisponibles}
+        selectedColegioId={selectedColegioId}
+        selectedCursoId={selectedCursoId}
+        selectedMateriaId={selectedMateriaId}
+        onSelectColegio={onSelectColegio}
+        onSelectCurso={onSelectCurso}
+        onSelectMateria={onSelectMateria}
+      />
+
+      {/* Filtros rápidos de seguimiento */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        {[
+          { id: 'TODOS', label: `Todos (${students.length})`, color: '#1E3A8A', bg: '#EFF6FF' },
+          { id: 'RIESGO', label: `En Riesgo (${enRiesgoCount})`, color: '#B91C1C', bg: '#FEF2F2' },
+          { id: 'AL_DIA', label: `Sin Riesgo (${alDiaCount})`, color: '#065F46', bg: '#ECFDF5' },
+        ].map(f => {
+          const active = estadoFiltro === f.id;
+          return (
+            <button
+              key={f.id}
+              onClick={() => setEstadoFiltro(f.id)}
+              style={{
+                background: active ? f.bg : '#FFFFFF',
+                color: active ? f.color : '#64748B',
+                border: `1px solid ${active ? f.color : '#E2E8F0'}`,
+                borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: active ? 700 : 500,
+                cursor: 'pointer'
+              }}
+            >
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
+
       {loading ? (
         <Loading text="Cargando expedientes de estudiantes..." />
       ) : filtered.length === 0 ? (
-        <EmptyState icon={Users} title="Sin resultados" description="No se encontro ningún estudiante con ese criterio." />
+        <EmptyState icon={Users} title="Sin resultados" description="No se encontró ningún estudiante con ese criterio en esta materia." />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: 16 }}>
           {filtered.map(est => (
@@ -3011,48 +3330,47 @@ export function TeacherStudentsView() {
                   width: 40, height: 40, borderRadius: '50%',
                   background: est.riesgo_academico
                     ? 'linear-gradient(135deg, #FEE2E2, #FECACA)'
-                    : 'linear-gradient(135deg, #5B5FC7, #4338CA)',
+                    : 'linear-gradient(135deg, #1E3A8A, #3B82F6)',
                   color: est.riesgo_academico ? '#B91C1C' : '#FFFFFF',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 700, fontSize: '14px', flexShrink: 0,
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.12)'
+                  fontWeight: 700, fontSize: '14px', flexShrink: 0
                 }}>
                   {est.nombre_completo.slice(0, 2).toUpperCase()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#242424', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontWeight: 700, fontSize: '13.5px', color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {est.nombre_completo}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#616161' }}>
-                    {est.matricula} - {est.grado} "{est.paralelo}"
+                  <div style={{ fontSize: '11px', color: '#64748B' }}>
+                    {est.matricula} · {est.materia_nombre || materiaActual?.materia_nombre}
                   </div>
                 </div>
-                <span className={`badge ${est.estado_academico === 'Excelente' ? 'badge-calificada' : est.estado_academico === 'Regular' ? 'badge-pendiente' : 'badge-vencida'}`}>
+                <span className={`badge ${est.estado_academico === 'Aprobado' || est.estado_academico === 'Excelente' ? 'badge-calificada' : est.estado_academico === 'Regular' ? 'badge-pendiente' : 'badge-vencida'}`}>
                   {est.estado_academico}
                 </span>
               </div>
 
               {/* Progress bar */}
               <div style={{ marginBottom: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#616161', marginBottom: 4 }}>
-                  <span>Progreso de tareas</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748B', marginBottom: 4 }}>
+                  <span>Entregas en la materia</span>
                   <span style={{ fontWeight: 600 }}>{est.tareas_entregadas}/{est.tareas_asignadas} ({est.porcentaje_cumplimiento}%)</span>
                 </div>
                 <ProgressBar value={est.porcentaje_cumplimiento} color={est.porcentaje_cumplimiento >= 80 ? 'success' : est.porcentaje_cumplimiento >= 50 ? 'warning' : 'danger'} height={6} />
               </div>
 
               {/* Average + risk flag */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTop: '1px solid #EDEBE9', marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTop: '1px solid #F1F5F9', marginBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: '11px', color: '#8A8886' }}>Promedio:</span>
+                  <span style={{ fontSize: '11px', color: '#64748B' }}>Promedio:</span>
                   <span style={{ fontWeight: 700, fontSize: '14px', color: getNoteColor(est.promedio) }}>
-                    {est.promedio > 0 ? `${est.promedio}/100` : '-'}
+                    {est.promedio > 0 ? `${est.promedio}/100` : '—'}
                   </span>
                 </div>
                 {est.riesgo_academico && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#B91C1C', fontSize: '11px', fontWeight: 600 }}>
                     <AlertTriangle size={12} />
-                    Riesgo academico
+                    Riesgo académico
                   </div>
                 )}
               </div>
@@ -3060,11 +3378,11 @@ export function TeacherStudentsView() {
               {/* Send report button */}
               <button
                 className="btn btn-primary"
-                style={{ width: '100%', justifyContent: 'center', fontSize: '12.5px' }}
+                style={{ width: '100%', justifyContent: 'center', fontSize: '12.5px', background: '#1E3A8A' }}
                 onClick={() => setReportStudent(est)}
               >
                 <Send size={13} />
-                Enviar reporte de desempeno
+                Enviar reporte de desempeño
               </button>
             </div>
           ))}
@@ -3089,80 +3407,185 @@ export function TeacherStudentsView() {
 }
 
 // ============================================================
-// 6. TEACHER REPORTS VIEW (REPORTES Y ANLISIS)
+// 6. TEACHER REPORTS VIEW (REPORTES REALES POR COLEGIO/CURSO/MATERIA)
 // ============================================================
 export function TeacherReportsView() {
-  const [reports, setReports] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const {
+    colegios, cursosDisponibles, materiasDisponibles,
+    colegioActual, cursoActual, materiaActual,
+    selectedColegioId, selectedCursoId, selectedMateriaId,
+    onSelectColegio, onSelectCurso, onSelectMateria,
+    students, loading
+  } = useDocenteEstructura({ allowAllMaterias: true });
 
-  useEffect(() => {
-    teacherAPI.reports()
-      .then(setReports)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+  const stats = useMemo(() => {
+    const totalEst = students.length;
+    const conNota = students.filter(s => s.promedio > 0);
+    const promGen = conNota.length > 0
+      ? Math.round((conNota.reduce((acc, s) => acc + s.promedio, 0) / conNota.length) * 10) / 10
+      : 0;
+    const totalEntregas = students.reduce((acc, s) => acc + (s.tareas_entregadas || 0), 0);
+    const totalAsignadas = students.reduce((acc, s) => acc + (s.tareas_asignadas || 0), 0);
+    const totalPendientes = students.reduce((acc, s) => acc + (s.tareas_pendientes || 0), 0);
+    const enRiesgo = students.filter(s => s.riesgo_academico).length;
 
-  if (loading) return <Loading text="Generando reportes analiticos..." />;
-  if (!reports) return null;
+    const dp = conNota.filter(s => s.promedio >= 85).length;
+    const dOpt = conNota.filter(s => s.promedio >= 69 && s.promedio < 85).length;
+    const da = conNota.filter(s => s.promedio >= 51 && s.promedio < 69).length;
+    const ed = conNota.filter(s => s.promedio < 51).length;
+    const sinNotas = totalEst - conNota.length;
+
+    return {
+      totalEst,
+      promGen,
+      totalEntregas,
+      totalAsignadas,
+      totalPendientes,
+      enRiesgo,
+      distribucion: [
+        { rango: 'Desarrollo Pleno / Excelente (85 - 100 pts)', cantidad: dp, color: '#10B981' },
+        { rango: 'Desarrollo Óptimo / Bueno (69 - 84 pts)', cantidad: dOpt, color: '#2563EB' },
+        { rango: 'Desarrollo Aceptable / Regular (51 - 68 pts)', cantidad: da, color: '#F59E0B' },
+        { rango: 'En Desarrollo / Riesgo (0 - 50 pts)', cantidad: ed, color: '#EF4444' },
+        { rango: 'Sin calificaciones registradas', cantidad: sinNotas, color: '#94A3B8' },
+      ]
+    };
+  }, [students]);
 
   return (
     <div className="page-container">
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#242424', marginBottom: 4 }}>
-          Reportes y Estadisticas académicas
-        </h2>
-        <p style={{ color: '#616161', fontSize: '12.5px' }}>
-          Distribucion de notas, cumplimiento institucional e indicadores globales de tus cursos.
-        </p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A', margin: '0 0 4px' }}>
+            Reportes y Estadísticas Académicas
+          </h2>
+          <p style={{ color: '#64748B', fontSize: '12.5px', margin: 0 }}>
+            Indicadores reales, distribución de notas y cumplimiento por colegio, curso y materia.
+          </p>
+        </div>
+
+        {cursoActual?.curso_id && (
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => window.open(`/api/v2/cursos/${cursoActual.curso_id}/boletin-pdf/`, '_blank')}
+            style={{ background: '#059669', display: 'inline-flex', alignItems: 'center', gap: 6, height: 34 }}
+          >
+            <Download size={14} /> Descargar Cuadro PDF del Curso
+          </button>
+        )}
       </div>
 
-      <div className="stats-grid" style={{ marginBottom: 20 }}>
-        <div className="stat-card">
-          <div className="stat-card-icon blue"><Award size={20} /></div>
-          <div className="stat-card-info">
-            <div className="stat-card-value">{reports.promedio_general} / 100</div>
-            <div className="stat-card-label">Promedio General</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card-icon green"><ClipboardList size={20} /></div>
-          <div className="stat-card-info">
-            <div className="stat-card-value">{reports.total_tareas}</div>
-            <div className="stat-card-label">Tareas Asignadas</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card-icon yellow"><InboxIcon size={20} /></div>
-          <div className="stat-card-info">
-            <div className="stat-card-value">{reports.total_entregas}</div>
-            <div className="stat-card-label">Entregas Recibidas</div>
-          </div>
-        </div>
-      </div>
+      <DocenteHierarchySelectorBar
+        colegios={colegios}
+        cursosDisponibles={cursosDisponibles}
+        materiasDisponibles={materiasDisponibles}
+        selectedColegioId={selectedColegioId}
+        selectedCursoId={selectedCursoId}
+        selectedMateriaId={selectedMateriaId}
+        onSelectColegio={onSelectColegio}
+        onSelectCurso={onSelectCurso}
+        onSelectMateria={onSelectMateria}
+        allowAllMaterias={true}
+      />
 
-      <div className="card">
-        <div className="card-header">
-          <span className="card-title"><BarChart2 size={16} /> Distribucion de Calificaciones</span>
-        </div>
-        <div className="card-body">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {reports.distribucion_notas.map((d, i) => (
-              <div key={i}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', marginBottom: 4 }}>
-                  <span style={{ fontWeight: 600, color: '#242424' }}>{d.rango}</span>
-                  <span style={{ color: '#616161', fontWeight: 600 }}>{d.cantidad} estudiante(s)</span>
-                </div>
-                <div style={{ background: '#EDEBE9', borderRadius: '4px', height: 8, overflow: 'hidden' }}>
-                  <div style={{
-                    width: `${Math.min(100, (d.cantidad / Math.max(reports.total_entregas, 1)) * 100)}%`,
-                    backgroundColor: d.color, height: '100%', borderRadius: '4px'
-                  }} />
-                </div>
+      {loading ? (
+        <Loading text="Generando estadísticas reales del grupo..." />
+      ) : (
+        <>
+          <div className="stats-grid" style={{ marginBottom: 20 }}>
+            <div className="stat-card">
+              <div className="stat-card-icon blue"><Award size={20} /></div>
+              <div className="stat-card-info">
+                <div className="stat-card-value">{stats.promGen > 0 ? `${stats.promGen} / 100` : '—'}</div>
+                <div className="stat-card-label">Promedio {materiaActual ? materiaActual.materia_nombre : 'del Curso'}</div>
               </div>
-            ))}
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-icon green"><InboxIcon size={20} /></div>
+              <div className="stat-card-info">
+                <div className="stat-card-value">{stats.totalEntregas} / {stats.totalAsignadas}</div>
+                <div className="stat-card-label">Entregas Registradas</div>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-icon yellow"><AlertTriangle size={20} /></div>
+              <div className="stat-card-info">
+                <div className="stat-card-value">{stats.enRiesgo}</div>
+                <div className="stat-card-label">Registros en Riesgo</div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+
+          {/* Tabla resumen por materia cuando se seleccionan todas las materias del curso */}
+          {!materiaActual && materiasDisponibles.length > 0 && (
+            <div className="card" style={{ marginBottom: 20 }}>
+              <div className="card-header">
+                <span className="card-title"><BookOpen size={16} /> Comparativa por Materias — {cursoActual?.curso_nombre}</span>
+              </div>
+              <div className="card-body" style={{ overflowX: 'auto' }}>
+                <table className="teams-table">
+                  <thead>
+                    <tr>
+                      <th>Materia</th>
+                      <th>Estudiantes</th>
+                      <th>Promedio</th>
+                      <th>Entregas</th>
+                      <th>Pendientes</th>
+                      <th>En Riesgo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {materiasDisponibles.map(m => {
+                      const ests = m.estudiantes || [];
+                      const notas = ests.map(e => e.promedio).filter(p => p != null && p > 0);
+                      const promM = notas.length ? Math.round((notas.reduce((a, b) => a + b, 0) / notas.length) * 10) / 10 : null;
+                      const entM = ests.reduce((a, e) => a + (e.tareas_entregadas || 0), 0);
+                      const pendM = ests.reduce((a, e) => a + (e.tareas_pendientes || 0), 0);
+                      const riskM = ests.filter(e => e.en_riesgo).length;
+                      return (
+                        <tr key={m.materia_id}>
+                          <td style={{ fontWeight: 700, color: '#0F172A' }}>{m.materia_nombre}</td>
+                          <td>{ests.length}</td>
+                          <td style={{ fontWeight: 700, color: getNoteColor(promM || 0) }}>{promM ? `${promM}/100` : '—'}</td>
+                          <td style={{ color: '#059669', fontWeight: 600 }}>{entM}</td>
+                          <td style={{ color: pendM > 0 ? '#D97706' : '#64748B', fontWeight: 600 }}>{pendM}</td>
+                          <td style={{ color: riskM > 0 ? '#DC2626' : '#059669', fontWeight: 700 }}>{riskM}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">
+                <BarChart2 size={16} /> Distribución de Calificaciones — {colegioActual?.colegio_nombre} ({cursoActual?.curso_nombre})
+              </span>
+            </div>
+            <div className="card-body">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {stats.distribucion.map((d, i) => (
+                  <div key={i}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', marginBottom: 4 }}>
+                      <span style={{ fontWeight: 600, color: '#0F172A' }}>{d.rango}</span>
+                      <span style={{ color: '#64748B', fontWeight: 600 }}>{d.cantidad} registro(s)</span>
+                    </div>
+                    <div style={{ background: '#E2E8F0', borderRadius: '4px', height: 8, overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${Math.min(100, (d.cantidad / Math.max(stats.totalEst, 1)) * 100)}%`,
+                        backgroundColor: d.color, height: '100%', borderRadius: '4px', transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
