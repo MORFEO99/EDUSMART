@@ -154,7 +154,11 @@ export function StudentGradesView({ onNavigate }) {
                 padding: '12px 14px', fontSize: '12.5px', color: '#242424', lineHeight: 1.5,
                 borderLeft: '3px solid #5B5FC7'
               }}>
-                {selectedTask.entrega?.calificacion?.retroalimentacion || 'El docente no ha adjuntado comentarios escritos adicionales.'}
+                {(() => {
+                  const r = selectedTask.retroalimentacion || selectedTask.entrega?.calificacion?.retroalimentacion || selectedTask.mi_entrega?.calificacion?.retroalimentacion;
+                  const text = typeof r === 'object' ? (r?.comentario || '') : (r || '');
+                  return text || 'El docente no ha adjuntado comentarios escritos adicionales.';
+                })()}
               </div>
             </div>
 
@@ -422,12 +426,17 @@ export function StudentResultsView({ onNavigate }) {
 
   if (loading) return <Loading text="Cargando tus resultados académicos..." />;
 
-  const gradedTasks = tareas.filter(t => t.nota !== null && t.nota !== undefined);
+  const getTaskNota = (t) => {
+    const val = t.nota ?? t.calificacion?.nota ?? t.entrega?.calificacion?.nota ?? t.mi_entrega?.calificacion?.nota;
+    return (val !== null && val !== undefined) ? parseFloat(val) : null;
+  };
+
+  const gradedTasks = tareas.map(t => ({ ...t, notaCalculada: getTaskNota(t) })).filter(t => t.notaCalculada !== null);
   const average = gradedTasks.length
-    ? Math.round((gradedTasks.reduce((acc, t) => acc + (parseFloat(t.nota) || 0), 0) / gradedTasks.length) * 10) / 10
+    ? Math.round((gradedTasks.reduce((acc, t) => acc + (t.notaCalculada || 0), 0) / gradedTasks.length) * 10) / 10
     : 0;
-  const highest = gradedTasks.length ? Math.max(...gradedTasks.map(t => parseFloat(t.nota) || 0)) : 0;
-  const approved = gradedTasks.filter(t => parseFloat(t.nota) >= 60).length;
+  const highest = gradedTasks.length ? Math.max(...gradedTasks.map(t => t.notaCalculada || 0)) : 0;
+  const approved = gradedTasks.filter(t => t.notaCalculada >= 60).length;
 
   // Group by materia
   const byMateria = {};
@@ -435,7 +444,7 @@ export function StudentResultsView({ onNavigate }) {
     const m = t.materia || 'General';
     if (!byMateria[m]) byMateria[m] = { tasks: [], total: 0, count: 0 };
     byMateria[m].tasks.push(t);
-    byMateria[m].total += parseFloat(t.nota) || 0;
+    byMateria[m].total += t.notaCalculada || 0;
     byMateria[m].count += 1;
   });
 
@@ -552,12 +561,12 @@ export function StudentResultsView({ onNavigate }) {
                           style={{
                             padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
                             fontSize: 12, fontWeight: 700,
-                            background: `${getNoteColor(t.nota)}15`,
-                            color: getNoteColor(t.nota),
-                            border: `1px solid ${getNoteColor(t.nota)}30`
+                            background: `${getNoteColor(t.notaCalculada)}15`,
+                            color: getNoteColor(t.notaCalculada),
+                            border: `1px solid ${getNoteColor(t.notaCalculada)}30`
                           }}
                         >
-                          {t.nota}/100
+                          {t.notaCalculada}/100
                         </div>
                       ))}
                     </div>
@@ -591,11 +600,11 @@ export function StudentResultsView({ onNavigate }) {
                 >
                   <div style={{
                     width: 42, height: 42, borderRadius: 10, flexShrink: 0,
-                    background: `${getNoteColor(t.nota)}15`,
+                    background: `${getNoteColor(t.notaCalculada)}15`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 14, fontWeight: 800, color: getNoteColor(t.nota)
+                    fontSize: 14, fontWeight: 800, color: getNoteColor(t.notaCalculada)
                   }}>
-                    {t.nota}
+                    {t.notaCalculada}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 14, color: '#0F172A', marginBottom: 3 }}>{t.titulo}</div>
@@ -603,7 +612,7 @@ export function StudentResultsView({ onNavigate }) {
                       {t.materia} · {t.docente} · {formatDate(t.fecha_limite)}
                     </div>
                   </div>
-                  {t.entrega?.calificacion?.retroalimentacion && (
+                  {(t.retroalimentacion || t.entrega?.calificacion?.retroalimentacion || t.mi_entrega?.calificacion?.retroalimentacion) && (
                     <div style={{
                       padding: '4px 10px', borderRadius: 20, fontSize: 11,
                       background: '#F0F9FF', color: '#0284C7', fontWeight: 600
@@ -622,49 +631,54 @@ export function StudentResultsView({ onNavigate }) {
 
       {/* Task detail modal */}
       <Modal open={!!selectedTask} onClose={() => setSelectedTask(null)} title="Detalle de Calificación">
-        {selectedTask && (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, padding: '14px 16px', background: '#F8FAFC', borderRadius: 8 }}>
-              <div style={{
-                width: 52, height: 52, borderRadius: 12, flexShrink: 0,
-                background: `${getNoteColor(selectedTask.nota)}15`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 20, fontWeight: 800, color: getNoteColor(selectedTask.nota)
-              }}>
-                {selectedTask.nota}
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: '#0F172A' }}>{selectedTask.titulo}</div>
-                <div style={{ fontSize: 12, color: '#64748B' }}>{selectedTask.materia} · {selectedTask.docente}</div>
-                <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
-                  <span style={{ fontWeight: 600, color: selectedTask.nota >= 60 ? '#10B981' : '#EF4444' }}>
-                    {selectedTask.nota >= 60 ? '✓ Aprobado' : '✗ No aprobado'}
-                  </span>
-                  {' · '}{selectedTask.nota}/{selectedTask.puntaje_maximo} puntos
-                </div>
-              </div>
-            </div>
-            {selectedTask.entrega?.calificacion?.retroalimentacion ? (
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-                  Retroalimentación del Docente
-                </div>
+        {selectedTask && (() => {
+          const notaVal = selectedTask.notaCalculada ?? selectedTask.nota ?? selectedTask.mi_entrega?.calificacion?.nota ?? 0;
+          const rawR = selectedTask.retroalimentacion || selectedTask.entrega?.calificacion?.retroalimentacion || selectedTask.mi_entrega?.calificacion?.retroalimentacion;
+          const rText = typeof rawR === 'object' ? (rawR?.comentario || '') : (rawR || '');
+          return (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, padding: '14px 16px', background: '#F8FAFC', borderRadius: 8 }}>
                 <div style={{
-                  background: '#F0FDF4', border: '1px solid #BBF7D0',
-                  borderLeft: '3px solid #10B981', borderRadius: 8,
-                  padding: '12px 14px', fontSize: 13, color: '#14532D', lineHeight: 1.6
+                  width: 52, height: 52, borderRadius: 12, flexShrink: 0,
+                  background: `${getNoteColor(notaVal)}15`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 20, fontWeight: 800, color: getNoteColor(notaVal)
                 }}>
-                  {selectedTask.entrega.calificacion.retroalimentacion}
+                  {notaVal}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#0F172A' }}>{selectedTask.titulo}</div>
+                  <div style={{ fontSize: 12, color: '#64748B' }}>{selectedTask.materia} · {selectedTask.docente}</div>
+                  <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
+                    <span style={{ fontWeight: 600, color: notaVal >= 60 ? '#10B981' : '#EF4444' }}>
+                      {notaVal >= 60 ? '✓ Aprobado' : '✗ No aprobado'}
+                    </span>
+                    {' · '}{notaVal}/{selectedTask.puntaje_maximo || 100} puntos
+                  </div>
                 </div>
               </div>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '16px 0', color: '#94A3B8', fontSize: 13 }}>
-                <MessageSquare size={24} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.4 }} />
-                El docente no dejó comentarios adicionales.
-              </div>
-            )}
-          </div>
-        )}
+              {rText ? (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
+                    Retroalimentación del Docente
+                  </div>
+                  <div style={{
+                    background: '#F0FDF4', border: '1px solid #BBF7D0',
+                    borderLeft: '3px solid #10B981', borderRadius: 8,
+                    padding: '12px 14px', fontSize: 13, color: '#14532D', lineHeight: 1.6
+                  }}>
+                    {rText}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '16px 0', color: '#94A3B8', fontSize: 13 }}>
+                  <MessageSquare size={24} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.4 }} />
+                  El docente no dejó comentarios adicionales.
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </Modal>
     </div>
   );

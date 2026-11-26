@@ -123,7 +123,7 @@ class RetroalimentacionSerializer(serializers.ModelSerializer):
 
 class CalificacionSerializer(serializers.ModelSerializer):
     docente_nombre = serializers.SerializerMethodField()
-    retroalimentacion = RetroalimentacionSerializer(read_only=True)
+    retroalimentacion = serializers.SerializerMethodField()
 
     class Meta:
         model = Calificacion
@@ -131,6 +131,14 @@ class CalificacionSerializer(serializers.ModelSerializer):
 
     def get_docente_nombre(self, obj):
         return obj.docente.usuario.nombre_completo if obj.docente else 'Docente'
+
+    def get_retroalimentacion(self, obj):
+        try:
+            if hasattr(obj, 'retroalimentacion') and obj.retroalimentacion:
+                return obj.retroalimentacion.comentario
+        except Exception:
+            pass
+        return ''
 
 
 class VersionEntregaSerializer(serializers.ModelSerializer):
@@ -196,6 +204,9 @@ class TareaSerializer(serializers.ModelSerializer):
     materiales = MaterialSerializer(many=True, read_only=True)
     esta_vencida = serializers.ReadOnlyField()
     mi_entrega = serializers.SerializerMethodField()
+    entrega = serializers.SerializerMethodField()
+    nota = serializers.SerializerMethodField()
+    retroalimentacion = serializers.SerializerMethodField()
     total_entregas = serializers.SerializerMethodField()
     estado_estudiante = serializers.SerializerMethodField()
 
@@ -209,7 +220,7 @@ class TareaSerializer(serializers.ModelSerializer):
             'docente', 'docente_nombre', 'titulo', 'descripcion',
             'indicaciones', 'puntaje_maximo', 'fecha_publicacion',
             'fecha_limite', 'esta_vencida', 'estado', 'estado_estudiante', 'materiales',
-            'mi_entrega', 'total_entregas'
+            'mi_entrega', 'entrega', 'nota', 'retroalimentacion', 'total_entregas'
         ]
 
     def get_espacio_nombre(self, obj):
@@ -293,6 +304,29 @@ class TareaSerializer(serializers.ModelSerializer):
             if entrega:
                 return EntregaSerializer(entrega).data
         return None
+
+    def get_entrega(self, obj):
+        return self.get_mi_entrega(obj)
+
+    def get_nota(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and request.user.rol == 'ESTUDIANTE' and hasattr(request.user, 'perfil_estudiante'):
+            entrega = Entrega.objects.filter(tarea=obj, estudiante=request.user.perfil_estudiante).first()
+            if entrega and hasattr(entrega, 'calificacion'):
+                return entrega.calificacion.nota
+        return None
+
+    def get_retroalimentacion(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and request.user.rol == 'ESTUDIANTE' and hasattr(request.user, 'perfil_estudiante'):
+            entrega = Entrega.objects.filter(tarea=obj, estudiante=request.user.perfil_estudiante).first()
+            if entrega and hasattr(entrega, 'calificacion'):
+                try:
+                    if hasattr(entrega.calificacion, 'retroalimentacion') and entrega.calificacion.retroalimentacion:
+                        return entrega.calificacion.retroalimentacion.comentario
+                except Exception:
+                    pass
+        return ''
 
     def get_estado_estudiante(self, obj):
         request = self.context.get('request')

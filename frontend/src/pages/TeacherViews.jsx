@@ -18,7 +18,11 @@ import RubricaEditor from '../components/RubricaEditor';
 // ============================================================
 export function GradeSubmissionModal({ entrega, onClose, onSuccess }) {
   const initialNota = entrega?.calificacion?.nota ?? entrega?.nota ?? '';
-  const initialRetro = entrega?.calificacion?.retroalimentacion || entrega?.retroalimentacion || '';
+  const initialRetro = (() => {
+    const r = entrega?.calificacion?.retroalimentacion ?? entrega?.retroalimentacion;
+    if (!r) return '';
+    return typeof r === 'object' ? (r.comentario || '') : String(r);
+  })();
   const [nota, setNota] = useState(initialNota !== null && initialNota !== undefined ? initialNota : '');
   const [retro, setRetro] = useState(initialRetro);
   const [loading, setLoading] = useState(false);
@@ -1872,7 +1876,7 @@ export function TeacherSubmissionsView({ initialTaskId }) {
     setSearch('');
   };
 
-  const isSubGraded = (s) => !!s.calificacion || (s.nota !== null && s.nota !== undefined);
+  const isSubGraded = (s) => !!s.calificacion || (s.nota !== null && s.nota !== undefined) || s.estado === 'CALIFICADO';
 
   // Filtrado final
   const filtered = useMemo(() => {
@@ -2189,8 +2193,8 @@ export function TeacherSubmissionsView({ initialTaskId }) {
                       </span>
                     )}
 
-                    <span className={`badge ${isGraded ? 'badge-calificada' : 'badge-en_revision'}`} style={{ fontSize: 12, padding: '4px 10px' }}>
-                      {isGraded ? 'Calificada' : 'Pendiente revision'}
+                    <span className={`badge ${isGraded ? 'badge-calificada' : ent.estado === 'DEVUELTA' ? 'badge-atrasada' : 'badge-en_revision'}`} style={{ fontSize: 12, padding: '4px 10px' }}>
+                      {isGraded ? 'Calificada' : ent.estado === 'DEVUELTA' ? 'Devuelta para corrección' : 'Pendiente revision'}
                     </span>
 
                     {isGraded && (
@@ -2238,14 +2242,19 @@ export function TeacherSubmissionsView({ initialTaskId }) {
                   )}
 
                   {/* Retroalimentacion docente previa */}
-                  {(ent.calificacion?.retroalimentacion || ent.retroalimentacion) && (
-                    <div style={{
-                      marginTop: 8, padding: '6px 10px', background: '#ECFDF5',
-                      border: '1px solid #A7F3D0', borderRadius: 6, fontSize: '12px', color: '#065F46'
-                    }}>
-                      <strong>Retroalimentacion:</strong> "{ent.calificacion?.retroalimentacion || ent.retroalimentacion}"
-                    </div>
-                  )}
+                  {(() => {
+                    const rawR = ent.calificacion?.retroalimentacion || ent.retroalimentacion;
+                    const rText = typeof rawR === 'object' ? (rawR.comentario || '') : (rawR || '');
+                    if (!rText) return null;
+                    return (
+                      <div style={{
+                        marginTop: 8, padding: '6px 10px', background: '#ECFDF5',
+                        border: '1px solid #A7F3D0', borderRadius: 6, fontSize: '12px', color: '#065F46'
+                      }}>
+                        <strong>Retroalimentacion:</strong> "{rText}"
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* BARRA DE ACCIONES Y BOTONES */}

@@ -276,7 +276,8 @@ export function TaskDetailModal({ taskId, onClose, defaultMode = 'detail' }) {
 
   const badge = getTaskBadge(tarea.estado_actual);
   const priBadge = getPriorityBadge(tarea.prioridad);
-  const cal = tarea.entrega?.calificacion;
+  const entregaRegistrada = tarea.entrega || tarea.mi_entrega;
+  const cal = entregaRegistrada?.calificacion;
 
   return (
     <div>
@@ -361,40 +362,43 @@ export function TaskDetailModal({ taskId, onClose, defaultMode = 'detail' }) {
           )}
 
           {/* My submission */}
-          {tarea.entrega && (
+          {entregaRegistrada && (
             <div style={{ background: '#DFF6DD', border: '1px solid rgba(16,124,65,0.25)', borderRadius: '4px', padding: '12px 14px', marginBottom: 14 }}>
               <div style={{ fontWeight: 600, color: '#107C41', marginBottom: 6, fontSize: '12.5px' }}>Entrega registrada</div>
               <div style={{ fontSize: '12px', color: '#242424', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Paperclip size={12} /> {tarea.entrega.archivo_nombre}</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={12} /> {formatDateTime(tarea.entrega.fecha_entrega)}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Paperclip size={12} /> {entregaRegistrada.archivo_nombre || 'Archivo adjunto'}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={12} /> {formatDateTime(entregaRegistrada.fecha_entrega)}</span>
               </div>
-              {tarea.entrega.observaciones && (
+              {entregaRegistrada.observaciones && (
                 <p style={{ fontSize: '12px', color: '#616161', marginTop: 6, fontStyle: 'italic' }}>
-                  Nota del estudiante: "{tarea.entrega.observaciones}"
+                  Nota del estudiante: "{entregaRegistrada.observaciones}"
                 </p>
               )}
             </div>
           )}
 
           {/* Calificación and feedback */}
-          {cal && (
-            <div style={{ background: '#FAF9F8', border: '1px solid #EDEBE9', borderRadius: '4px', padding: '12px 14px', marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontWeight: 600, color: '#242424', fontSize: '12.5px' }}>Calificación obtenida</span>
-                <span style={{ fontSize: '18px', fontWeight: 700, color: getNoteColor(cal.nota) }}>
-                  {cal.nota} <span style={{ fontSize: '12px', color: '#616161', fontWeight: 400 }}>/ {tarea.puntaje_maximo}</span>
-                </span>
-              </div>
-              {cal.retroalimentacion && (
-                <div style={{ borderLeft: '3px solid #5B5FC7', paddingLeft: 10, fontSize: '12px', color: '#242424', lineHeight: 1.5, marginTop: 6 }}>
-                  Retroalimentación: "{cal.retroalimentacion}"
+          {cal && (() => {
+            const rText = typeof cal.retroalimentacion === 'object' ? (cal.retroalimentacion?.comentario || '') : (cal.retroalimentacion || '');
+            return (
+              <div style={{ background: '#FAF9F8', border: '1px solid #EDEBE9', borderRadius: '4px', padding: '12px 14px', marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontWeight: 600, color: '#242424', fontSize: '12.5px' }}>Calificación obtenida</span>
+                  <span style={{ fontSize: '18px', fontWeight: 700, color: getNoteColor(cal.nota) }}>
+                    {cal.nota} <span style={{ fontSize: '12px', color: '#616161', fontWeight: 400 }}>/ {tarea.puntaje_maximo}</span>
+                  </span>
                 </div>
-              )}
-              <div style={{ fontSize: '11px', color: '#8A8886', marginTop: 8 }}>
-                Evaluado el {formatDate(cal.fecha_calificacion)} por {cal.docente}
+                {rText && (
+                  <div style={{ borderLeft: '3px solid #5B5FC7', paddingLeft: 10, fontSize: '12px', color: '#242424', lineHeight: 1.5, marginTop: 6 }}>
+                    Retroalimentación: "{rText}"
+                  </div>
+                )}
+                <div style={{ fontSize: '11px', color: '#8A8886', marginTop: 8 }}>
+                  Evaluado el {formatDate(cal.fecha_calificacion)} por {cal.docente || 'Docente'}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Actions */}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>

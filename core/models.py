@@ -489,7 +489,7 @@ class ProgresoAcademico(models.Model):
         return f"Progreso {self.estudiante.usuario.nombre_completo}: {self.porcentaje_cumplimiento}%"
 
     def recalcular(self):
-        espacios_ids = self.estudiante.espacios_inscritos.values_list('espacio_id', flat=True)
+        espacios_ids = self.estudiante.get_espacios_ids()
         tareas_totales = Tarea.objects.filter(espacio_id__in=espacios_ids, estado='PUBLICADA')
         total_count = tareas_totales.count()
         entregas = Entrega.objects.filter(estudiante=self.estudiante, tarea__in=tareas_totales)

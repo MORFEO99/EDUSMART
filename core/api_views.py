@@ -924,6 +924,8 @@ def api_calificar_entrega(request, pk):
             retro.comentario = retro_comentario
             retro.fecha = timezone.now()
             retro.save()
+    else:
+        Retroalimentacion.objects.filter(calificacion=calificacion).delete()
 
     # Also update latest VersionEntrega
     latest_v = entrega.versiones.order_by('-numero_version').first()
@@ -943,6 +945,18 @@ def api_calificar_entrega(request, pk):
             tarea=entrega.tarea,
             nota=nota,
             retroalimentacion=retro_comentario
+        )
+    except Exception:
+        pass
+
+    # Django ORM: notificar al estudiante de su calificacion en la plataforma
+    try:
+        Notificacion.objects.create(
+            usuario=entrega.estudiante.usuario,
+            tipo='CALIFICADA',
+            mensaje=f"Tu tarea '{entrega.tarea.titulo}' fue calificada con {nota}/100." + (f" Observación: '{retro_comentario}'" if retro_comentario else ""),
+            espacio_id=entrega.tarea.espacio.id,
+            tarea_id=entrega.tarea.id
         )
     except Exception:
         pass
@@ -989,6 +1003,7 @@ def api_devolver_entrega(request, pk):
 
     entrega.estado = 'DEVUELTA'
     entrega.save()
+    entrega.estudiante.actualizar_progreso()
 
     latest_v = entrega.versiones.order_by('-numero_version').first()
     if latest_v:
