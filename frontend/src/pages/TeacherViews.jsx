@@ -983,18 +983,44 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
             </div>
           </div>
 
-          {/* Filtros de estado de tarea */}
-          <div className="teams-tabs" style={{ marginBottom: 14 }}>
+          {/* Filtros de estado de tarea estilo Microsoft Teams */}
+          <div style={{
+            display: 'flex', gap: 24, alignItems: 'center',
+            borderBottom: '1px solid #E2E8F0', marginBottom: 18
+          }}>
             {[
               { id: 'todas', label: `Todas (${tasks.length})` },
               { id: 'activas', label: `Activas (${tasks.filter(t => !t.esta_vencida).length})` },
               { id: 'pendientes_calificar', label: `Por calificar (${tasks.filter(t => (t.pendientes_calificacion || 0) > 0).length})` },
               { id: 'vencidas', label: `Vencidas (${tasks.filter(t => t.esta_vencida).length})` },
-            ].map(tab => (
-              <button key={tab.id} className={`teams-tab ${taskFilter === tab.id ? 'active' : ''}`} onClick={() => setTaskFilter(tab.id)}>
-                {tab.label}
-              </button>
-            ))}
+            ].map(tab => {
+              const isActive = taskFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setTaskFilter(tab.id)}
+                  style={{
+                    background: 'none', border: 'none',
+                    color: isActive ? '#1E3A8A' : '#64748B',
+                    fontSize: '13.5px', fontWeight: isActive ? 700 : 500,
+                    cursor: 'pointer', padding: '8px 2px 12px 2px',
+                    position: 'relative', display: 'flex', alignItems: 'center', gap: 4,
+                    transition: 'color 0.15s ease'
+                  }}
+                >
+                  {tab.label}
+                  {tab.id === 'vencidas' && tasks.some(t => t.esta_vencida) && (
+                    <span style={{ color: '#DC2626', fontWeight: 800, fontSize: 13 }}>•</span>
+                  )}
+                  {isActive && (
+                    <div style={{
+                      position: 'absolute', bottom: -1, left: 0, right: 0,
+                      height: 3, background: '#1E3A8A', borderRadius: '3px 3px 0 0'
+                    }} />
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {loadingTasks ? (
@@ -1010,91 +1036,124 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
               action={<button className="btn btn-primary" onClick={onOpenCreate} style={{ background: '#1E3A8A' }}><Plus size={14} /> Publicar primera tarea</button>}
             />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
               {(() => {
-                const groups = {};
+                const groupsMap = {};
                 filteredTasks.forEach(t => {
-                  const key = `${t.colegio_nombre || 'Colegio'}|||${t.curso_nombre || 'Curso'}|||${t.materia || 'Materia'}`;
-                  if (!groups[key]) {
-                    groups[key] = {
-                      colegio: t.colegio_nombre || 'Colegio',
-                      curso: t.curso_nombre || 'Curso',
-                      materia: t.materia || 'Materia',
-                      items: []
-                    };
+                  const d = t.fecha_limite ? new Date(t.fecha_limite) : null;
+                  let dayMonth = 'Sin fecha';
+                  let weekday = '';
+                  let rawDate = 0;
+                  if (d && !isNaN(d.getTime())) {
+                    dayMonth = `${d.getDate()} ${d.toLocaleDateString('es-ES', { month: 'short' }).replace('.', '')}`;
+                    weekday = d.toLocaleDateString('es-ES', { weekday: 'long' });
+                    rawDate = d.getTime();
                   }
-                  groups[key].items.push(t);
+                  const key = `${dayMonth}|||${weekday}`;
+                  if (!groupsMap[key]) {
+                    groupsMap[key] = { dayMonth, weekday, rawDate, items: [] };
+                  }
+                  groupsMap[key].items.push(t);
                 });
-                return Object.entries(groups).map(([gKey, grp]) => (
-                  <div key={gKey} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <div style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8,
-                      padding: '8px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0',
-                      borderLeft: '4px solid #1E3A8A', borderRadius: 8
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 12.5 }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#1E3A8A', fontWeight: 700 }}>
-                          <School size={14} /> {grp.colegio}
-                        </span>
-                        <span style={{ color: '#94A3B8' }}>›</span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#0369A1', fontWeight: 700 }}>
-                          <GraduationCap size={14} /> {grp.curso}
-                        </span>
-                        <span style={{ color: '#94A3B8' }}>›</span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#059669', fontWeight: 700 }}>
-                          <BookOpen size={14} /> {grp.materia}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', background: '#FFFFFF', border: '1px solid #CBD5E1', padding: '2px 8px', borderRadius: 12 }}>
-                        {grp.items.length} {grp.items.length === 1 ? 'tarea' : 'tareas'}
-                      </span>
+
+                const sortedGroups = Object.values(groupsMap).sort((a, b) => a.rawDate - b.rawDate);
+
+                return sortedGroups.map((grp, gIdx) => (
+                  <div key={gIdx}>
+                    {/* Encabezado de fecha estilo Microsoft Teams */}
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+                      <span style={{ fontSize: '14.5px', fontWeight: 700, color: '#0F172A' }}>{grp.dayMonth}</span>
+                      {grp.weekday && (
+                        <span style={{ fontSize: '12.5px', color: '#64748B' }}>{grp.weekday}</span>
+                      )}
                     </div>
 
-                    {grp.items.map(t => {
-                      const priBadge = getPriorityBadge(t.prioridad);
-                      return (
-                        <div key={t.id} className="task-card" style={{ background: '#FFFFFF', borderRadius: 10, border: '1px solid #E2E8F0', padding: 16 }}>
-                          {/* Header: título + badges */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
-                            <span style={{ fontWeight: 700, fontSize: '14.5px', color: '#0F172A' }}>{t.titulo}</span>
-                            <div style={{ display: 'flex', gap: 6 }}>
-                              <span className={`badge ${priBadge.cls}`}>{priBadge.label}</span>
-                              <span className={`badge ${t.esta_vencida ? 'badge-vencida' : 'badge-calificada'}`}>
-                                {t.esta_vencida ? 'Vencida' : 'Activa'}
-                              </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {grp.items.map(t => {
+                        const badge = getTeacherSubjectBadge(t.materia);
+                        const dLim = t.fecha_limite ? new Date(t.fecha_limite) : null;
+                        const horaStr = dLim && !isNaN(dLim.getTime())
+                          ? `${String(dLim.getHours()).padStart(2, '0')}:${String(dLim.getMinutes()).padStart(2, '0')}`
+                          : '23:59';
+
+                        return (
+                          <div
+                            key={t.id}
+                            onClick={() => onNavigate('entregas', { filterTaskId: t.id })}
+                            style={{
+                              background: '#FFFFFF',
+                              border: '1px solid #E2E8F0',
+                              borderRadius: 8,
+                              padding: '13px 18px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 16,
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                              transition: 'all 0.15s ease',
+                              flexWrap: 'wrap'
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.borderColor = '#BFDBFE';
+                              e.currentTarget.style.background = '#F8FAFC';
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.borderColor = '#E2E8F0';
+                              e.currentTarget.style.background = '#FFFFFF';
+                            }}
+                          >
+                            {/* Izquierda: Ícono cuadrado de materia + Título y detalles */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: '1 1 320px', minWidth: 0 }}>
+                              <div style={{
+                                width: 38, height: 38, borderRadius: 8, background: badge.bg,
+                                color: '#FFFFFF', fontSize: 11.5, fontWeight: 800,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                              }}>
+                                {badge.initials}
+                              </div>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', marginBottom: 2 }}>
+                                  {t.titulo}
+                                </div>
+                                <div style={{ fontSize: '12px', color: t.esta_vencida ? '#DC2626' : '#64748B', fontWeight: t.esta_vencida ? 600 : 400 }}>
+                                  {t.esta_vencida ? 'Venció' : 'Vence'} a las {horaStr} · {t.puntaje_maximo} pts
+                                </div>
+                                <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: 1 }}>
+                                  {[t.materia, t.curso_nombre, t.colegio_nombre].filter(Boolean).join(' · ')}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Derecha: Estado de entregas + acción */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '12px' }}>
+                                <span style={{ color: '#0F172A', fontWeight: 600 }}>
+                                  Entregadas: <strong>{t.entregadas || t.total_entregas || 0}</strong>
+                                </span>
+                                <span style={{
+                                  color: (t.pendientes_calificacion || 0) > 0 ? '#B45309' : '#059669',
+                                  background: (t.pendientes_calificacion || 0) > 0 ? '#FEF3C7' : '#ECFDF5',
+                                  padding: '2px 8px', borderRadius: 6, fontWeight: 700
+                                }}>
+                                  Por calificar: {t.pendientes_calificacion || 0}
+                                </span>
+                              </div>
+                              <button
+                                className="btn btn-primary btn-sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onNavigate('entregas', { filterTaskId: t.id });
+                                }}
+                                style={{ height: 30, fontSize: 11.5, background: '#1E3A8A', padding: '0 12px' }}
+                              >
+                                Ver entregas
+                              </button>
                             </div>
                           </div>
-
-                          {/* Detalles: fecha + puntaje */}
-                          <div style={{ display: 'flex', gap: 16, fontSize: '12px', color: '#64748B', flexWrap: 'wrap' }}>
-                            <span><strong>Fecha límite:</strong> {formatDate(t.fecha_limite)}</span>
-                            <span><strong>Puntaje:</strong> {t.puntaje_maximo} pts</span>
-                          </div>
-
-                          {/* Footer: stats + acción */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTop: '1px solid #F1F5F9', flexWrap: 'wrap', gap: 10 }}>
-                            <div style={{ display: 'flex', gap: 16, fontSize: '12.5px', flexWrap: 'wrap' }}>
-                              <span style={{ color: '#0F172A', fontWeight: 600 }}>
-                                Entregadas: <strong>{t.entregadas || t.total_entregas || 0}</strong>
-                              </span>
-                              <span style={{ color: (t.pendientes_calificacion || 0) > 0 ? '#D97706' : '#059669', fontWeight: 700 }}>
-                                Por calificar: {t.pendientes_calificacion || 0}
-                              </span>
-                              <span style={{ color: '#64748B' }}>
-                                Calificadas: {t.calificadas || 0}
-                              </span>
-                            </div>
-                            <button
-                              className="btn btn-primary btn-sm"
-                              onClick={() => onNavigate('entregas', { filterTaskId: t.id })}
-                              style={{ height: 32, fontSize: 12, background: '#1E3A8A' }}
-                            >
-                              Ver entregas
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 ));
               })()}
