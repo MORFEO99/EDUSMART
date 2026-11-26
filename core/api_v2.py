@@ -1776,6 +1776,64 @@ def _build_student_list_excel(espacio, tareas):
 # GESTOR DE AVANCE DE TEMAS — ENDPOINTS
 # ==============================================================================
 
+def _auto_generar_evaluacion_ia(tema, docente, espacio=None):
+    """
+    Genera y publica automáticamente una evaluación/cuestionario con IA (PracticaTema)
+    para el tema o contenido subido por el docente y notifica a los estudiantes del curso.
+    """
+    from .models import PracticaTema, EstudianteCurso, Notificacion, Espacio
+    from .ai_practice_service import generate_exam_practice
+
+    practica = PracticaTema.objects.filter(tema=tema).first()
+    if not practica:
+        try:
+            ai_data = generate_exam_practice(
+                materia_nombre=tema.materia.nombre,
+                tema_titulo=tema.titulo,
+                tema_descripcion=tema.descripcion,
+                nivel_educativo=getattr(tema.materia.curso, 'nombre', ''),
+                cantidad=5,
+                dificultad='INTERMEDIO'
+            )
+            practica = PracticaTema.objects.create(
+                tema=tema,
+                materia=tema.materia,
+                docente=docente,
+                titulo=ai_data.get('titulo', f"Evaluación IA: {tema.titulo}"),
+                descripcion=ai_data.get('descripcion', ''),
+                preguntas=ai_data.get('preguntas', []),
+                dificultad='INTERMEDIO',
+                tiempo_limite_minutos=ai_data.get('tiempo_limite_minutos', 15),
+                motor_ia=ai_data.get('motor_ia', 'EduSmart AI'),
+                activo=True
+            )
+        except Exception as e:
+            print(f"[Auto Practice] Error: {e}")
+            return None
+
+    if practica:
+        try:
+            esp_id = espacio.id if espacio else None
+            if not esp_id:
+                esp_obj = Espacio.objects.filter(materia=tema.materia).first()
+                esp_id = esp_obj.id if esp_obj else None
+            if tema.materia.curso:
+                uids = EstudianteCurso.objects.filter(
+                    curso=tema.materia.curso, estado='ACTIVO'
+                ).values_list('estudiante__usuario_id', flat=True)
+                for uid in uids:
+                    Notificacion.objects.create(
+                        usuario_id=uid,
+                        mensaje=f"✨ Nueva evaluación con IA publicada en {tema.materia.nombre}: '{tema.titulo}'. Ya disponible en tus Simuladores IA.",
+                        tipo='AVISO_NUEVO',
+                        espacio_id=esp_id,
+                        leida=False
+                    )
+        except Exception:
+            pass
+    return practica
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def api_temas_avance(request, materia_id):
@@ -1841,11 +1899,14 @@ def api_temas_avance(request, materia_id):
         descripcion=request.data.get('descripcion', ''),
         unidad=request.data.get('unidad', ''),
         orden=request.data.get('orden', 0),
-        estado=request.data.get('estado', 'PENDIENTE'),
+        estado=request.data.get('estado', 'COMPLETADO'),
         fecha_inicio=request.data.get('fecha_inicio') or None,
         fecha_fin=request.data.get('fecha_fin') or None,
         observaciones=request.data.get('observaciones', ''),
     )
+    auto_ia = request.data.get('auto_generar_ia', True)
+    practica = _auto_generar_evaluacion_ia(t, docente) if auto_ia else None
+
     return Response({
         'id': t.id, 'titulo': t.titulo, 'estado': t.estado, 'unidad': t.unidad,
         'orden': t.orden, 'descripcion': t.descripcion,
@@ -1853,6 +1914,9 @@ def api_temas_avance(request, materia_id):
         'fecha_fin': t.fecha_fin.isoformat() if t.fecha_fin else None,
         'observaciones': t.observaciones,
         'fecha_creacion': t.fecha_creacion.isoformat(),
+        'tiene_practica': bool(practica),
+        'practica_id': practica.id if practica else None,
+        'practica_titulo': practica.titulo if practica else None,
     }, status=201)
 
 
@@ -1885,48 +1949,9 @@ def api_tema_avance_detail(request, materia_id, tema_id):
     # Si el tema fue marcado como COMPLETADO, generar automáticamente simulador de examen con IA si aún no existe
     practica_id = None
     if tema.estado == 'COMPLETADO':
-        from .models import PracticaTema
-        from .ai_practice_service import generate_exam_practice
-        practica = PracticaTema.objects.filter(tema=tema).first()
-        if not practica:
-            try:
-                ai_data = generate_exam_practice(
-                    materia_nombre=tema.materia.nombre,
-                    tema_titulo=tema.titulo,
-                    tema_descripcion=tema.descripcion,
-                    nivel_educativo=getattr(tema.materia.curso, 'nombre', ''),
-                    cantidad=5,
-                    dificultad='INTERMEDIO'
-                )
-                practica = PracticaTema.objects.create(
-                    tema=tema,
-                    materia=tema.materia,
-                    docente=docente,
-                    titulo=ai_data.get('titulo', f"Simulador de Examen: {tema.titulo}"),
-                    descripcion=ai_data.get('descripcion', ''),
-                    preguntas=ai_data.get('preguntas', []),
-                    dificultad='INTERMEDIO',
-                    tiempo_limite_minutos=ai_data.get('tiempo_limite_minutos', 15),
-                    motor_ia=ai_data.get('motor_ia', 'EduSmart AI'),
-                    activo=True
-                )
-            except Exception as e:
-                print(f"[Auto Practice] Error: {e}")
+        practica = _auto_generar_evaluacion_ia(tema, docente)
         if practica:
             practica_id = practica.id
-            try:
-                from .models import EstudianteCurso, Notificacion
-                if tema.materia.curso:
-                    uids = EstudianteCurso.objects.filter(curso=tema.materia.curso).values_list('estudiante__usuario_id', flat=True)
-                    for uid in uids:
-                        Notificacion.objects.create(
-                            usuario_id=uid,
-                            mensaje=f"✨ Tu profesor completó '{tema.titulo}' en {tema.materia.nombre}. Se ha publicado el Simulador con IA para preparar tu examen.",
-                            tipo='AVISO_NUEVO',
-                            leida=False
-                        )
-            except Exception:
-                pass
 
     return Response({
         'id': tema.id, 'titulo': tema.titulo, 'descripcion': tema.descripcion,

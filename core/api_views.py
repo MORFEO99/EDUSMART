@@ -1466,7 +1466,27 @@ def api_espacio_recursos(request, espacio_id):
             tamano=tamano
         )
 
-        return Response(RecursoEspacioSerializer(recurso).data, status=status.HTTP_201_CREATED)
+        # Generar y publicar automáticamente evaluación con IA para el contenido subido
+        practica_generada = None
+        if espacio.materia and data.get('auto_generar_ia', True):
+            from .api_v2 import _auto_generar_evaluacion_ia
+            tema_auto, _ = TemaAvance.objects.get_or_create(
+                materia=espacio.materia,
+                docente=user.perfil_docente,
+                titulo=titulo,
+                defaults={
+                    'descripcion': descripcion or f"Contenido de estudio: {titulo}",
+                    'unidad': 'Contenido Subido',
+                    'estado': 'COMPLETADO'
+                }
+            )
+            practica_generada = _auto_generar_evaluacion_ia(tema_auto, user.perfil_docente, espacio=espacio)
+
+        res_data = RecursoEspacioSerializer(recurso).data
+        res_data['practica_generada'] = bool(practica_generada)
+        res_data['practica_id'] = practica_generada.id if practica_generada else None
+        res_data['practica_titulo'] = practica_generada.titulo if practica_generada else None
+        return Response(res_data, status=status.HTTP_201_CREATED)
 
 
 @api_view(['DELETE'])

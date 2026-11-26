@@ -538,8 +538,18 @@ function AddTemaModal({ materiaId, onClose, onCreated }) {
   };
 
   return (
-    <Modal open={true} onClose={onClose} title="+ Agregar Tema al Programa">
+    <Modal open={true} onClose={onClose} title="Subir Contenido / Tema y Generar Evaluación IA">
       <form onSubmit={handleSubmit}>
+        <div style={{
+          background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: 8,
+          padding: '10px 12px', marginBottom: 14, fontSize: 12, color: '#3730A3',
+          display: 'flex', alignItems: 'flex-start', gap: 8
+        }}>
+          <Sparkles size={15} style={{ flexShrink: 0, marginTop: 2 }} />
+          <span>
+            Al guardar este tema o contenido, la <strong>IA generará y publicará automáticamente</strong> un cuestionario de evaluación en el perfil de tus estudiantes.
+          </span>
+        </div>
         {error && <Alert type="error" onClose={() => setError('')}>{error}</Alert>}
         <div className="form-group">
           <label className="form-label">Título del Tema <span className="required">*</span></label>
@@ -779,6 +789,10 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
       setStats({ total, completados, en_progreso, pendientes, porcentaje_avance: total > 0 ? Math.round(completados / total * 100) : 0 });
       return all;
     });
+    if (newTema?.tiene_practica) {
+      setAiSuccessMsg(`✨ ¡Contenido "${newTema.titulo}" publicado y evaluación con IA generada automáticamente para tus estudiantes!`);
+      setTimeout(() => setAiSuccessMsg(null), 6000);
+    }
   };
 
   // 
@@ -1061,20 +1075,33 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
       {activeTab === 'avance' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/*  HEADER  */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{
+            background: '#FFFFFF', borderRadius: 12, border: '1px solid #E2E8F0',
+            padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+          }}>
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Layers size={20} style={{ color: '#4338CA' }} /> Gestor de Avance de Temas y Simuladores IA
+                <Sparkles size={19} style={{ color: '#4338CA' }} /> Generador Automático de Evaluaciones con IA
               </h2>
               <p style={{ fontSize: '12.5px', color: '#64748B', margin: 0 }}>
-                Registra el progreso curricular y genera simuladores de examen con IA al completar cada tema.
+                Sube el contenido de un tema y la IA creará y publicará automáticamente el cuestionario en el perfil de tus estudiantes.
               </p>
+              {selectedMateriaId && (
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 700, color: '#1E3A8A', background: '#EFF6FF', padding: '2px 8px', borderRadius: 6 }}>{selectedColegio?.colegio_nombre}</span>
+                  <span style={{ color: '#94A3B8' }}>›</span>
+                  <span style={{ fontWeight: 700, color: '#0369A1', background: '#E0F2FE', padding: '2px 8px', borderRadius: 6 }}>{selectedCurso?.curso_nombre}</span>
+                  <span style={{ color: '#94A3B8' }}>›</span>
+                  <span style={{ fontWeight: 700, color: '#3730A3', background: '#EEF2FF', padding: '2px 8px', borderRadius: 6 }}>{selectedMateria?.materia_nombre}</span>
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={loadEstructura}
-                style={{ height: 34, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                style={{ height: 36, display: 'inline-flex', alignItems: 'center', gap: 6 }}
               >
                 <RefreshCw size={13} /> Actualizar
               </button>
@@ -1082,78 +1109,13 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={() => setShowAddModal(true)}
-                  style={{ height: 34, display: 'inline-flex', alignItems: 'center', gap: 6, background: '#4338CA' }}
+                  style={{ height: 36, display: 'inline-flex', alignItems: 'center', gap: 6, background: '#4338CA', fontWeight: 700 }}
                 >
-                  <Plus size={15} /> Agregar Tema
+                  <Plus size={15} /> Subir Tema y Generar IA
                 </button>
               )}
             </div>
           </div>
-
-      {/*  CASCADE FILTER  */}
-      <div style={{
-        background: '#FFFFFF', padding: '16px 20px', borderRadius: 12,
-        border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-      }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-
-          {/* 1. Colegio */}
-          <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#1E3A8A', marginBottom: 6 }}>&#127979; Colegio</label>
-            <select
-              className="form-control"
-              value={selectedColegioId || ''}
-              onChange={e => onSelectColegio(parseInt(e.target.value))}
-              style={{ height: 42, fontSize: 13, fontWeight: 600, border: '1.5px solid #BFDBFE', borderRadius: 8, background: '#F8FAFC' }}
-            >
-              <option value="">-- Selecciona colegio --</option>
-              {colegios.map(c => <option key={c.colegio_id} value={c.colegio_id}>{c.colegio_nombre}</option>)}
-            </select>
-          </div>
-
-          {/* 2. Curso */}
-          <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#0369A1', marginBottom: 6 }}>&#127891; Curso</label>
-            <select
-              className="form-control"
-              value={selectedCursoId || ''}
-              onChange={e => onSelectCurso(parseInt(e.target.value))}
-              style={{ height: 42, fontSize: 13, fontWeight: 600, border: '1.5px solid #BAE6FD', borderRadius: 8, background: '#F8FAFC' }}
-              disabled={!selectedColegioId}
-            >
-              <option value="">-- Selecciona curso --</option>
-              {cursos.map(c => <option key={c.curso_id} value={c.curso_id}>{c.curso_nombre}</option>)}
-            </select>
-          </div>
-
-          {/* 3. Materia */}
-          <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#4338CA', marginBottom: 6 }}>&#128214; Materia</label>
-            <select
-              className="form-control"
-              value={selectedMateriaId || ''}
-              onChange={e => setSelectedMateriaId(parseInt(e.target.value))}
-              style={{ height: 42, fontSize: 13, fontWeight: 600, border: '1.5px solid #C7D2FE', borderRadius: 8, background: '#F8FAFC' }}
-              disabled={!selectedCursoId}
-            >
-              <option value="">-- Selecciona materia --</option>
-              {materias.map(m => <option key={m.materia_id} value={m.materia_id}>{m.materia_nombre}</option>)}
-            </select>
-          </div>
-        </div>
-
-        {/* Breadcrumb */}
-        {selectedMateriaId && (
-          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#475569', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 600, color: '#64748B' }}>Visualizando temas de:</span>
-            <span style={{ fontWeight: 800, color: '#1E3A8A', background: '#EFF6FF', padding: '2px 8px', borderRadius: 6 }}> {selectedColegio?.colegio_nombre}</span>
-            <span>&gt;</span>
-            <span style={{ fontWeight: 800, color: '#0369A1', background: '#E0F2FE', padding: '2px 8px', borderRadius: 6 }}> {selectedCurso?.curso_nombre}</span>
-            <span>&gt;</span>
-            <span style={{ fontWeight: 800, color: '#3730A3', background: '#EEF2FF', padding: '2px 8px', borderRadius: 6 }}> {selectedMateria?.materia_nombre}</span>
-          </div>
-        )}
-      </div>
 
       {/*  STATS CARDS + PROGRESS BAR  */}
       {selectedMateriaId && (
@@ -1307,31 +1269,28 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
                     onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
                     onMouseLeave={e => e.currentTarget.style.background = tema.estado === 'COMPLETADO' ? '#FAFFFE' : '#FFFFFF'}
                   >
-                    {/* Toggle button */}
+                    {/* Status icon */}
                     <button
                       onClick={() => handleToggleEstado(tema)}
                       disabled={isToggling}
-                      title={`Avanzar a: ${ESTADO_CONFIG[NEXT_STATE[tema.estado]].label}`}
+                      title={`Cambiar estado (${ESTADO_CONFIG[NEXT_STATE[tema.estado]].label})`}
                       style={{
                         flexShrink: 0, width: 34, height: 34,
-                        border: `2px solid ${cfg.color}`,
+                        border: `1.5px solid ${cfg.color}55`,
                         background: cfg.bg, color: cfg.color,
                         borderRadius: 8, cursor: 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 15, transition: 'all 0.15s', opacity: isToggling ? 0.5 : 1
+                        transition: 'all 0.15s', opacity: isToggling ? 0.5 : 1
                       }}
                     >
-                      {isToggling ? '...' : cfg.dot}
-
+                      {isToggling ? '...' : (tema.estado === 'COMPLETADO' ? <CheckCircle size={17} /> : <Clock size={17} />)}
                     </button>
 
                     {/* Content */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={{
-                          fontWeight: 700, fontSize: '14px', color: '#0F172A',
-                          textDecoration: tema.estado === 'COMPLETADO' ? 'line-through' : 'none',
-                          opacity: tema.estado === 'COMPLETADO' ? 0.65 : 1
+                          fontWeight: 700, fontSize: '14px', color: '#0F172A'
                         }}>
                           {tema.orden > 0 && <span style={{ color: '#94A3B8', fontSize: 12, marginRight: 4 }}>#{tema.orden}</span>}
                           {tema.titulo}
@@ -1361,16 +1320,16 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
                         <button
                           onClick={() => handleGenerarPractica(tema)}
                           disabled={generatingAi === tema.id}
-                          title="El simulador con IA está activo para tus alumnos. Clic para regenerar."
+                          title="Evaluación IA publicada en el perfil del estudiante. Clic para regenerar preguntas."
                           style={{
-                            padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
-                            background: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE',
-                            cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
+                            padding: '5px 10px', borderRadius: 6, fontSize: 11.5, fontWeight: 700,
+                            background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0',
+                            cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5,
                             whiteSpace: 'nowrap'
                           }}
                         >
-                          <Sparkles size={11} color="#4338CA" />
-                          {generatingAi === tema.id ? 'Regenerando...' : 'Simulador IA Activo'}
+                          <Sparkles size={12} color="#059669" />
+                          {generatingAi === tema.id ? 'Regenerando...' : '✓ Evaluación IA Publicada'}
                         </button>
                       ) : (
                         <button
