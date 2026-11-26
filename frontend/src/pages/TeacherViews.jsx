@@ -850,7 +850,26 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
   if (loading) return <Loading text="Cargando estructura académica..." />;
 
   return (
-    <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', minHeight: 'calc(100vh - 64px)', background: '#F8FAFC', flexWrap: 'wrap' }}>
+      <TeamsHierarchyLeftRail
+        colegios={estructura}
+        selectedMateriaId={filterMateriaId === 'TODOS' ? 'TODAS' : filterMateriaId}
+        allowAll={true}
+        onSelectAll={() => {
+          setFilterColegioId('TODOS');
+          setFilterCursoId('TODOS');
+          setFilterMateriaId('TODOS');
+        }}
+        selectCombo={(colId, curId, matId) => {
+          setFilterColegioId(String(colId));
+          setFilterCursoId(String(curId));
+          setFilterMateriaId(String(matId));
+          setSelectedColegioId(colId);
+          setSelectedCursoId(curId);
+          setSelectedMateriaId(matId);
+        }}
+      />
+      <div className="page-container" style={{ flex: 1, minWidth: 320, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* Pestañas Principales: Gestión de Tareas vs Avance Curricular / IA */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderBottom: '1px solid #E2E8F0', paddingBottom: 12 }}>
@@ -915,78 +934,6 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
               </button>
             </div>
           </div>
-
-          {/* ── Filtros jerárquicos: Colegio → Curso → Materia ── */}
-          {filterColegios.length > 0 && (
-            <div style={{
-              background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 10,
-              padding: '12px 16px', marginBottom: 14,
-              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10
-            }}>
-              {/* Colegio */}
-              <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#1E3A8A', marginBottom: 5 }}>
-                  <School size={13} /> Colegio
-                </label>
-                <select
-                  className="form-control"
-                  style={{ height: 36, fontSize: 12.5, fontWeight: 600 }}
-                  value={filterColegioId}
-                  onChange={e => {
-                    setFilterColegioId(e.target.value);
-                    setFilterCursoId('TODOS');
-                    setFilterMateriaId('TODOS');
-                  }}
-                >
-                  <option value="TODOS">— Todos los colegios —</option>
-                  {filterColegios.map(c => (
-                    <option key={c.colegio_id} value={c.colegio_id}>{c.colegio_nombre}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Curso */}
-              <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#0284C7', marginBottom: 5 }}>
-                  <GraduationCap size={13} /> Curso
-                </label>
-                <select
-                  className="form-control"
-                  style={{ height: 36, fontSize: 12.5, fontWeight: 600 }}
-                  value={filterCursoId}
-                  disabled={filterColegioId === 'TODOS'}
-                  onChange={e => {
-                    setFilterCursoId(e.target.value);
-                    setFilterMateriaId('TODOS');
-                  }}
-                >
-                  <option value="TODOS">— Todos los cursos —</option>
-                  {filterCursos.map(c => (
-                    <option key={c.curso_id} value={c.curso_id}>{c.curso_nombre}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Materia */}
-              <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#059669', marginBottom: 5 }}>
-                  <BookOpen size={13} /> Materia
-                </label>
-                <select
-                  className="form-control"
-                  style={{ height: 36, fontSize: 12.5, fontWeight: 600 }}
-                  value={filterMateriaId}
-                  disabled={filterCursoId === 'TODOS'}
-                  onChange={e => setFilterMateriaId(e.target.value)}
-                >
-                  <option value="TODOS">— Todas las materias —</option>
-                  {filterMaterias.map(m => (
-                    <option key={m.materia_id} value={m.materia_id}>{m.materia_nombre}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
 
           {/* Filtros de estado de tarea */}
           <div className="teams-tabs" style={{ marginBottom: 14 }}>
@@ -1496,6 +1443,7 @@ export function TeacherTasksView({ onNavigate, onOpenCreate }) {
       )}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -1916,7 +1864,20 @@ export function TeacherSubmissionsView({ initialTaskId }) {
   }, [submissions, selectedColegioId, selectedCursoId, selectedMateriaId, selectedTareaId]);
 
   return (
-    <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', minHeight: 'calc(100vh - 64px)', background: '#F8FAFC', flexWrap: 'wrap' }}>
+      <TeamsHierarchyLeftRail
+        colegios={colegios}
+        selectedMateriaId={selectedMateriaId === 'TODOS' ? 'TODAS' : selectedMateriaId}
+        allowAll={true}
+        onSelectAll={resetFilters}
+        selectCombo={(colId, curId, matId) => {
+          setSelectedColegioId(colId);
+          setSelectedCursoId(curId);
+          setSelectedMateriaId(matId);
+          setSelectedTareaId('TODAS');
+        }}
+      />
+      <div className="page-container" style={{ flex: 1, minWidth: 320, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* HEADER PRINCIPAL */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -1962,124 +1923,51 @@ export function TeacherSubmissionsView({ initialTaskId }) {
         </div>
       </div>
 
-      {/* SELECTOR JERARQUICO ACADEMICO (COLEGIO > CURSO > MATERIA) */}
+      {/* FILTRO POR TAREA ESPECÍFICA + ALCANCE ACTIVO */}
       <div style={{
-        background: '#FFFFFF', borderRadius: 12, border: '1.5px solid #E2E8F0',
-        padding: '16px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+        background: '#FFFFFF', borderRadius: 10, border: '1px solid #E2E8F0',
+        padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Filter size={16} style={{ color: '#1E3A8A' }} />
-            <span style={{ fontWeight: 800, fontSize: 13, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Filtro Academico por Colegio, Curso y Materia
-            </span>
-          </div>
-
-          {(selectedColegioId !== 'TODOS' || selectedCursoId !== 'TODOS' || selectedMateriaId !== 'TODOS' || selectedTareaId !== 'TODAS' || search) && (
-            <button
-              onClick={resetFilters}
-              style={{
-                fontSize: 12, color: '#2563EB', background: '#EFF6FF', border: '1px solid #BFDBFE',
-                padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 600,
-                display: 'inline-flex', alignItems: 'center', gap: 4
-              }}
-            >
-              <RotateCcw size={12} /> Limpiar filtros / Ver todo
-            </button>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 220 }}>
+          <ClipboardList size={15} style={{ color: '#1E3A8A', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#1E293B', whiteSpace: 'nowrap' }}>Tarea:</span>
+          <select
+            className="form-control"
+            value={selectedTareaId}
+            onChange={e => setSelectedTareaId(e.target.value)}
+            style={{ height: 34, fontSize: 12.5, fontWeight: 600, maxWidth: 420 }}
+          >
+            <option value="TODAS">— Todas las tareas ({tareasDisponibles.length}) —</option>
+            {tareasDisponibles.map(t => (
+              <option key={t.id} value={t.id}>{t.titulo}</option>
+            ))}
+          </select>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-          {/* 1. Colegio */}
-          <div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#1E3A8A', marginBottom: 6 }}>
-              <School size={14} style={{ color: '#1E3A8A' }} /> Colegio
-            </label>
-            <select
-              className="form-control"
-              value={selectedColegioId}
-              onChange={e => onSelectColegio(e.target.value)}
-              style={{ height: 38, fontSize: 13, fontWeight: 600, border: '1px solid #CBD5E1', borderRadius: 6, background: '#F8FAFC' }}
-            >
-              <option value="TODOS">-- Todos los Colegios --</option>
-              {colegios.map(c => (
-                <option key={c.colegio_id} value={c.colegio_id}>{c.colegio_nombre}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* 2. Curso */}
-          <div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#0369A1', marginBottom: 6 }}>
-              <GraduationCap size={14} style={{ color: '#0369A1' }} /> Curso
-            </label>
-            <select
-              className="form-control"
-              value={selectedCursoId}
-              onChange={e => onSelectCurso(e.target.value)}
-              style={{ height: 38, fontSize: 13, fontWeight: 600, border: '1px solid #CBD5E1', borderRadius: 6, background: '#F8FAFC' }}
-            >
-              <option value="TODOS">-- Todos los Cursos --</option>
-              {cursosDisponibles.map(cr => (
-                <option key={cr.curso_id} value={cr.curso_id}>{cr.curso_nombre}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* 3. Materia */}
-          <div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#3730A3', marginBottom: 6 }}>
-              <BookOpen size={14} style={{ color: '#3730A3' }} /> Materia
-            </label>
-            <select
-              className="form-control"
-              value={selectedMateriaId}
-              onChange={e => onSelectMateria(e.target.value)}
-              style={{ height: 38, fontSize: 13, fontWeight: 600, border: '1px solid #CBD5E1', borderRadius: 6, background: '#F8FAFC' }}
-            >
-              <option value="TODOS">-- Todas las Materias --</option>
-              {materiasDisponibles.map(m => (
-                <option key={m.materia_id} value={m.materia_id}>{m.materia_nombre}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* 4. Tarea especifica */}
-          <div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: '#0F766E', marginBottom: 6 }}>
-              <ClipboardList size={14} style={{ color: '#0F766E' }} /> Tarea
-            </label>
-            <select
-              className="form-control"
-              value={selectedTareaId}
-              onChange={e => setSelectedTareaId(e.target.value)}
-              style={{ height: 38, fontSize: 13, fontWeight: 600, border: '1px solid #CBD5E1', borderRadius: 6, background: '#F8FAFC' }}
-            >
-              <option value="TODAS">-- Todas las Tareas ({tareasDisponibles.length}) --</option>
-              {tareasDisponibles.map(t => (
-                <option key={t.id} value={t.id}>{t.titulo}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Breadcrumb de alcance activo */}
-        <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#475569', flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 600, color: '#64748B' }}>Visualizando entregas de:</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: '#475569', flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 700, color: '#1E3A8A', background: '#EFF6FF', padding: '2px 8px', borderRadius: 4 }}>
             {selectedColegio ? selectedColegio.colegio_nombre : 'Todos los Colegios'}
           </span>
-          <span style={{ color: '#94A3B8' }}>&gt;</span>
-          <span style={{ fontWeight: 700, color: '#0369A1', background: '#E0F2FE', padding: '2px 8px', borderRadius: 4 }}>
-            {selectedCurso ? selectedCurso.curso_nombre : 'Todos los Cursos'}
+          {selectedMateria && (
+            <span style={{ fontWeight: 700, color: '#3730A3', background: '#EEF2FF', padding: '2px 8px', borderRadius: 4 }}>
+              {selectedMateria.materia_nombre}
+            </span>
+          )}
+          <span style={{ fontWeight: 600, color: '#0F172A', background: '#F1F5F9', padding: '2px 10px', borderRadius: 4 }}>
+            {filtered.length} entrega{filtered.length !== 1 ? 's' : ''}
           </span>
-          <span style={{ color: '#94A3B8' }}>&gt;</span>
-          <span style={{ fontWeight: 700, color: '#3730A3', background: '#EEF2FF', padding: '2px 8px', borderRadius: 4 }}>
-            {selectedMateria ? selectedMateria.materia_nombre : 'Todas las Materias'}
-          </span>
-          <span style={{ marginLeft: 'auto', fontWeight: 600, color: '#0F172A', background: '#F1F5F9', padding: '2px 10px', borderRadius: 4 }}>
-            {filtered.length} entrega{filtered.length !== 1 ? 's' : ''} encontrada{filtered.length !== 1 ? 's' : ''}
-          </span>
+          {(selectedColegioId !== 'TODOS' || selectedTareaId !== 'TODAS' || search) && (
+            <button
+              onClick={resetFilters}
+              style={{
+                fontSize: 11.5, color: '#2563EB', background: '#EFF6FF', border: '1px solid #BFDBFE',
+                padding: '3px 9px', borderRadius: 6, cursor: 'pointer', fontWeight: 600,
+                display: 'inline-flex', alignItems: 'center', gap: 4
+              }}
+            >
+              <RotateCcw size={11} /> Ver todo
+            </button>
+          )}
         </div>
       </div>
 
@@ -2410,6 +2298,7 @@ export function TeacherSubmissionsView({ initialTaskId }) {
           onSuccess={() => loadSubmissions()}
         />
       )}
+      </div>
     </div>
   );
 }
@@ -2790,8 +2679,9 @@ function getTeacherSubjectBadge(materia) {
   return { initials, bg: '#1E3A8A' };
 }
 
-function TeamsHierarchyLeftRail({ colegios, selectedMateriaId, selectCombo }) {
+function TeamsHierarchyLeftRail({ colegios, selectedMateriaId, selectCombo, allowAll = false, onSelectAll }) {
   if (!colegios || colegios.length === 0) return null;
+  const isAll = allowAll && (!selectedMateriaId || selectedMateriaId === 'TODAS' || selectedMateriaId === 'TODOS');
   return (
     <div style={{
       width: 260,
@@ -2811,6 +2701,29 @@ function TeamsHierarchyLeftRail({ colegios, selectedMateriaId, selectCombo }) {
       </div>
 
       <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
+        {allowAll && onSelectAll && (
+          <button
+            onClick={onSelectAll}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
+              borderRadius: 8, border: 'none',
+              borderLeft: isAll ? '3px solid #1E3A8A' : '3px solid transparent',
+              background: isAll ? '#EFF6FF' : 'transparent',
+              cursor: 'pointer', textAlign: 'left', width: '100%'
+            }}
+          >
+            <div style={{
+              width: 30, height: 30, borderRadius: 6, background: '#1E3A8A',
+              color: '#FFFFFF', fontSize: 10, fontWeight: 800,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            }}>
+              ALL
+            </div>
+            <div style={{ fontSize: 12.5, fontWeight: isAll ? 700 : 600, color: isAll ? '#1E3A8A' : '#1E293B' }}>
+              Todas las materias
+            </div>
+          </button>
+        )}
         {colegios.map(col => (
           <div key={col.colegio_id} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <div style={{
