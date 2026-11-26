@@ -26,7 +26,6 @@ import ImportarCalificacionesPage from './pages/ImportarCalificacionesPage';
 import EspacioDetallePage from './pages/EspacioDetallePage';
 import ListaExcelDocente from './pages/ListaExcelDocente';
 import StudentPracticeView from './pages/StudentPracticeView';
-import ChallengeBoard from './components/ChallengeBoard';
 import StudentAcademicProgressView from './pages/StudentAcademicProgressView';
 
 // ============================================================
@@ -152,12 +151,6 @@ export default function App() {
         case 'simuladores':
         case 'practicas-ia':
           return <StudentPracticeView onNavigate={handleNavigate} />;
-        case 'retos':
-          return (
-            <div style={{ maxWidth: 1100, margin: '0 auto', padding: '1.5rem 1rem' }}>
-              <ChallengeBoard userRole="ESTUDIANTE" />
-            </div>
-          );
         case 'mis-tareas':
         case 'tareas':
           return <MyTasks initialTaskId={extraData?.taskId} initialFilter={extraData?.filtro || 'pendientes'} onNavigate={handleNavigate} />;
@@ -233,14 +226,6 @@ export default function App() {
 
         case 'lista-excel':
           return <ListaExcelDocente onNavigate={handleNavigate} />;
-
-        // ── EXTRAS ───────────────────────────────────────────
-        case 'retos':
-          return (
-            <div style={{ maxWidth: 1100, margin: '0 auto', padding: '1.5rem 1rem' }}>
-              <ChallengeBoard userRole="DOCENTE" />
-            </div>
-          );
 
         // ── PERFIL ───────────────────────────────────────────
         case 'mi-perfil':

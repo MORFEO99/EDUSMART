@@ -79,12 +79,6 @@ export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount 
         { id: 'lista-excel', label: 'Lista Estudiantes',      icon: FileSpreadsheet },
       ]
     },
-    {
-      category: 'EXTRAS',
-      items: [
-        { id: 'retos', label: 'Retos Gamificados', icon: Trophy },
-      ]
-    },
   ];
 
   const NAV_ESTUDIANTE = [
@@ -101,12 +95,6 @@ export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount 
       items: [
         { id: 'practicas',      label: 'Simuladores IA',            icon: Sparkles },
         { id: 'calificaciones', label: 'Boletín de Calificaciones', icon: FileText },
-      ]
-    },
-    {
-      category: 'EXTRAS',
-      items: [
-        { id: 'retos', label: 'Retos Gamificados', icon: Trophy },
       ]
     },
   ];
