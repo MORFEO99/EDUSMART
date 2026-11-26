@@ -488,7 +488,7 @@ def api_espacio_detail(request, pk):
                 'fecha_fin': t.fecha_fin.strftime('%d/%m/%Y') if t.fecha_fin else None,
             })
 
-    recursos_qs = RecursoEspacio.objects.filter(espacio=espacio).order_by('-fecha_creacion')
+    recursos_qs = RecursoEspacio.objects.filter(espacio=espacio).order_by('-fecha_subida')
     recursos_data = RecursoEspacioSerializer(recursos_qs, many=True).data
 
     return Response({
