@@ -97,10 +97,10 @@ def api_generar_practica_tema(request, tema_id):
             est = Estudiante.objects.get(id=est_id)
             Notificacion.objects.create(
                 usuario=est.usuario,
-                titulo=f"✨ Simulador de Examen Disponible: {tema.titulo}",
-                mensaje=f"Tu docente de {materia.nombre} completó el tema '{tema.titulo}'. Ingresa ahora para practicar los ejercicios didácticos con IA y prepararte para tu examen.",
-                tipo='SISTEMA',
-                leida=False
+                mensaje=f"✨ Simulador de Examen Disponible en {materia.nombre}: '{tema.titulo}'. Ingresa a Simuladores IA para practicar.",
+                tipo='AVISO_NUEVO',
+                leida=False,
+                espacio_id=espacios.first().id if espacios.exists() else None
             )
         except Exception:
             pass

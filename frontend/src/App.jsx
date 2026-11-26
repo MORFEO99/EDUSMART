@@ -27,6 +27,7 @@ import EspacioDetallePage from './pages/EspacioDetallePage';
 import ListaExcelDocente from './pages/ListaExcelDocente';
 import StudentPracticeView from './pages/StudentPracticeView';
 import ChallengeBoard from './components/ChallengeBoard';
+import StudentAcademicProgressView from './pages/StudentAcademicProgressView';
 
 // ============================================================
 // PAGE TITLES
@@ -164,20 +165,19 @@ export default function App() {
           return <MyTasks initialTaskId={extraData?.taskId} initialFilter="pendientes" onNavigate={handleNavigate} />;
         case 'entregas':
           return <MyTasks initialTaskId={extraData?.taskId} initialFilter="entregadas_calificadas" onNavigate={handleNavigate} />;
+        case 'calificaciones-progreso':
         case 'resultados':
         case 'calificaciones':
-          return <StudentResultsView onNavigate={handleNavigate} />;
         case 'retroalimentacion':
-          return <StudentFeedbackView onNavigate={handleNavigate} />;
+        case 'mi-progreso':
+        case 'progreso':
+          return <StudentAcademicProgressView defaultTab={extraData?.tab || 'notas_retro'} onNavigate={handleNavigate} />;
         case 'espacios':
         case 'mis-espacios':
           return <StudentEspaciosView onNavigate={handleNavigate} />;
         case 'espacio_detail':
         case 'espacio-detalle':
           return <EspacioDetallePage user={user} espacioId={extraData?.espacioId} defaultTab={extraData?.defaultTab} onBack={() => handleNavigate('mis-espacios')} />;
-        case 'mi-progreso':
-        case 'progreso':
-          return <StudentProgress />;
         case 'mi-perfil':
           return <UserProfileView user={user} roleInfo={authState.roleInfo} onLogout={handleLogout} />;
         default:

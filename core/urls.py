@@ -54,6 +54,7 @@ urlpatterns = [
 
     # 6. Progreso Académico
     path('api/progreso/', api_views.api_progreso_academico, name='api_progreso'),
+    path('api/student/feedbacks/', api_views.api_student_feedbacks, name='api_student_feedbacks'),
 
     # 7. Actividad y Notificaciones
     path('api/actividad/', api_views.api_actividad_academica, name='api_actividad'),

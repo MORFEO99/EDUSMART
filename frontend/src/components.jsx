@@ -99,10 +99,8 @@ export function Sidebar({ user, activeSection, onNavigate, onLogout, notifCount 
     {
       category: 'SEGUIMIENTO',
       items: [
-        { id: 'practicas',       label: 'Simuladores IA',     icon: Sparkles },
-        { id: 'resultados',      label: 'Resultados',         icon: TrendingUp },
-        { id: 'retroalimentacion', label: 'Retroalimentación', icon: MessageSquare },
-        { id: 'mi-progreso',     label: 'Mi Progreso',        icon: Activity },
+        { id: 'practicas',               label: 'Simuladores IA',            icon: Sparkles },
+        { id: 'calificaciones-progreso', label: 'Calificaciones y Progreso', icon: Award },
       ]
     },
     {

@@ -1914,6 +1914,19 @@ def api_tema_avance_detail(request, materia_id, tema_id):
                 print(f"[Auto Practice] Error: {e}")
         if practica:
             practica_id = practica.id
+            try:
+                from .models import EstudianteCurso, Notificacion
+                if tema.materia.curso:
+                    uids = EstudianteCurso.objects.filter(curso=tema.materia.curso).values_list('estudiante__usuario_id', flat=True)
+                    for uid in uids:
+                        Notificacion.objects.create(
+                            usuario_id=uid,
+                            mensaje=f"✨ Tu profesor completó '{tema.titulo}' en {tema.materia.nombre}. Se ha publicado el Simulador con IA para preparar tu examen.",
+                            tipo='AVISO_NUEVO',
+                            leida=False
+                        )
+            except Exception:
+                pass
 
     return Response({
         'id': tema.id, 'titulo': tema.titulo, 'descripcion': tema.descripcion,

@@ -2030,3 +2030,36 @@ def api_password_reset_confirm(request):
         return Response({
             'error': 'El enlace de recuperación es inválido o ha expirado. Por favor solicita uno nuevo.'
         }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+def api_student_feedbacks(request):
+    user = request.user
+    if not user.is_authenticated or user.rol != 'ESTUDIANTE' or not hasattr(user, 'perfil_estudiante'):
+        return Response({'error': 'Acceso exclusivo para estudiantes.'}, status=status.HTTP_403_FORBIDDEN)
+
+    estudiante = user.perfil_estudiante
+    calificaciones = Calificacion.objects.filter(
+        entrega__estudiante=estudiante
+    ).select_related('entrega__tarea', 'entrega__tarea__espacio', 'docente__usuario').order_by('-fecha_calificacion')
+
+    feedbacks = []
+    for c in calificaciones:
+        retro = getattr(c, 'retroalimentacion', None)
+        comentario = retro.comentario if retro and retro.comentario else 'Entrega evaluada y calificada por el docente.'
+        tarea = c.entrega.tarea
+        feedbacks.append({
+            'id': c.id,
+            'tarea_id': tarea.id,
+            'tarea_titulo': tarea.titulo,
+            'materia': tarea.espacio.nombre if tarea.espacio else 'General',
+            'docente': c.docente.usuario.get_full_name() if c.docente else 'Docente',
+            'docente_avatar': getattr(c.docente.usuario, 'avatar_url', '') if c.docente else '',
+            'nota': float(c.nota),
+            'puntaje_maximo': tarea.puntaje_maximo or 100,
+            'comentario': comentario,
+            'fecha': c.fecha_calificacion.strftime('%d/%m/%Y %H:%M') if c.fecha_calificacion else '',
+            'archivo_nombre': c.entrega.archivo_nombre,
+            'archivo_url': c.entrega.archivo_url,
+        })
+    return Response(feedbacks)
