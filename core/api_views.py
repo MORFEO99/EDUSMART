@@ -1178,6 +1178,10 @@ def api_entregas_pendientes(request):
         fecha_vista = vista.fecha_ultima_vista.strftime('%d/%m/%Y %H:%M') if vista else e.fecha_entrega.strftime('%d/%m/%Y %H:%M')
         es_tardia = bool(e.tarea.fecha_limite and e.fecha_entrega > e.tarea.fecha_limite) or (e.estado == 'ATRASADO')
 
+        cal_obj = getattr(e, 'calificacion', None)
+        retro_obj = getattr(cal_obj, 'retroalimentacion', None) if cal_obj else None
+        retro_text = retro_obj.comentario if retro_obj else ''
+
         result.append({
             'id': e.id,
             'entrega_id': e.id,
@@ -1201,8 +1205,9 @@ def api_entregas_pendientes(request):
             'fecha_entrega': e.fecha_entrega.strftime('%d/%m/%Y %H:%M'),
             'estado': e.estado,
             'version': e.version,
-            'nota': e.calificacion.nota if hasattr(e, 'calificacion') else None,
-            'retroalimentacion': e.calificacion.retroalimentacion.comentario if hasattr(e, 'calificacion') and hasattr(e.calificacion, 'retroalimentacion') else '',
+            'nota': cal_obj.nota if cal_obj else None,
+            'retroalimentacion': retro_text,
+            'calificacion': {'nota': cal_obj.nota, 'retroalimentacion': retro_text} if cal_obj else None,
             'observaciones': e.observaciones,
             'ha_visto': ha_visto,
             'fecha_vista': fecha_vista,

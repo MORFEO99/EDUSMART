@@ -17,8 +17,10 @@ import RubricaEditor from '../components/RubricaEditor';
 // MODAL: GRADE SUBMISSION (CALIFICAR ENTREGA)
 // ============================================================
 export function GradeSubmissionModal({ entrega, onClose, onSuccess }) {
-  const [nota, setNota] = useState(entrega?.calificacion?.nota !== undefined ? entrega.calificacion.nota : '');
-  const [retro, setRetro] = useState(entrega?.calificacion?.retroalimentacion || '');
+  const initialNota = entrega?.calificacion?.nota ?? entrega?.nota ?? '';
+  const initialRetro = entrega?.calificacion?.retroalimentacion || entrega?.retroalimentacion || '';
+  const [nota, setNota] = useState(initialNota !== null && initialNota !== undefined ? initialNota : '');
+  const [retro, setRetro] = useState(initialRetro);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -33,7 +35,7 @@ export function GradeSubmissionModal({ entrega, onClose, onSuccess }) {
     setLoading(true);
     setError('');
     try {
-      await teacherAPI.gradeSubmission(entrega.entrega_id, {
+      await teacherAPI.gradeSubmission(entrega.entrega_id || entrega.id, {
         nota: val,
         retroalimentacion: retro
       });
@@ -1870,6 +1872,8 @@ export function TeacherSubmissionsView({ initialTaskId }) {
     setSearch('');
   };
 
+  const isSubGraded = (s) => !!s.calificacion || (s.nota !== null && s.nota !== undefined);
+
   // Filtrado final
   const filtered = useMemo(() => {
     return submissions.filter(s => {
@@ -1877,7 +1881,6 @@ export function TeacherSubmissionsView({ initialTaskId }) {
       if (selectedCursoId !== 'TODOS' && s.curso_id !== selectedCursoId) return false;
       if (selectedMateriaId !== 'TODOS' && s.materia_id !== selectedMateriaId) return false;
       if (selectedTareaId !== 'TODAS' && s.tarea_id !== parseInt(selectedTareaId)) return false;
-      if (initialTaskId && s.tarea_id !== initialTaskId) return false;
 
       // Filtro de busqueda
       if (search) {
@@ -1889,13 +1892,13 @@ export function TeacherSubmissionsView({ initialTaskId }) {
       }
 
       // Filtro de estado
-      if (filter === 'pendientes') return !s.calificacion && s.estado !== 'DEVUELTA';
-      if (filter === 'calificadas') return !!s.calificacion;
+      if (filter === 'pendientes') return !isSubGraded(s) && s.estado !== 'DEVUELTA';
+      if (filter === 'calificadas') return isSubGraded(s);
       if (filter === 'atrasadas') return s.es_tardia || s.estado === 'ATRASADO';
 
       return true;
     });
-  }, [submissions, selectedColegioId, selectedCursoId, selectedMateriaId, selectedTareaId, initialTaskId, search, filter]);
+  }, [submissions, selectedColegioId, selectedCursoId, selectedMateriaId, selectedTareaId, search, filter]);
 
   // Metricas para la seleccion actual
   const stats = useMemo(() => {
@@ -1909,8 +1912,8 @@ export function TeacherSubmissionsView({ initialTaskId }) {
 
     return {
       total: base.length,
-      pendientes: base.filter(s => !s.calificacion && s.estado !== 'DEVUELTA').length,
-      calificadas: base.filter(s => !!s.calificacion).length,
+      pendientes: base.filter(s => !isSubGraded(s) && s.estado !== 'DEVUELTA').length,
+      calificadas: base.filter(s => isSubGraded(s)).length,
       atrasadas: base.filter(s => s.es_tardia || s.estado === 'ATRASADO').length,
     };
   }, [submissions, selectedColegioId, selectedCursoId, selectedMateriaId, selectedTareaId]);
